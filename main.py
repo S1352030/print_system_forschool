@@ -1,10 +1,16 @@
 import os
 import shutil
 import tempfile
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Depends
+import secrets
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Depends, status
 from fastapi.responses import JSONResponse, FileResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pypdf import PdfReader
 from sqlalchemy.orm import Session
+from dotenv import load_dotenv
+
+# 載入 .env 檔案設定
+load_dotenv()
 
 # 引入資料庫模塊
 from database import Order, Announcement, get_db, engine, Base, ensure_order_columns
@@ -16,6 +22,26 @@ Base.metadata.create_all(bind=engine)
 ensure_order_columns()
 
 app = FastAPI(title="影印計價與通知系統")
+
+# ── 後台管理帳密與驗證設定 ──────────────────────────────────────
+# 建議於生產環境使用環境變數設定帳密。
+# 例如在 Windows PowerShell 啟動：
+#   $env:ADMIN_USERNAME="myadmin"; $env:ADMIN_PASSWORD="mypassword"; uvicorn main:app --reload
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")  # 預設密碼，請務必修改！
+
+security = HTTPBasic()
+
+def authenticate_admin(credentials: HTTPBasicCredentials = Depends(security)):
+    correct_username = secrets.compare_digest(credentials.username, ADMIN_USERNAME)
+    correct_password = secrets.compare_digest(credentials.password, ADMIN_PASSWORD)
+    if not (correct_username and correct_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="帳號或密碼錯誤",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
 
 PRICE_PER_PAGE_BY_COLOR: dict[str, int] = {
     "bw": 1,
@@ -32,7 +58,7 @@ async def serve_frontend():
     return FileResponse("index.html")
 
 @app.get("/admin")
-async def serve_admin():
+async def serve_admin(username: str = Depends(authenticate_admin)):
     """提供後台管理頁面"""
     return FileResponse("admin.html")
 
@@ -130,13 +156,13 @@ async def get_active_announcements(db: Session = Depends(get_db)):
     return announcements
 
 @app.get("/api/admin/announcements")
-async def get_all_announcements(db: Session = Depends(get_db)):
+async def get_all_announcements(db: Session = Depends(get_db), username: str = Depends(authenticate_admin)):
     """後台 API：取得所有公告列表"""
     announcements = db.query(Announcement).order_by(Announcement.id.desc()).all()
     return announcements
 
 @app.post("/api/announcements")
-async def create_announcement(payload: dict, db: Session = Depends(get_db)):
+async def create_announcement(payload: dict, db: Session = Depends(get_db), username: str = Depends(authenticate_admin)):
     """後台 API：新增公告"""
     content = payload.get("content")
     if not content or not content.strip():
@@ -148,7 +174,7 @@ async def create_announcement(payload: dict, db: Session = Depends(get_db)):
     return new_announce
 
 @app.put("/api/announcements/{announcement_id}")
-async def update_announcement_status(announcement_id: int, payload: dict, db: Session = Depends(get_db)):
+async def update_announcement_status(announcement_id: int, payload: dict, db: Session = Depends(get_db), username: str = Depends(authenticate_admin)):
     """後台 API：更新公告內容或啟用狀態"""
     announcement = db.query(Announcement).filter(Announcement.id == announcement_id).first()
     if not announcement:
@@ -163,7 +189,7 @@ async def update_announcement_status(announcement_id: int, payload: dict, db: Se
     return {"status": "success"}
 
 @app.delete("/api/announcements/{announcement_id}")
-async def delete_announcement(announcement_id: int, db: Session = Depends(get_db)):
+async def delete_announcement(announcement_id: int, db: Session = Depends(get_db), username: str = Depends(authenticate_admin)):
     """後台 API：刪除公告"""
     announcement = db.query(Announcement).filter(Announcement.id == announcement_id).first()
     if not announcement:
@@ -174,13 +200,13 @@ async def delete_announcement(announcement_id: int, db: Session = Depends(get_db
     return {"status": "success"}
 
 @app.get("/api/orders")
-async def get_all_orders(db: Session = Depends(get_db)):
+async def get_all_orders(db: Session = Depends(get_db), username: str = Depends(authenticate_admin)):
     """給後台用的 API：取得所有訂單"""
     orders = db.query(Order).order_by(Order.id.desc()).all()
     return orders
 
 @app.put("/api/orders/{order_id}")
-async def update_order_status(order_id: int, payload: dict, db: Session = Depends(get_db)):
+async def update_order_status(order_id: int, payload: dict, db: Session = Depends(get_db), username: str = Depends(authenticate_admin)):
     """給後台用的 API：更新付款或列印狀態"""
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
@@ -195,7 +221,7 @@ async def update_order_status(order_id: int, payload: dict, db: Session = Depend
     return {"status": "success"}
 
 @app.get("/api/orders/{order_id}/file")
-async def get_order_file(order_id: int, db: Session = Depends(get_db)):
+async def get_order_file(order_id: int, db: Session = Depends(get_db), username: str = Depends(authenticate_admin)):
     """給後台用的 API：串流 PDF 檔案以供下載或預覽"""
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
@@ -212,7 +238,7 @@ async def get_order_file(order_id: int, db: Session = Depends(get_db)):
     )
 
 @app.delete("/api/orders/{order_id}")
-async def delete_order(order_id: int, db: Session = Depends(get_db)):
+async def delete_order(order_id: int, db: Session = Depends(get_db), username: str = Depends(authenticate_admin)):
     """給後台用的 API：刪除訂單及其實體 PDF 檔案"""
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:

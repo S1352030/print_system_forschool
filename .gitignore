@@ -2,3 +2,4 @@ __pycache__/
 db.sqlite3
 uploads/
 how to open.txt
+.env
