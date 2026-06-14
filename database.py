@@ -1,6 +1,10 @@
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, text
 from sqlalchemy.orm import declarative_base, sessionmaker
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+def get_taipei_now():
+    # 取得台北時間 (UTC+8) 的 Naive Datetime，確保儲存於資料庫的為台北當地時間
+    return datetime.now(timezone(timedelta(hours=8))).replace(tzinfo=None)
 
 # ── 連線設定 ──────────────────────────────────────────────
 # SQLite 資料庫檔案會建立在同一資料夾下的 db.sqlite3
@@ -32,7 +36,7 @@ class Order(Base):
     binding     = Column(String,  nullable=True)                # 裝訂位置
     is_paid     = Column(Boolean, default=False, nullable=False)    # 是否已付款
     is_printed  = Column(Boolean, default=False, nullable=False)    # 是否已列印
-    created_at  = Column(DateTime, default=datetime.now)        # 訂單建立時間
+    created_at  = Column(DateTime, default=get_taipei_now)        # 訂單建立時間
 
 
 class Announcement(Base):
@@ -41,7 +45,7 @@ class Announcement(Base):
     id          = Column(Integer, primary_key=True, autoincrement=True)
     content     = Column(String, nullable=False)                # 公告內容
     is_active   = Column(Boolean, default=True, nullable=False) # 是否啟用
-    created_at  = Column(DateTime, default=datetime.now)        # 建立時間
+    created_at  = Column(DateTime, default=get_taipei_now)        # 建立時間
 
 
 # ── FastAPI 用的 Dependency ───────────────────────────────

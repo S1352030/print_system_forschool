@@ -13,7 +13,7 @@ LINE Messaging API 通知模塊
 
 import os
 import requests
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 
 # 載入 .env 檔案設定
@@ -53,7 +53,7 @@ def send_line_notification(
         print(f"[LINE Notify Warning] {err_msg}")
         return {"error": err_msg}
 
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
 
     # 訊息排版與 Emoji
     message = (
