@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>自助影印上傳</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --primary: #006494;
+      --on-primary: #ffffff;
+      --primary-container: #cae6ff;
+      --on-primary-container: #001e30;
+      --surface: #fdfcff;
+      --surface-container: #f0f4f8;
+      --on-surface: #1a1c1e;
+      --on-surface-variant: #43474e;
+      --outline: #73777f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Noto Sans TC', 'Segoe UI', sans-serif;
+      background: var(--surface-container);
+      color: var(--on-surface);
+      min-height: 100vh;
+      margin: 0;
+      padding: 24px 16px;
+    }
+    .page-wrapper {
+      max-width: 900px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+    @media (max-width: 680px) { .page-wrapper { grid-template-columns: 1fr; } }
+
+    .md3-card, .preview-card {
+      background: var(--surface);
+      border-radius: 24px;
+      padding: 28px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .header { text-align: center; margin-bottom: 24px; }
+    .header h1 { font-size: 20px; font-weight: 700; margin: 0; }
+    .header p { font-size: 13px; color: var(--on-surface-variant); margin-top: 6px; }
+
+    .md3-text-field { position: relative; margin-bottom: 20px; }
+    .md3-text-field input {
+      width: 100%; padding: 16px; padding-top: 24px; font-size: 15px;
+      background: var(--surface-container); border: none;
+      border-bottom: 1px solid var(--on-surface-variant);
+      border-radius: 4px 4px 0 0; color: var(--on-surface);
+      transition: border-color .2s; font-family: inherit;
+    }
+    .md3-text-field input:focus { outline: none; border-bottom: 2px solid var(--primary); }
+    .md3-text-field label {
+      position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+      font-size: 15px; color: var(--on-surface-variant);
+      transition: top .2s, font-size .2s, color .2s; pointer-events: none;
+    }
+    .md3-text-field input:focus + label,
+    .md3-text-field input:not(:placeholder-shown) + label {
+      top: 12px; font-size: 11px; color: var(--primary);
+    }
+
+    .file-upload-container {
+      border: 2px dashed var(--outline); border-radius: 16px;
+      padding: 20px; text-align: center; cursor: pointer;
+      margin-bottom: 20px; transition: background-color .2s, border-color .2s;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+    }
+    .file-upload-container:hover { background: var(--primary-container); border-color: var(--primary); }
+    .file-upload-container .material-symbols-outlined {
+      font-size: 40px; color: var(--primary); margin-bottom: 6px; display: block; line-height: 1;
+    }
+    .file-upload-container p { margin: 0; font-size: 13px; color: var(--on-surface-variant); }
+    input[type="file"] { display: none; }
+
+    #file-info {
+      background: var(--primary-container); color: var(--on-primary-container);
+      padding: 12px 16px; border-radius: 12px; margin-bottom: 20px;
+      font-size: 13px; display: flex; align-items: center; gap: 10px;
+    }
+    .hidden { display: none !important; }
+
+    .section-label {
+      font-size: 11px; font-weight: 700; color: var(--primary);
+      text-transform: uppercase; letter-spacing: .1em; margin-bottom: 10px; margin-top: 4px;
+    }
+    .print-settings { display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px; }
+    .setting-row { display: flex; flex-direction: column; gap: 6px; }
+    .setting-row-label { font-size: 12px; color: var(--on-surface-variant); }
+
+    .chip-group { display: flex; gap: 8px; flex-wrap: wrap; }
+    .chip-group label {
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 14px; border: 1.5px solid var(--outline);
+      border-radius: 100px; font-size: 13px; cursor: pointer;
+      transition: all .18s; color: var(--on-surface-variant); user-select: none;
+    }
+    .chip-group input[type="radio"] { display: none; }
+    .chip-group label:has(input:checked) {
+      background: var(--primary-container); border-color: var(--primary);
+      color: var(--on-primary-container); font-weight: 600;
+    }
+    .chip-group label .material-symbols-outlined { font-size: 17px; line-height: 1; }
+
+    .md3-btn-filled {
+      width: 100%; background: var(--primary); color: var(--on-primary);
+      border: none; border-radius: 100px; padding: 15px; font-size: 15px;
+      font-weight: 600; cursor: pointer; display: flex; justify-content: center;
+      align-items: center; gap: 8px; transition: background-color .2s, box-shadow .2s;
+      font-family: inherit;
+    }
+    .md3-btn-filled:hover { background: #005a87; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
+    .md3-btn-filled:disabled {
+      background: rgba(26,28,30,.12); color: rgba(26,28,30,.38); cursor: not-allowed;
+    }
+    .spinner {
+      border: 2px solid rgba(255,255,255,.3); border-top: 2px solid #fff;
+      border-radius: 50%; width: 18px; height: 18px; animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .binding-other-input {
+      margin-top: 8px; width: 100%; padding: 10px 14px;
+      font-size: 13px; font-family: inherit;
+      background: var(--surface-container);
+      border: 1.5px solid var(--outline); border-radius: 10px;
+      color: var(--on-surface); transition: border-color .2s;
+    }
+    .binding-other-input:focus { outline: none; border-color: var(--primary); }
+
+    /* Preview panel */
+    .preview-card { display: flex; flex-direction: column; }
+    .preview-card h2 {
+      font-size: 15px; font-weight: 700; margin: 0 0 16px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .preview-card h2 .material-symbols-outlined { font-size: 20px; color: var(--primary); line-height: 1; }
+    .pdf-placeholder {
+      flex: 1; border-radius: 12px; background: var(--surface-container);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 320px; color: var(--on-surface-variant); font-size: 13px; gap: 10px;
+    }
+    .pdf-placeholder .material-symbols-outlined { font-size: 48px; opacity: .35; display: block; line-height: 1; }
+    #pdf-preview-iframe {
+      width: 100%; flex: 1; min-height: 420px; border: none; border-radius: 12px;
+    }
+    .preview-meta {
+      margin-top: 12px; font-size: 12px; color: var(--on-surface-variant);
+      display: flex; gap: 16px; flex-wrap: wrap;
+    }
+    .preview-meta span { display: flex; align-items: center; gap: 4px; }
+    .preview-meta .material-symbols-outlined { font-size: 14px; line-height: 1; }
+
+    /* Tabs & History Styles */
+    .md3-tabs {
+      display: flex;
+      border-bottom: 1.5px solid rgba(115, 119, 127, 0.2);
+      margin-bottom: 24px;
+      gap: 4px;
+    }
+    .md3-tab {
+      flex: 1;
+      padding: 10px 4px;
+      text-align: center;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--on-surface-variant);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      position: relative;
+      transition: all .2s;
+      border-radius: 12px 12px 0 0;
+      user-select: none;
+    }
+    .md3-tab:hover {
+      color: var(--primary);
+      background-color: rgba(0, 100, 148, 0.05);
+    }
+    .md3-tab.active {
+      color: var(--primary);
+      font-weight: 700;
+      background-color: rgba(0, 100, 148, 0.08);
+    }
+    .md3-tab-indicator {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 48px;
+      height: 3px;
+      background-color: var(--primary);
+      border-radius: 3px 3px 0 0;
+      display: none;
+    }
+    .md3-tab.active .md3-tab-indicator {
+      display: block;
+    }
+    .md3-tab .material-symbols-outlined {
+      font-size: 18px;
+    }
+    .history-item {
+      border: 1px solid rgba(115, 119, 127, 0.3);
+      border-radius: 16px;
+      padding: 14px;
+      background: var(--surface-container);
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .history-item:hover {
+      border-color: var(--primary);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .history-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      margin-bottom: 6px;
+    }
+    .history-item-id {
+      font-family: 'Noto Sans TC', sans-serif;
+      font-size: 11px;
+      color: var(--on-surface-variant);
+      font-weight: 600;
+    }
+    .history-item-date {
+      font-size: 11px;
+      color: var(--on-surface-variant);
+    }
+    .history-item-filename {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      text-decoration: underline;
+      word-break: break-all;
+    }
+    .history-item-filename:hover {
+      color: #005a87;
+    }
+    .history-item-filename .material-symbols-outlined {
+      font-size: 15px;
+    }
+    .history-item-details {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px dashed rgba(115, 119, 127, 0.3);
+    }
+    .history-item-price {
+      font-weight: 700;
+      font-size: 13px;
+      color: var(--on-surface);
+    }
+    .history-item-badges {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      margin-bottom: 6px;
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-size: 10.5px;
+      font-weight: 700;
+    }
+    .status-paid {
+      background-color: #e8f5e9;
+      color: #2e7d32;
+    }
+    .status-unpaid {
+      background-color: #ffebee;
+      color: #c62828;
+    }
+    .status-printed {
+      background-color: #e8f5e9;
+      color: #2e7d32;
+    }
+    .status-queued {
+      background-color: #fff8e1;
+      color: #b78103;
+    }
+    #history-list::-webkit-scrollbar {
+      width: 6px;
+    }
+    #history-list::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    #history-list::-webkit-scrollbar-thumb {
+      background: var(--outline);
+      border-radius: 3px;
+    }
+
+    /* Announcement Card Scroll Styles */
+    .announcement-item-text {
+      font-size: 13.5px;
+      line-height: 1.6;
+      color: var(--on-surface-variant);
+      word-break: break-all;
+    }
+    .announcement-item-divider {
+      height: 1px;
+      background: rgba(115, 119, 127, 0.2);
+      margin: 12px 0;
+    }
+    #announce-items-container::-webkit-scrollbar {
+      width: 6px;
+    }
+    #announce-items-container::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    #announce-items-container::-webkit-scrollbar-thumb {
+      background: var(--outline);
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+<div class="page-wrapper">
+
+
+  <!-- Left: Form & History Panel -->
+  <div class="md3-card">
+    <div class="header">
+      <h1 id="page-title">自助影印上傳</h1>
+      <p id="page-subtitle">請填寫資料並設定列印選項</p>
+    </div>
+
+    <!-- M3 Tabs -->
+    <div class="md3-tabs">
+      <div class="md3-tab active" id="tab-upload" onclick="switchTab('upload')">
+        <span class="material-symbols-outlined">upload_file</span>
+        <span>檔案上傳</span>
+        <div class="md3-tab-indicator"></div>
+      </div>
+      <div class="md3-tab" id="tab-history" onclick="switchTab('history')">
+        <span class="material-symbols-outlined">history</span>
+        <span>歷史訂單</span>
+        <div class="md3-tab-indicator"></div>
+      </div>
+    </div>
+
+    <!-- Panel 1: Upload Form -->
+    <div id="upload-panel">
+      <form id="uploadForm">
+        <div class="md3-text-field">
+          <input type="text" id="user_name" name="user_name" placeholder=" " required>
+          <label for="user_name">您的姓名或學號</label>
+        </div>
+
+        <label class="file-upload-container" id="drop-area">
+          <span class="material-symbols-outlined">upload_file</span>
+          <p>點擊選擇 PDF 檔案<br>或將檔案拖曳至此處</p>
+          <input type="file" id="pdf_file" name="file" accept="application/pdf" required>
+        </label>
+
+        <div id="file-info" class="hidden">
+          <span class="material-symbols-outlined">description</span>
+          <span id="file-name-text">已選擇：無</span>
+        </div>
+
+        <div class="section-label">列印設定</div>
+        <div class="print-settings">
+
+          <div class="setting-row">
+            <div class="setting-row-label">色彩模式</div>
+            <div class="chip-group">
+              <label>
+                <input type="radio" name="color_mode" value="bw" checked>
+                <span class="material-symbols-outlined">invert_colors</span>
+                <span>黑白</span>
+              </label>
+              <label>
+                <input type="radio" name="color_mode" value="color">
+                <span class="material-symbols-outlined">palette</span>
+                <span>彩色</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-row-label">列印方式</div>
+            <div class="chip-group">
+              <label>
+                <input type="radio" name="duplex" value="single" checked>
+                <span class="material-symbols-outlined">article</span>
+                <span>單面</span>
+              </label>
+              <label>
+                <input type="radio" name="duplex" value="double">
+                <span class="material-symbols-outlined">menu_book</span>
+                <span>雙面</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="setting-row" id="binding-row">
+            <div class="setting-row-label">裝訂位置</div>
+            <div class="chip-group">
+              <label>
+                <input type="radio" name="binding" value="top_left" checked>
+                <span class="material-symbols-outlined">north_west</span>
+                <span>左上角</span>
+              </label>
+              <label>
+                <input type="radio" name="binding" value="top_right">
+                <span class="material-symbols-outlined">north_east</span>
+                <span>右上角</span>
+              </label>
+              <label>
+                <input type="radio" name="binding" value="other">
+                <span class="material-symbols-outlined">edit</span>
+                <span>其他</span>
+              </label>
+            </div>
+            <input type="text" id="binding_other_text" class="binding-other-input hidden" placeholder="請說明裝訂方式…" maxlength="60">
+          </div>
+
+        </div>
+
+        <button type="submit" class="md3-btn-filled" id="submit-btn" disabled>
+          <span class="material-symbols-outlined" style="font-size:18px;line-height:1">send</span>
+          <span id="btn-text">確認送出並試算金額</span>
+          <div id="btn-spinner" class="spinner hidden"></div>
+        </button>
+      </form>
+    </div>
+
+    <!-- Panel 2: History Query -->
+    <div id="history-panel" class="hidden">
+      <div class="md3-text-field">
+        <input type="text" id="history_search_name" placeholder=" ">
+        <label for="history_search_name">請輸入您的姓名或學號</label>
+      </div>
+      <button type="button" class="md3-btn-filled" id="history-search-btn">
+        <span class="material-symbols-outlined" style="font-size:18px;line-height:1">search</span>
+        <span>開始查詢訂單</span>
+      </button>
+
+      <div id="history-loading" class="hidden" style="text-align: center; margin-top: 24px;">
+        <div class="spinner" style="border: 2px solid var(--outline); border-top: 2px solid var(--primary); display: inline-block;"></div>
+        <p style="font-size: 13px; color: var(--on-surface-variant); margin-top: 8px;">查詢中，請稍後...</p>
+      </div>
+
+      <div id="history-empty" class="hidden" style="text-align: center; margin-top: 24px; padding: 20px; color: var(--on-surface-variant);">
+        <span class="material-symbols-outlined" style="font-size: 44px; opacity: .35; display: block; margin-bottom: 8px;">search_off</span>
+        <span>找不到您的歷史訂單紀錄</span>
+      </div>
+
+      <div id="history-list" class="hidden" style="margin-top: 24px; display: flex; flex-direction: column; gap: 14px; max-height: 480px; overflow-y: auto; padding-right: 4px;">
+        <!-- Dynamically populated -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Column -->
+  <div style="display: flex; flex-direction: column; gap: 20px;">
+    <!-- PDF Preview -->
+    <div class="preview-card" style="flex: 1;">
+      <h2>
+        <span class="material-symbols-outlined">preview</span>
+        PDF 預覽
+      </h2>
+      <div class="pdf-placeholder" id="pdf-placeholder">
+        <span class="material-symbols-outlined">picture_as_pdf</span>
+        <span>選擇 PDF 後顯示預覽</span>
+      </div>
+      <iframe id="pdf-preview-iframe" class="hidden" title="PDF預覽"></iframe>
+      <div class="preview-meta hidden" id="preview-meta">
+        <span>
+          <span class="material-symbols-outlined">draft</span>
+          <span id="meta-name">—</span>
+        </span>
+        <span>
+          <span class="material-symbols-outlined">straighten</span>
+          <span id="meta-size">—</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- Announcement Card -->
+    <div id="announce-card" class="preview-card hidden" style="max-height: 280px; display: flex; flex-direction: column;">
+      <h2>
+        <span class="material-symbols-outlined" style="color: #f39c12;">campaign</span>
+        系統公告
+      </h2>
+      <div id="announce-items-container" style="flex: 1; overflow-y: auto; padding-right: 6px; font-size: 13.5px; line-height: 1.6; color: var(--on-surface-variant);">
+        <!-- Dynamically loaded announcements -->
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const fileInput = document.getElementById('pdf_file');
+  const fileInfo = document.getElementById('file-info');
+  const fileNameText = document.getElementById('file-name-text');
+  const submitBtn = document.getElementById('submit-btn');
+  const userNameInput = document.getElementById('user_name');
+  const uploadForm = document.getElementById('uploadForm');
+  const btnText = document.getElementById('btn-text');
+  const btnSpinner = document.getElementById('btn-spinner');
+  const pdfPlaceholder = document.getElementById('pdf-placeholder');
+  const pdfIframe = document.getElementById('pdf-preview-iframe');
+  const previewMeta = document.getElementById('preview-meta');
+  const bindingRow = document.getElementById('binding-row');
+
+  document.querySelectorAll('input[name="duplex"]').forEach(radio => {
+    radio.addEventListener('change', checkFormValidity);
+  });
+
+  // 「其他」裝訂位置 → 顯示文字輸入框
+  document.querySelectorAll('input[name="binding"]').forEach(r => {
+    r.addEventListener('change', function() {
+      const otherInput = document.getElementById('binding_other_text');
+      if (this.value === 'other') {
+        otherInput.classList.remove('hidden');
+        otherInput.focus();
+      } else {
+        otherInput.classList.add('hidden');
+        otherInput.value = '';
+      }
+      checkFormValidity();
+    });
+  });
+  document.getElementById('binding_other_text').addEventListener('input', checkFormValidity);
+
+  // ── 拖曳上傳 ──
+  const dropArea = document.getElementById('drop-area');
+
+  ['dragenter', 'dragover'].forEach(evt => {
+    dropArea.addEventListener(evt, function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      dropArea.style.backgroundColor = 'var(--primary-container)';
+      dropArea.style.borderColor = 'var(--primary)';
+    });
+  });
+
+  ['dragleave', 'dragend'].forEach(evt => {
+    dropArea.addEventListener(evt, function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      dropArea.style.backgroundColor = '';
+      dropArea.style.borderColor = '';
+    });
+  });
+
+  dropArea.addEventListener('drop', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    dropArea.style.backgroundColor = '';
+    dropArea.style.borderColor = '';
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) handleFile(files[0]);
+  });
+
+  fileInput.addEventListener('change', function() {
+    if (this.files && this.files.length > 0) {
+      handleFile(this.files[0]);
+    } else {
+      fileInfo.classList.add('hidden');
+      resetPreview();
+      checkFormValidity();
+    }
+  });
+
+  function handleFile(file) {
+    if (file.type !== 'application/pdf') {
+      alert('請上傳 PDF 格式的檔案！');
+      fileInput.value = '';
+      fileInfo.classList.add('hidden');
+      resetPreview();
+      checkFormValidity();
+      return;
+    }
+    // 將拖曳的檔案同步給 input，讓送出時 FormData 可正確讀取
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    fileInput.files = dt.files;
+
+    fileNameText.textContent = '已選擇：' + file.name;
+    fileInfo.classList.remove('hidden');
+    showPreview(file);
+    checkFormValidity();
+  }
+
+  function showPreview(file) {
+    const url = URL.createObjectURL(file);
+    pdfIframe.src = url;
+    pdfPlaceholder.classList.add('hidden');
+    pdfIframe.classList.remove('hidden');
+    previewMeta.classList.remove('hidden');
+    document.getElementById('meta-name').textContent = file.name;
+    document.getElementById('meta-size').textContent = (file.size / 1024).toFixed(0) + ' KB';
+  }
+
+  function resetPreview() {
+    pdfIframe.src = '';
+    pdfPlaceholder.classList.remove('hidden');
+    pdfIframe.classList.add('hidden');
+    previewMeta.classList.add('hidden');
+  }
+
+  userNameInput.addEventListener('input', checkFormValidity);
+  document.querySelectorAll('input[name="binding"]').forEach(r => r.addEventListener('change', checkFormValidity));
+
+  function checkFormValidity() {
+    const duplexVal = document.querySelector('input[name="duplex"]:checked')?.value;
+    const bindingOk = duplexVal !== 'double' || !!document.querySelector('input[name="binding"]:checked');
+    submitBtn.disabled = !(userNameInput.value.trim() && fileInput.files.length > 0 && bindingOk);
+  }
+
+  uploadForm.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    submitBtn.disabled = true;
+    btnText.textContent = '處理中...';
+    btnSpinner.classList.remove('hidden');
+
+    const nameVal = userNameInput.value.trim();
+
+    const formData = new FormData();
+    formData.append('user_name', nameVal);
+    formData.append('file', fileInput.files[0]);
+    formData.append('color_mode', document.querySelector('input[name="color_mode"]:checked')?.value || 'bw');
+    formData.append('duplex', document.querySelector('input[name="duplex"]:checked')?.value || 'single');
+    const binding = document.querySelector('input[name="binding"]:checked')?.value;
+    if (binding) formData.append('binding', binding);
+
+    try {
+      const response = await fetch('/api/upload', { method: 'POST', body: formData });
+      if (response.ok) {
+        const result = await response.json();
+        alert('✅ 上傳成功！\n訂單編號：' + result.order_id + '\n結算金額：' + result.total_price + ' 元\n通知已發送給管理員。');
+        
+        // 儲存姓名於 localStorage 並同步
+        localStorage.setItem('print_user_name', nameVal);
+        document.getElementById('history_search_name').value = nameVal;
+
+        uploadForm.reset();
+
+        // 恢復填入姓名
+        userNameInput.value = nameVal;
+
+        fileInfo.classList.add('hidden');
+        bindingRow.style.display = 'none';
+        resetPreview();
+        checkFormValidity();
+
+        // 如果歷史訂單列表已經渲染過，自動重新查詢以更新列表
+        if (document.getElementById('history-list').children.length > 0) {
+          fetchHistory();
+        }
+      } else {
+        alert('❌ 上傳失敗，請稍後再試。');
+      }
+    } catch (error) {
+      alert('❌ 網路錯誤，無法連線到伺服器。');
+    } finally {
+      btnText.textContent = '確認送出並試算金額';
+      btnSpinner.classList.add('hidden');
+      checkFormValidity();
+    }
+  });
+
+  // ── 歷史訂單相關功能與 Tab 切換 ──
+  function switchTab(tab) {
+    const tabUpload = document.getElementById('tab-upload');
+    const tabHistory = document.getElementById('tab-history');
+    const uploadPanel = document.getElementById('upload-panel');
+    const historyPanel = document.getElementById('history-panel');
+    const pageTitle = document.getElementById('page-title');
+    const pageSubtitle = document.getElementById('page-subtitle');
+
+    if (tab === 'upload') {
+      tabUpload.classList.add('active');
+      tabHistory.classList.remove('active');
+      uploadPanel.classList.remove('hidden');
+      historyPanel.classList.add('hidden');
+      pageTitle.textContent = '自助影印上傳';
+      pageSubtitle.textContent = '請填寫資料並設定列印選項';
+    } else {
+      tabUpload.classList.remove('active');
+      tabHistory.classList.add('active');
+      uploadPanel.classList.add('hidden');
+      historyPanel.classList.remove('hidden');
+      pageTitle.textContent = '歷史訂單查詢';
+      pageSubtitle.textContent = '輸入姓名/學號即可查看您的列印紀錄';
+
+      // 切換至歷史訂單時，若有姓名但未查詢過，自動查詢
+      const searchInput = document.getElementById('history_search_name');
+      if (searchInput.value.trim() && document.getElementById('history-list').children.length === 0) {
+        fetchHistory();
+      }
+    }
+  }
+
+  async function fetchHistory() {
+    const searchName = document.getElementById('history_search_name').value.trim();
+    if (!searchName) {
+      alert('請輸入您的姓名或學號以供查詢！');
+      return;
+    }
+
+    // 儲存於 localStorage，方便下次使用
+    localStorage.setItem('print_user_name', searchName);
+    userNameInput.value = searchName;
+    checkFormValidity();
+
+    const loadingDiv = document.getElementById('history-loading');
+    const emptyDiv = document.getElementById('history-empty');
+    const listDiv = document.getElementById('history-list');
+
+    loadingDiv.classList.remove('hidden');
+    emptyDiv.classList.add('hidden');
+    listDiv.classList.add('hidden');
+    listDiv.innerHTML = '';
+
+    try {
+      const response = await fetch('/api/orders/history?user_name=' + encodeURIComponent(searchName));
+      if (response.ok) {
+        const orders = await response.json();
+        loadingDiv.classList.add('hidden');
+        if (orders.length === 0) {
+          emptyDiv.classList.remove('hidden');
+        } else {
+          renderHistoryList(orders);
+          listDiv.classList.remove('hidden');
+        }
+      } else {
+        throw new Error('HTTP ' + response.status);
+      }
+    } catch (e) {
+      loadingDiv.classList.add('hidden');
+      alert('❌ 查詢失敗：' + e.message);
+    }
+  }
+
+  function renderHistoryList(orders) {
+    const listDiv = document.getElementById('history-list');
+    listDiv.innerHTML = orders.map(order => {
+      const paidBadge = order.is_paid 
+        ? '<span class="status-badge status-paid">🟢 已付款</span>' 
+        : '<span class="status-badge status-unpaid">🔴 未付款</span>';
+      
+      const printedBadge = order.is_printed 
+        ? '<span class="status-badge status-printed">🟢 已列印</span>' 
+        : '<span class="status-badge status-queued">🟡 排隊中</span>';
+
+      const settingsBadges = [];
+      if (order.color_mode === 'color') {
+        settingsBadges.push('<span class="badge-chip badge-color" style="background: rgba(52,152,219,.15); color: #5dade2; border: 1px solid rgba(52,152,219,.3); padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight:600;">彩色</span>');
+      } else {
+        settingsBadges.push('<span class="badge-chip badge-bw" style="background: rgba(122,138,176,.15); color: var(--outline); border: 1px solid rgba(122,138,176,.3); padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight:600;">黑白</span>');
+      }
+
+      if (order.duplex === 'double') {
+        settingsBadges.push('<span class="badge-chip badge-double" style="background: rgba(243,156,18,.1); color: #f5b041; border: 1px solid rgba(243,156,18,.3); padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight:600;">雙面</span>');
+        if (order.binding === 'top_left') {
+          settingsBadges.push('<span class="badge-chip badge-binding" style="background: rgba(233,69,96,.1); color: #ec7c8b; border: 1px solid rgba(233,69,96,.3); padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight:600;">左上裝訂</span>');
+        } else if (order.binding === 'top_right') {
+          settingsBadges.push('<span class="badge-chip badge-binding" style="background: rgba(233,69,96,.1); color: #ec7c8b; border: 1px solid rgba(233,69,96,.3); padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight:600;">右上裝訂</span>');
+        } else if (order.binding === 'other') {
+          settingsBadges.push('<span class="badge-chip badge-binding" style="background: rgba(233,69,96,.1); color: #ec7c8b; border: 1px solid rgba(233,69,96,.3); padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight:600;">其他裝訂</span>');
+        }
+      } else {
+        settingsBadges.push('<span class="badge-chip badge-single" style="background: rgba(46,204,113,.1); color: #58d68d; border: 1px solid rgba(46,204,113,.3); padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight:600;">單面</span>');
+      }
+
+      return `
+        <div class="history-item">
+          <div class="history-item-header">
+            <span class="history-item-id">訂單編號 #${order.id}</span>
+            <span class="history-item-date">${formatDate(order.created_at)}</span>
+          </div>
+          <div class="history-item-filename" onclick="previewPastOrder(${order.id}, '${escJsString(order.file_name)}')" title="點擊預覽此檔案">
+            <span class="material-symbols-outlined">picture_as_pdf</span>
+            <span>${escHtml(order.file_name)}</span>
+          </div>
+          <div class="history-item-badges">
+            ${settingsBadges.join('')}
+            <span style="font-size: 10px; padding: 2px 6px; border-radius: 6px; background: rgba(0, 100, 148, 0.08); color: var(--primary); font-weight:600;">${order.total_pages} 頁</span>
+          </div>
+          <div class="history-item-details">
+            <div class="history-item-price">NT$ ${(order.total_price || 0).toLocaleString()} 元</div>
+            <div style="display: flex; gap: 6px;">
+              ${paidBadge}
+              ${printedBadge}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function previewPastOrder(orderId, fileName) {
+    const url = '/api/orders/' + orderId + '/file';
+    pdfIframe.src = url;
+    pdfPlaceholder.classList.add('hidden');
+    pdfIframe.classList.remove('hidden');
+    previewMeta.classList.remove('hidden');
+    document.getElementById('meta-name').textContent = fileName;
+    document.getElementById('meta-size').textContent = '歷史訂單 #' + orderId;
+  }
+
+  function formatDate(dateStr) {
+    if (!dateStr) return '';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day} ${hours}:${minutes}`;
+    } catch (e) {
+      return dateStr;
+    }
+  }
+
+  function escHtml(str) {
+    return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  function escJsString(str) {
+    return String(str ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
+  }
+
+  async function loadActiveAnnouncements() {
+    const container = document.getElementById('announce-items-container');
+    const card = document.getElementById('announce-card');
+    try {
+      const response = await fetch('/api/announcements');
+      if (response.ok) {
+        const announcements = await response.json();
+        if (announcements && announcements.length > 0) {
+          container.innerHTML = announcements.map((ann, idx) => {
+            const divider = idx > 0 ? '<div class="announcement-item-divider"></div>' : '';
+            return `${divider}<div class="announcement-item-text">${escHtml(ann.content)}</div>`;
+          }).join('');
+          card.classList.remove('hidden');
+        } else {
+          card.classList.add('hidden');
+        }
+      }
+    } catch (e) {
+      console.error('無法載入公告：', e);
+    }
+  }
+
+  // 綁定搜尋輸入框與按鈕事件
+  document.getElementById('history-search-btn').addEventListener('click', fetchHistory);
+  document.getElementById('history_search_name').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      fetchHistory();
+    }
+  });
+
+  // 網頁載入時讀取 localStorage
+  window.addEventListener('DOMContentLoaded', () => {
+    loadActiveAnnouncements(); // 載入系統公告
+    const savedName = localStorage.getItem('print_user_name');
+    if (savedName) {
+      userNameInput.value = savedName;
+      document.getElementById('history_search_name').value = savedName;
+      checkFormValidity();
+    }
+  });
+</script>
+</body>
+</html>
