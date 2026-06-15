@@ -624,7 +624,15 @@
 
   function checkFormValidity() {
     const duplexVal = document.querySelector('input[name="duplex"]:checked')?.value;
-    const bindingOk = duplexVal !== 'double' || !!document.querySelector('input[name="binding"]:checked');
+    const bindingRadio = document.querySelector('input[name="binding"]:checked');
+    
+    let bindingOk = true;
+    if (bindingRadio && bindingRadio.value === 'other') {
+      const otherVal = document.getElementById('binding_other_text').value.trim();
+      bindingOk = otherVal.length > 0;
+    } else if (duplexVal === 'double') {
+      bindingOk = !!bindingRadio;
+    }
     submitBtn.disabled = !(userNameInput.value.trim() && fileInput.files.length > 0 && bindingOk);
   }
 
@@ -641,8 +649,12 @@
     formData.append('file', fileInput.files[0]);
     formData.append('color_mode', document.querySelector('input[name="color_mode"]:checked')?.value || 'bw');
     formData.append('duplex', document.querySelector('input[name="duplex"]:checked')?.value || 'single');
-    const binding = document.querySelector('input[name="binding"]:checked')?.value;
-    if (binding) formData.append('binding', binding);
+    
+    let bindingVal = document.querySelector('input[name="binding"]:checked')?.value;
+    if (bindingVal === 'other') {
+      bindingVal = document.getElementById('binding_other_text').value.trim();
+    }
+    if (bindingVal) formData.append('binding', bindingVal);
 
     try {
       const response = await fetch('/api/upload', { method: 'POST', body: formData });
@@ -660,7 +672,12 @@
         userNameInput.value = nameVal;
 
         fileInfo.classList.add('hidden');
-        bindingRow.style.display = 'none';
+        
+        // 隱藏「其他」裝訂方式輸入框並重設
+        const otherInput = document.getElementById('binding_other_text');
+        otherInput.classList.add('hidden');
+        otherInput.value = '';
+
         resetPreview();
         checkFormValidity();
 
@@ -773,15 +790,18 @@
 
       if (order.duplex === 'double') {
         settingsBadges.push('<span class="badge-chip badge-double" style="background: rgba(243,156,18,.1); color: #f5b041; border: 1px solid rgba(243,156,18,.3); padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight:600;">雙面</span>');
-        if (order.binding === 'top_left') {
-          settingsBadges.push('<span class="badge-chip badge-binding" style="background: rgba(233,69,96,.1); color: #ec7c8b; border: 1px solid rgba(233,69,96,.3); padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight:600;">左上裝訂</span>');
-        } else if (order.binding === 'top_right') {
-          settingsBadges.push('<span class="badge-chip badge-binding" style="background: rgba(233,69,96,.1); color: #ec7c8b; border: 1px solid rgba(233,69,96,.3); padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight:600;">右上裝訂</span>');
-        } else if (order.binding === 'other') {
-          settingsBadges.push('<span class="badge-chip badge-binding" style="background: rgba(233,69,96,.1); color: #ec7c8b; border: 1px solid rgba(233,69,96,.3); padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight:600;">其他裝訂</span>');
-        }
       } else {
         settingsBadges.push('<span class="badge-chip badge-single" style="background: rgba(46,204,113,.1); color: #58d68d; border: 1px solid rgba(46,204,113,.3); padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight:600;">單面</span>');
+      }
+
+      if (order.binding === 'top_left') {
+        settingsBadges.push('<span class="badge-chip badge-binding" style="background: rgba(233,69,96,.1); color: #ec7c8b; border: 1px solid rgba(233,69,96,.3); padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight:600;">左上裝訂</span>');
+      } else if (order.binding === 'top_right') {
+        settingsBadges.push('<span class="badge-chip badge-binding" style="background: rgba(233,69,96,.1); color: #ec7c8b; border: 1px solid rgba(233,69,96,.3); padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight:600;">右上裝訂</span>');
+      } else if (order.binding === 'other') {
+        settingsBadges.push('<span class="badge-chip badge-binding" style="background: rgba(233,69,96,.1); color: #ec7c8b; border: 1px solid rgba(233,69,96,.3); padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight:600;">其他裝訂</span>');
+      } else if (order.binding) {
+        settingsBadges.push('<span class="badge-chip badge-binding" style="background: rgba(233,69,96,.1); color: #ec7c8b; border: 1px solid rgba(233,69,96,.3); padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight:600;">' + escHtml(order.binding) + '</span>');
       }
 
       return `

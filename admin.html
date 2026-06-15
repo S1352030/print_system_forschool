@@ -330,13 +330,22 @@
     }
     if (duplex === 'double') {
       badges.push('<span class="badge-chip badge-double">雙面</span>');
-      if (binding === 'short_edge') {
-        badges.push('<span class="badge-chip badge-binding">短邊裝訂</span>');
-      } else if (binding === 'long_edge') {
-        badges.push('<span class="badge-chip badge-binding">長邊裝訂</span>');
-      }
     } else {
       badges.push('<span class="badge-chip badge-single">單面</span>');
+    }
+
+    if (binding === 'top_left') {
+      badges.push('<span class="badge-chip badge-binding">左上裝訂</span>');
+    } else if (binding === 'top_right') {
+      badges.push('<span class="badge-chip badge-binding">右上裝訂</span>');
+    } else if (binding === 'short_edge') {
+      badges.push('<span class="badge-chip badge-binding">短邊裝訂</span>');
+    } else if (binding === 'long_edge') {
+      badges.push('<span class="badge-chip badge-binding">長邊裝訂</span>');
+    } else if (binding === 'other') {
+      badges.push('<span class="badge-chip badge-binding">其他裝訂</span>');
+    } else if (binding) {
+      badges.push('<span class="badge-chip badge-binding">' + escHtml(binding) + '</span>');
     }
     return '<div class="setting-badges">' + badges.join('') + '</div>';
   }
