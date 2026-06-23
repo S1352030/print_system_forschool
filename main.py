@@ -237,6 +237,31 @@ async def get_order_file(order_id: int, db: Session = Depends(get_db), username:
         filename=order.file_name
     )
 
+@app.get("/api/orders/{order_id}/preview")
+async def preview_order_file(order_id: int, user_name: str, db: Session = Depends(get_db)):
+    """前台使用者預覽 PDF 檔案，需提供正確的 user_name"""
+    if not user_name or not user_name.strip():
+        raise HTTPException(status_code=400, detail="請提供姓名或學號以供驗證")
+    
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="找不到該訂單")
+        
+    if order.user_name.strip() != user_name.strip():
+        raise HTTPException(status_code=403, detail="無權存取此訂單的檔案")
+        
+    file_path = os.path.join(UPLOAD_DIR, f"order_{order_id}.pdf")
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="找不到該訂單的 PDF 檔案")
+        
+    return FileResponse(
+        file_path,
+        media_type="application/pdf",
+        filename=order.file_name,
+        content_disposition_type="inline"
+    )
+
+
 @app.delete("/api/orders/{order_id}")
 async def delete_order(order_id: int, db: Session = Depends(get_db), username: str = Depends(authenticate_admin)):
     """給後台用的 API：刪除訂單及其實體 PDF 檔案"""

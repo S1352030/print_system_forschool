@@ -831,7 +831,12 @@
   }
 
   function previewPastOrder(orderId, fileName) {
-    const url = '/api/orders/' + orderId + '/file';
+    const searchName = document.getElementById('history_search_name').value.trim() || localStorage.getItem('print_user_name');
+    if (!searchName) {
+      alert('請先輸入您的姓名或學號！');
+      return;
+    }
+    const url = '/api/orders/' + orderId + '/preview?user_name=' + encodeURIComponent(searchName);
     pdfIframe.src = url;
     pdfPlaceholder.classList.add('hidden');
     pdfIframe.classList.remove('hidden');
