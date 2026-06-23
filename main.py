@@ -55,12 +55,12 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 @app.get("/")
 async def serve_frontend():
     """提供使用者上傳頁面"""
-    return FileResponse("index.html")
+    return FileResponse("index.html", headers={"Cache-Control": "no-cache"})
 
 @app.get("/admin")
 async def serve_admin(username: str = Depends(authenticate_admin)):
     """提供後台管理頁面"""
-    return FileResponse("admin.html")
+    return FileResponse("admin.html", headers={"Cache-Control": "no-cache"})
 
 # ── 工具函式 ──────────────────────────────────────────────
 def count_pdf_pages(file_path: str) -> int:
