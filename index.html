@@ -31,11 +31,34 @@
       max-width: 900px;
       margin: 0 auto;
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       gap: 20px;
       align-items: start;
     }
-    @media (max-width: 680px) { .page-wrapper { grid-template-columns: 1fr; } }
+    @media (max-width: 680px) {
+      body {
+        padding: 12px 8px;
+      }
+      .page-wrapper {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 12px;
+      }
+      .md3-card, .preview-card {
+        padding: 16px 12px;
+        border-radius: 16px;
+      }
+      .chip-group {
+        gap: 6px;
+      }
+      .chip-group label {
+        padding: 6px 10px;
+        font-size: 12.5px;
+        gap: 4px;
+      }
+      .chip-group label .material-symbols-outlined {
+        font-size: 15px;
+      }
+    }
 
     .md3-card, .preview-card {
       background: var(--surface);
@@ -60,6 +83,10 @@
       position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
       font-size: 15px; color: var(--on-surface-variant);
       transition: top .2s, font-size .2s, color .2s; pointer-events: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: calc(100% - 32px);
     }
     .md3-text-field input:focus + label,
     .md3-text-field input:not(:placeholder-shown) + label {
@@ -666,9 +693,9 @@
       ` : '';
 
       return `
-        <div class="file-item-card" style="background: var(--surface); border: 1.5px solid rgba(115, 119, 127, 0.2); border-radius: 16px; padding: 14px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px;">
+        <div class="file-item-card" style="background: var(--surface); border: 1.5px solid rgba(115, 119, 127, 0.2); border-radius: 16px; padding: 14px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
           <!-- 標題欄：檔名、大小、預覽、刪除 -->
-          <div style="display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; justify-content: space-between; min-width: 0;">
             <div style="display: flex; align-items: center; gap: 8px; cursor: pointer; flex: 1; min-width: 0;" onclick="previewFile(${idx})">
               <span class="material-symbols-outlined" style="color: var(--primary); font-size: 20px;">description</span>
               <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; color: var(--primary);" title="${escHtml(file.name)}">${escHtml(file.name)} (${(file.size / 1024).toFixed(0)} KB) ${pagesText}</span>
@@ -679,8 +706,8 @@
           </div>
 
           <!-- 列印設定區域 -->
-          <div style="display: flex; flex-direction: column; gap: 8px; border-top: 1px dashed rgba(115, 119, 127, 0.2); padding-top: 8px;">
-            <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+          <div style="display: flex; flex-direction: column; gap: 8px; border-top: 1px dashed rgba(115, 119, 127, 0.2); padding-top: 8px; min-width: 0;">
+            <div style="display: flex; gap: 16px; flex-wrap: wrap; min-width: 0;">
               <!-- 色彩模式 -->
               <div style="display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 140px;">
                 <span style="font-size: 11px; color: var(--on-surface-variant); font-weight: 600;">色彩模式</span>
