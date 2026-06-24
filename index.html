@@ -359,6 +359,12 @@
     <!-- Panel 1: Upload Form -->
     <div id="upload-panel">
       <form id="uploadForm">
+        <!-- 上傳冷卻提示橫幅 -->
+        <div id="cooldown-banner" class="hidden" style="background-color: #fbe9e7; color: #d84315; border: 1.5px solid #ffccbc; padding: 12px 16px; border-radius: 16px; margin-bottom: 20px; font-size: 13.5px; display: flex; align-items: center; gap: 8px; font-weight: 500; transition: all 0.3s ease;">
+          <span class="material-symbols-outlined" style="font-size: 20px; color: #d84315; animation: spin 2s linear infinite;">hourglass_empty</span>
+          <span id="cooldown-banner-text">上傳已完成！為避免重複提交，系統冷卻中，請稍候 7 秒...</span>
+        </div>
+
         <div class="md3-text-field">
           <input type="text" id="user_name" name="user_name" placeholder=" " required>
           <label for="user_name">您的姓名或學號</label>
@@ -367,71 +373,23 @@
         <label class="file-upload-container" id="drop-area">
           <span class="material-symbols-outlined">upload_file</span>
           <p>點擊選擇 PDF 檔案<br>或將檔案拖曳至此處</p>
-          <input type="file" id="pdf_file" name="file" accept="application/pdf" required>
+          <input type="file" id="pdf_file" name="file" accept="application/pdf" multiple>
         </label>
 
-        <div id="file-info" class="hidden">
-          <span class="material-symbols-outlined">description</span>
-          <span id="file-name-text">已選擇：無</span>
+        <div id="file-list-container" class="hidden" style="margin-bottom: 20px;">
+          <div class="section-label">已選擇的檔案 (最多 5 個)</div>
+          <div id="selected-files-list" style="display: flex; flex-direction: column; gap: 8px;">
+            <!-- 已選擇的檔案清單 -->
+          </div>
         </div>
 
-        <div class="section-label">列印設定</div>
-        <div class="print-settings">
 
-          <div class="setting-row">
-            <div class="setting-row-label">色彩模式</div>
-            <div class="chip-group">
-              <label>
-                <input type="radio" name="color_mode" value="bw" checked>
-                <span class="material-symbols-outlined">invert_colors</span>
-                <span>黑白</span>
-              </label>
-              <label>
-                <input type="radio" name="color_mode" value="color">
-                <span class="material-symbols-outlined">palette</span>
-                <span>彩色</span>
-              </label>
-            </div>
-          </div>
 
-          <div class="setting-row">
-            <div class="setting-row-label">列印方式</div>
-            <div class="chip-group">
-              <label>
-                <input type="radio" name="duplex" value="single" checked>
-                <span class="material-symbols-outlined">article</span>
-                <span>單面</span>
-              </label>
-              <label>
-                <input type="radio" name="duplex" value="double">
-                <span class="material-symbols-outlined">menu_book</span>
-                <span>雙面</span>
-              </label>
-            </div>
-          </div>
 
-          <div class="setting-row" id="binding-row">
-            <div class="setting-row-label">裝訂位置</div>
-            <div class="chip-group">
-              <label>
-                <input type="radio" name="binding" value="top_left" checked>
-                <span class="material-symbols-outlined">north_west</span>
-                <span>左上角</span>
-              </label>
-              <label>
-                <input type="radio" name="binding" value="top_right">
-                <span class="material-symbols-outlined">north_east</span>
-                <span>右上角</span>
-              </label>
-              <label>
-                <input type="radio" name="binding" value="other">
-                <span class="material-symbols-outlined">edit</span>
-                <span>其他</span>
-              </label>
-            </div>
-            <input type="text" id="binding_other_text" class="binding-other-input hidden" placeholder="請說明裝訂方式…" maxlength="60">
-          </div>
-
+        <div class="md3-text-field" style="margin-bottom: 24px;">
+          <input type="text" id="pickup_location" name="pickup_location" placeholder=" " maxlength="100" required>
+          <label for="pickup_location">你要什麼時候拿? (例如: 明天中午、下午3點，限20字)</label>
+          <div id="pickup-error" style="color: #ba1a1a; font-size: 12px; margin-top: 4px; display: none;">⚠️ 抱歉，輸入字數最多只能 20 個字喔！</div>
         </div>
 
         <button type="submit" class="md3-btn-filled" id="submit-btn" disabled>
@@ -510,8 +468,6 @@
 
 <script>
   const fileInput = document.getElementById('pdf_file');
-  const fileInfo = document.getElementById('file-info');
-  const fileNameText = document.getElementById('file-name-text');
   const submitBtn = document.getElementById('submit-btn');
   const userNameInput = document.getElementById('user_name');
   const uploadForm = document.getElementById('uploadForm');
@@ -520,27 +476,11 @@
   const pdfPlaceholder = document.getElementById('pdf-placeholder');
   const pdfIframe = document.getElementById('pdf-preview-iframe');
   const previewMeta = document.getElementById('preview-meta');
-  const bindingRow = document.getElementById('binding-row');
+  const pickupLocationInput = document.getElementById('pickup_location');
 
-  document.querySelectorAll('input[name="duplex"]').forEach(radio => {
-    radio.addEventListener('change', checkFormValidity);
-  });
-
-  // 「其他」裝訂位置 → 顯示文字輸入框
-  document.querySelectorAll('input[name="binding"]').forEach(r => {
-    r.addEventListener('change', function() {
-      const otherInput = document.getElementById('binding_other_text');
-      if (this.value === 'other') {
-        otherInput.classList.remove('hidden');
-        otherInput.focus();
-      } else {
-        otherInput.classList.add('hidden');
-        otherInput.value = '';
-      }
-      checkFormValidity();
-    });
-  });
-  document.getElementById('binding_other_text').addEventListener('input', checkFormValidity);
+  let selectedFiles = [];
+  let isCooldown = false;
+  let cooldownTimer = null;
 
   // ── 拖曳上傳 ──
   const dropArea = document.getElementById('drop-area');
@@ -549,6 +489,7 @@
     dropArea.addEventListener(evt, function(e) {
       e.preventDefault();
       e.stopPropagation();
+      if (isCooldown) return;
       dropArea.style.backgroundColor = 'var(--primary-container)';
       dropArea.style.borderColor = 'var(--primary)';
     });
@@ -568,39 +509,239 @@
     e.stopPropagation();
     dropArea.style.backgroundColor = '';
     dropArea.style.borderColor = '';
+    if (isCooldown) return;
     const files = e.dataTransfer.files;
-    if (files && files.length > 0) handleFile(files[0]);
+    if (files && files.length > 0) addFiles(files);
   });
 
   fileInput.addEventListener('change', function() {
+    if (isCooldown) return;
     if (this.files && this.files.length > 0) {
-      handleFile(this.files[0]);
-    } else {
-      fileInfo.classList.add('hidden');
-      resetPreview();
-      checkFormValidity();
+      addFiles(this.files);
+      fileInput.value = ''; 
     }
   });
 
-  function handleFile(file) {
-    if (file.type !== 'application/pdf') {
-      alert('請上傳 PDF 格式的檔案！');
-      fileInput.value = '';
-      fileInfo.classList.add('hidden');
-      resetPreview();
+  function addFiles(files) {
+    if (isCooldown) return;
+    
+    let addedCount = 0;
+    let nonPdfFound = false;
+    let duplicateFound = false;
+    let overLimit = false;
+    let newlyAdded = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+        nonPdfFound = true;
+        continue;
+      }
+      if (selectedFiles.some(f => f.file.name === file.name && f.file.size === file.size)) {
+        duplicateFound = true;
+        continue;
+      }
+      if (selectedFiles.length < 5) {
+        const fileObj = {
+          file: file,
+          colorMode: 'bw',
+          duplex: 'single',
+          binding: 'top_left',
+          bindingOtherText: '',
+          pages: null
+        };
+        selectedFiles.push(fileObj);
+        newlyAdded.push(fileObj);
+        addedCount++;
+      } else {
+        overLimit = true;
+        break;
+      }
+    }
+
+    if (nonPdfFound) {
+      alert('⚠️ 僅接受 PDF 格式的檔案！');
+    }
+    if (duplicateFound) {
+      alert('⚠️ 已忽略重複選擇的檔案。');
+    }
+    if (overLimit) {
+      alert('⚠️ 最多只能選擇 5 個檔案！');
+    }
+
+    renderFileList();
+    checkFormValidity();
+    
+    if (selectedFiles.length > 0) {
+      showPreview(selectedFiles[selectedFiles.length - 1].file);
+    }
+
+    // 非同步向後端獲取每一份文件的頁數
+    newlyAdded.forEach(async (fileObj) => {
+      const formData = new FormData();
+      formData.append('file', fileObj.file);
+      try {
+        const response = await fetch('/api/check-pages', { method: 'POST', body: formData });
+        if (response.ok) {
+          const result = await response.json();
+          fileObj.pages = result.pages;
+          if (result.pages === 1) {
+            fileObj.binding = null; // 當文件為 1 頁時，將裝訂選項清空
+            fileObj.duplex = 'single'; // 當文件為 1 頁時，限制為單面
+          }
+        } else {
+          fileObj.pages = 2; // 解析失敗默認設為 2 頁，顯示裝訂選單以防萬一
+        }
+      } catch (e) {
+        fileObj.pages = 2; // 網路錯誤默認設為 2 頁
+      }
+      renderFileList();
       checkFormValidity();
+    });
+  }
+
+  function renderFileList() {
+    const listContainer = document.getElementById('file-list-container');
+    const filesList = document.getElementById('selected-files-list');
+    
+    if (selectedFiles.length === 0) {
+      listContainer.classList.add('hidden');
+      resetPreview();
       return;
     }
-    // 將拖曳的檔案同步給 input，讓送出時 FormData 可正確讀取
-    const dt = new DataTransfer();
-    dt.items.add(file);
-    fileInput.files = dt.files;
 
-    fileNameText.textContent = '已選擇：' + file.name;
-    fileInfo.classList.remove('hidden');
-    showPreview(file);
-    checkFormValidity();
+    listContainer.classList.remove('hidden');
+    filesList.innerHTML = selectedFiles.map((fileObj, idx) => {
+      const file = fileObj.file;
+      const pagesText = fileObj.pages === null 
+        ? `<span style="font-size: 11.5px; color: var(--outline); font-weight: normal;">(計算頁數中...)</span>` 
+        : `<span style="font-size: 11.5px; color: var(--outline); font-weight: normal;">(${fileObj.pages} 頁)</span>`;
+
+      // 只有在頁數未明 (null) 或是頁數大於 1 時才顯示裝訂位置與單雙面
+      const showBinding = fileObj.pages === null || fileObj.pages > 1;
+      const showDuplex = fileObj.pages === null || fileObj.pages > 1;
+
+      const bindingHtml = showBinding ? `
+            <!-- 裝訂位置 -->
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <span style="font-size: 11px; color: var(--on-surface-variant); font-weight: 600;">裝訂位置</span>
+              <div class="chip-group">
+                <label>
+                  <input type="radio" name="binding_${idx}" value="top_left" ${fileObj.binding === 'top_left' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'binding', 'top_left')">
+                  <span class="material-symbols-outlined" style="font-size: 17px;">north_west</span>
+                  <span>左上角</span>
+                </label>
+                <label>
+                  <input type="radio" name="binding_${idx}" value="top_right" ${fileObj.binding === 'top_right' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'binding', 'top_right')">
+                  <span class="material-symbols-outlined" style="font-size: 17px;">north_east</span>
+                  <span>右上角</span>
+                </label>
+                <label>
+                  <input type="radio" name="binding_${idx}" value="other" ${fileObj.binding === 'other' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'binding', 'other')">
+                  <span class="material-symbols-outlined" style="font-size: 17px;">edit</span>
+                  <span>其他</span>
+                </label>
+              </div>
+              <input type="text" id="binding_other_text_${idx}" class="binding-other-input ${fileObj.binding === 'other' ? '' : 'hidden'}" placeholder="請說明裝訂方式… (限 10 字)" maxlength="10" value="${escHtml(fileObj.bindingOtherText || '')}" oninput="updateFileOtherText(${idx}, this.value)" style="margin-top: 6px; width: 100%; padding: 8px 12px; font-size: 12.5px; border-radius: 8px;">
+            </div>
+      ` : '';
+
+      const duplexHtml = showDuplex ? `
+              <!-- 列印方式 -->
+              <div style="display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 140px;">
+                <span style="font-size: 11px; color: var(--on-surface-variant); font-weight: 600;">列印方式</span>
+                <div class="chip-group">
+                  <label>
+                    <input type="radio" name="duplex_${idx}" value="single" ${fileObj.duplex === 'single' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'duplex', 'single')">
+                    <span class="material-symbols-outlined" style="font-size: 17px;">article</span>
+                    <span>單面</span>
+                  </label>
+                  <label>
+                    <input type="radio" name="duplex_${idx}" value="double" ${fileObj.duplex === 'double' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'duplex', 'double')">
+                    <span class="material-symbols-outlined" style="font-size: 17px;">menu_book</span>
+                    <span>雙面</span>
+                  </label>
+                </div>
+              </div>
+      ` : '';
+
+      return `
+        <div class="file-item-card" style="background: var(--surface); border: 1.5px solid rgba(115, 119, 127, 0.2); border-radius: 16px; padding: 14px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px;">
+          <!-- 標題欄：檔名、大小、預覽、刪除 -->
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 8px; cursor: pointer; flex: 1; min-width: 0;" onclick="previewFile(${idx})">
+              <span class="material-symbols-outlined" style="color: var(--primary); font-size: 20px;">description</span>
+              <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; color: var(--primary);" title="${escHtml(file.name)}">${escHtml(file.name)} (${(file.size / 1024).toFixed(0)} KB) ${pagesText}</span>
+            </div>
+            <button type="button" onclick="removeFile(${idx})" style="background: transparent; border: none; color: var(--on-surface-variant); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px; border-radius: 50%; width: 28px; height: 28px; transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.06)'" onmouseout="this.style.background='transparent'">
+              <span class="material-symbols-outlined" style="font-size: 20px;">close</span>
+            </button>
+          </div>
+
+          <!-- 列印設定區域 -->
+          <div style="display: flex; flex-direction: column; gap: 8px; border-top: 1px dashed rgba(115, 119, 127, 0.2); padding-top: 8px;">
+            <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+              <!-- 色彩模式 -->
+              <div style="display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 140px;">
+                <span style="font-size: 11px; color: var(--on-surface-variant); font-weight: 600;">色彩模式</span>
+                <div class="chip-group">
+                  <label>
+                    <input type="radio" name="color_mode_${idx}" value="bw" ${fileObj.colorMode === 'bw' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'colorMode', 'bw')">
+                    <span class="material-symbols-outlined" style="font-size: 17px;">invert_colors</span>
+                    <span>黑白</span>
+                  </label>
+                  <label>
+                    <input type="radio" name="color_mode_${idx}" value="color" ${fileObj.colorMode === 'color' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'colorMode', 'color')">
+                    <span class="material-symbols-outlined" style="font-size: 17px;">palette</span>
+                    <span>彩色</span>
+                  </label>
+                </div>
+              </div>
+
+              ${duplexHtml}
+            </div>
+
+            ${bindingHtml}
+          </div>
+        </div>
+      `;
+    }).join('');
   }
+
+  window.updateFileSetting = function(idx, key, value) {
+    if (isCooldown) return;
+    if (selectedFiles[idx]) {
+      selectedFiles[idx][key] = value;
+      renderFileList();
+      checkFormValidity();
+    }
+  };
+
+  window.updateFileOtherText = function(idx, value) {
+    if (isCooldown) return;
+    if (selectedFiles[idx]) {
+      selectedFiles[idx].bindingOtherText = value;
+      checkFormValidity();
+    }
+  };
+
+  window.removeFile = function(idx) {
+    if (isCooldown) return;
+    selectedFiles.splice(idx, 1);
+    renderFileList();
+    checkFormValidity();
+    if (selectedFiles.length > 0) {
+      showPreview(selectedFiles[selectedFiles.length - 1].file);
+    } else {
+      resetPreview();
+    }
+  };
+
+  window.previewFile = function(idx) {
+    if (selectedFiles[idx]) {
+      showPreview(selectedFiles[idx].file);
+    }
+  };
 
   function showPreview(file) {
     const url = URL.createObjectURL(file);
@@ -620,79 +761,171 @@
   }
 
   userNameInput.addEventListener('input', checkFormValidity);
-  document.querySelectorAll('input[name="binding"]').forEach(r => r.addEventListener('change', checkFormValidity));
+  pickupLocationInput.addEventListener('input', checkFormValidity);
 
   function checkFormValidity() {
-    const duplexVal = document.querySelector('input[name="duplex"]:checked')?.value;
-    const bindingRadio = document.querySelector('input[name="binding"]:checked');
-    
-    let bindingOk = true;
-    if (bindingRadio && bindingRadio.value === 'other') {
-      const otherVal = document.getElementById('binding_other_text').value.trim();
-      bindingOk = otherVal.length > 0;
-    } else if (duplexVal === 'double') {
-      bindingOk = !!bindingRadio;
+    if (isCooldown) {
+      submitBtn.disabled = true;
+      return;
     }
-    submitBtn.disabled = !(userNameInput.value.trim() && fileInput.files.length > 0 && bindingOk);
+
+    let allSettingsOk = true;
+    for (let i = 0; i < selectedFiles.length; i++) {
+      const fileObj = selectedFiles[i];
+      if (fileObj.binding === 'other' && !fileObj.bindingOtherText.trim()) {
+        allSettingsOk = false;
+        break;
+      }
+    }
+
+    const pickupVal = pickupLocationInput.value.trim();
+    const pickupLengthOk = pickupVal.length > 0 && pickupVal.length <= 20;
+    const pickupError = document.getElementById('pickup-error');
+
+    if (pickupLocationInput.value.length > 20) {
+      pickupError.style.display = 'block';
+    } else {
+      pickupError.style.display = 'none';
+    }
+
+    submitBtn.disabled = !(userNameInput.value.trim() && selectedFiles.length > 0 && allSettingsOk && pickupLengthOk);
+  }
+
+  function toggleFormInputs(disabled) {
+    userNameInput.disabled = disabled;
+    pickupLocationInput.disabled = disabled;
+    
+    const listContainer = document.getElementById('selected-files-list');
+    if (disabled) {
+      listContainer.style.pointerEvents = 'none';
+      listContainer.style.opacity = '0.6';
+      dropArea.style.pointerEvents = 'none';
+      dropArea.style.opacity = '0.6';
+    } else {
+      listContainer.style.pointerEvents = 'auto';
+      listContainer.style.opacity = '1';
+      dropArea.style.pointerEvents = 'auto';
+      dropArea.style.opacity = '1';
+    }
+  }
+
+  function startCooldown() {
+    isCooldown = true;
+    toggleFormInputs(true);
+    let secondsLeft = 7;
+    
+    // 顯示冷卻橫幅
+    const banner = document.getElementById('cooldown-banner');
+    const bannerText = document.getElementById('cooldown-banner-text');
+    banner.classList.remove('hidden');
+    bannerText.textContent = `上傳已完成！為避免重複提交，系統冷卻中，請稍候 7 秒...`;
+    
+    btnSpinner.classList.add('hidden');
+    submitBtn.disabled = true;
+    btnText.textContent = `已上傳完成！請稍候 7 秒後再繼續上傳...`;
+
+    cooldownTimer = setInterval(() => {
+      secondsLeft--;
+      if (secondsLeft > 0) {
+        btnText.textContent = `已上傳完成！請稍候 ${secondsLeft} 秒後再繼續上傳...`;
+        bannerText.textContent = `上傳已完成！為避免重複提交，系統冷卻中，請稍候 ${secondsLeft} 秒...`;
+      } else {
+        clearInterval(cooldownTimer);
+        isCooldown = false;
+        toggleFormInputs(false);
+        btnText.textContent = '確認送出並試算金額';
+        banner.classList.add('hidden'); // 隱藏冷卻橫幅
+        checkFormValidity();
+      }
+    }, 1000);
   }
 
   uploadForm.addEventListener('submit', async function(e) {
     e.preventDefault();
+    if (isCooldown) return;
+    if (selectedFiles.length === 0) return;
+
     submitBtn.disabled = true;
-    btnText.textContent = '處理中...';
     btnSpinner.classList.remove('hidden');
 
     const nameVal = userNameInput.value.trim();
+    const pickupLocationVal = pickupLocationInput.value.trim();
 
-    const formData = new FormData();
-    formData.append('user_name', nameVal);
-    formData.append('file', fileInput.files[0]);
-    formData.append('color_mode', document.querySelector('input[name="color_mode"]:checked')?.value || 'bw');
-    formData.append('duplex', document.querySelector('input[name="duplex"]:checked')?.value || 'single');
-    
-    let bindingVal = document.querySelector('input[name="binding"]:checked')?.value;
-    if (bindingVal === 'other') {
-      bindingVal = document.getElementById('binding_other_text').value.trim();
-    }
-    if (bindingVal) formData.append('binding', bindingVal);
+    let uploadedCount = 0;
+    let totalPaidPrice = 0;
+    let firstOrderId = null;
+    let hasError = false;
 
-    try {
-      const response = await fetch('/api/upload', { method: 'POST', body: formData });
-      if (response.ok) {
-        const result = await response.json();
-        alert('✅ 上傳成功！\n訂單編號：' + result.order_id + '\n結算金額：' + result.total_price + ' 元\n通知已發送給管理員。');
-        
-        // 儲存姓名於 localStorage 並同步
-        localStorage.setItem('print_user_name', nameVal);
-        document.getElementById('history_search_name').value = nameVal;
+    toggleFormInputs(true);
 
-        uploadForm.reset();
-
-        // 恢復填入姓名
-        userNameInput.value = nameVal;
-
-        fileInfo.classList.add('hidden');
-        
-        // 隱藏「其他」裝訂方式輸入框並重設
-        const otherInput = document.getElementById('binding_other_text');
-        otherInput.classList.add('hidden');
-        otherInput.value = '';
-
-        resetPreview();
-        checkFormValidity();
-
-        // 如果歷史訂單列表已經渲染過，自動重新查詢以更新列表
-        if (document.getElementById('history-list').children.length > 0) {
-          fetchHistory();
-        }
-      } else {
-        alert('❌ 上傳失敗，請稍後再試。');
+    for (let i = 0; i < selectedFiles.length; i++) {
+      const fileObj = selectedFiles[i];
+      btnText.textContent = `正在上傳第 ${i + 1}/${selectedFiles.length} 個檔案...`;
+      
+      const formData = new FormData();
+      formData.append('user_name', nameVal);
+      formData.append('file', fileObj.file);
+      formData.append('color_mode', fileObj.colorMode);
+      formData.append('duplex', fileObj.duplex);
+      
+      let bindingVal = fileObj.binding;
+      if (bindingVal === 'other') {
+        bindingVal = fileObj.bindingOtherText.trim();
       }
-    } catch (error) {
-      alert('❌ 網路錯誤，無法連線到伺服器。');
-    } finally {
+      if (bindingVal) formData.append('binding', bindingVal);
+      if (pickupLocationVal) formData.append('pickup_location', pickupLocationVal);
+
+      try {
+        const response = await fetch('/api/upload', { method: 'POST', body: formData });
+        if (response.ok) {
+          const result = await response.json();
+          uploadedCount++;
+          totalPaidPrice += result.total_price;
+          if (firstOrderId === null) {
+            firstOrderId = result.order_id;
+          }
+        } else {
+          const errData = await response.json().catch(() => ({}));
+          const errMsg = errData.detail || '上傳失敗';
+          alert(`❌ 檔案「${fileObj.file.name}」上傳失敗：${errMsg}`);
+          hasError = true;
+          break;
+        }
+      } catch (error) {
+        alert(`❌ 網路錯誤，無法上傳「${fileObj.file.name}」。`);
+        hasError = true;
+        break;
+      }
+    }
+
+    if (uploadedCount > 0) {
+      let msg = `✅ 上傳成功！共成功上傳 ${uploadedCount} 個檔案。\n`;
+      if (uploadedCount === 1) {
+        msg += `訂單編號：${firstOrderId}\n`;
+      } else {
+        msg += `訂單編號：${firstOrderId} ~ ${firstOrderId + uploadedCount - 1}\n`;
+      }
+      msg += `結算總金額：${totalPaidPrice} 元\n通知已發送給管理員。`;
+      alert(msg);
+
+      localStorage.setItem('print_user_name', nameVal);
+      document.getElementById('history_search_name').value = nameVal;
+
+      uploadForm.reset();
+      userNameInput.value = nameVal;
+      selectedFiles = [];
+      renderFileList();
+
+      resetPreview();
+      startCooldown();
+
+      if (document.getElementById('history-list').children.length > 0) {
+        fetchHistory();
+      }
+    } else {
       btnText.textContent = '確認送出並試算金額';
       btnSpinner.classList.add('hidden');
+      toggleFormInputs(false);
       checkFormValidity();
     }
   });

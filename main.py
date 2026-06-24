@@ -71,6 +71,27 @@ def count_pdf_pages(file_path: str) -> int:
         raise ValueError(f"無法讀取 PDF 頁數：{exc}") from exc
 
 # ── API 路由 ──────────────────────────────────────────────
+@app.post("/api/check-pages")
+async def check_pdf_pages(file: UploadFile = File(...)):
+    """臨時解析 PDF 檔並返回頁數"""
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="僅接受 PDF 格式的檔案。")
+    
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            shutil.copyfileobj(file.file, tmp)
+            tmp_path = tmp.name
+        
+        try:
+            total_pages = count_pdf_pages(tmp_path)
+            return {"status": "success", "pages": total_pages}
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
 @app.post("/api/upload")
 async def upload_order(
     file: UploadFile = File(...),
@@ -78,6 +99,7 @@ async def upload_order(
     color_mode: str = Form("bw"),
     duplex: str = Form("single"),
     binding: str | None = Form(None),
+    pickup_location: str | None = Form(None),
     db: Session = Depends(get_db)  # 注入資料庫 Session
 ) -> JSONResponse:
     
@@ -88,6 +110,8 @@ async def upload_order(
         raise HTTPException(status_code=400, detail="Invalid color mode")
     if duplex not in {"single", "double"}:
         raise HTTPException(status_code=400, detail="Invalid duplex mode")
+    if pickup_location and len(pickup_location) > 20:
+        raise HTTPException(status_code=400, detail="取件時間長度不能超過 20 個字元。")
 
     tmp_path = None
     try:
@@ -111,7 +135,8 @@ async def upload_order(
             total_price=total_price,
             color_mode=color_mode,
             duplex=duplex,
-            binding=binding
+            binding=binding,
+            pickup_location=pickup_location
         )
         db.add(new_order)
         db.commit()

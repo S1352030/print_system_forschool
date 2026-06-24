@@ -347,6 +347,11 @@
     } else if (binding) {
       badges.push('<span class="badge-chip badge-binding">' + escHtml(binding) + '</span>');
     }
+
+    if (order.pickup_location) {
+      badges.push('<span class="badge-chip badge-binding">時間：' + escHtml(order.pickup_location) + '</span>');
+    }
+
     return '<div class="setting-badges">' + badges.join('') + '</div>';
   }
 

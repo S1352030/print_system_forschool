@@ -34,6 +34,7 @@ class Order(Base):
     color_mode  = Column(String,  default="bw", nullable=False) # 色彩模式: bw/color
     duplex      = Column(String,  default="single", nullable=False) # 列印方式: single/double
     binding     = Column(String,  nullable=True)                # 裝訂位置
+    pickup_location = Column(String, nullable=True)             # 取件地點
     is_paid     = Column(Boolean, default=False, nullable=False)    # 是否已付款
     is_printed  = Column(Boolean, default=False, nullable=False)    # 是否已列印
     created_at  = Column(DateTime, default=get_taipei_now)        # 訂單建立時間
@@ -66,6 +67,7 @@ def ensure_order_columns():
         "color_mode": "ALTER TABLE orders ADD COLUMN color_mode VARCHAR NOT NULL DEFAULT 'bw'",
         "duplex": "ALTER TABLE orders ADD COLUMN duplex VARCHAR NOT NULL DEFAULT 'single'",
         "binding": "ALTER TABLE orders ADD COLUMN binding VARCHAR",
+        "pickup_location": "ALTER TABLE orders ADD COLUMN pickup_location VARCHAR",
     }
 
     with engine.begin() as conn:
