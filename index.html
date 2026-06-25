@@ -4,8 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>自助影印上傳</title>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" media="print" onload="this.media='all'" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+  <noscript>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
+  </noscript>
   <style>
     :root {
       --primary: #006494;
@@ -425,6 +431,18 @@
       from { opacity: 0; transform: translateY(-8px); }
       to { opacity: 1; transform: translateY(0); }
     }
+
+    /* History badge chips (extracted from inline styles) */
+    .hist-badge {
+      padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight: 600;
+      display: inline-flex; align-items: center;
+    }
+    .hist-badge-bw { background: rgba(122,138,176,.15); color: var(--outline); border: 1px solid rgba(122,138,176,.3); }
+    .hist-badge-color { background: rgba(52,152,219,.15); color: #5dade2; border: 1px solid rgba(52,152,219,.3); }
+    .hist-badge-single { background: rgba(46,204,113,.1); color: #58d68d; border: 1px solid rgba(46,204,113,.3); }
+    .hist-badge-double { background: rgba(243,156,18,.1); color: #f5b041; border: 1px solid rgba(243,156,18,.3); }
+    .hist-badge-binding { background: rgba(233,69,96,.1); color: #ec7c8b; border: 1px solid rgba(233,69,96,.3); }
+    .hist-badge-pages { background: rgba(0, 100, 148, 0.08); color: var(--primary); }
   </style>
 </head>
 <body>
@@ -688,8 +706,23 @@
       showPreview(selectedFiles[selectedFiles.length - 1].file);
     }
 
-    // 非同步向後端獲取每一份文件的頁數
+    // 非同步獲取每一份文件的頁數（優先本地解析，失敗才呼叫 API）
     newlyAdded.forEach(async (fileObj) => {
+      // 嘗試本地解析 PDF 頁數（省下一次完整 PDF 上傳流量）
+      const localPages = await getLocalPdfPageCount(fileObj.file);
+      if (localPages !== null && localPages > 0) {
+        fileObj.pages = localPages;
+        if (localPages === 1) {
+          fileObj.binding = null;
+          fileObj.duplex = 'single';
+        }
+        renderFileList();
+        checkFormValidity();
+        updatePriceSummary();
+        return;
+      }
+
+      // Fallback：向後端 API 查詢頁數
       const formData = new FormData();
       formData.append('file', fileObj.file);
       try {
@@ -698,14 +731,14 @@
           const result = await response.json();
           fileObj.pages = result.pages;
           if (result.pages === 1) {
-            fileObj.binding = null; // 當文件為 1 頁時，將裝訂選項清空
-            fileObj.duplex = 'single'; // 當文件為 1 頁時，限制為單面
+            fileObj.binding = null;
+            fileObj.duplex = 'single';
           }
         } else {
-          fileObj.pages = 2; // 解析失敗默認設為 2 頁，顯示裝訂選單以防萬一
+          fileObj.pages = 2;
         }
       } catch (e) {
-        fileObj.pages = 2; // 網路錯誤默認設為 2 頁
+        fileObj.pages = 2;
       }
       renderFileList();
       checkFormValidity();
@@ -1126,25 +1159,25 @@
 
       const settingsBadges = [];
       if (order.color_mode === 'color') {
-        settingsBadges.push('<span class="badge-chip badge-color" style="background: rgba(52,152,219,.15); color: #5dade2; border: 1px solid rgba(52,152,219,.3); padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight:600;">彩色</span>');
+        settingsBadges.push('<span class="hist-badge hist-badge-color">彩色</span>');
       } else {
-        settingsBadges.push('<span class="badge-chip badge-bw" style="background: rgba(122,138,176,.15); color: var(--outline); border: 1px solid rgba(122,138,176,.3); padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight:600;">黑白</span>');
+        settingsBadges.push('<span class="hist-badge hist-badge-bw">黑白</span>');
       }
 
       if (order.duplex === 'double') {
-        settingsBadges.push('<span class="badge-chip badge-double" style="background: rgba(243,156,18,.1); color: #f5b041; border: 1px solid rgba(243,156,18,.3); padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight:600;">雙面</span>');
+        settingsBadges.push('<span class="hist-badge hist-badge-double">雙面</span>');
       } else {
-        settingsBadges.push('<span class="badge-chip badge-single" style="background: rgba(46,204,113,.1); color: #58d68d; border: 1px solid rgba(46,204,113,.3); padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight:600;">單面</span>');
+        settingsBadges.push('<span class="hist-badge hist-badge-single">單面</span>');
       }
 
       if (order.binding === 'top_left') {
-        settingsBadges.push('<span class="badge-chip badge-binding" style="background: rgba(233,69,96,.1); color: #ec7c8b; border: 1px solid rgba(233,69,96,.3); padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight:600;">左上裝訂</span>');
+        settingsBadges.push('<span class="hist-badge hist-badge-binding">左上裝訂</span>');
       } else if (order.binding === 'top_right') {
-        settingsBadges.push('<span class="badge-chip badge-binding" style="background: rgba(233,69,96,.1); color: #ec7c8b; border: 1px solid rgba(233,69,96,.3); padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight:600;">右上裝訂</span>');
+        settingsBadges.push('<span class="hist-badge hist-badge-binding">右上裝訂</span>');
       } else if (order.binding === 'other') {
-        settingsBadges.push('<span class="badge-chip badge-binding" style="background: rgba(233,69,96,.1); color: #ec7c8b; border: 1px solid rgba(233,69,96,.3); padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight:600;">其他裝訂</span>');
+        settingsBadges.push('<span class="hist-badge hist-badge-binding">其他裝訂</span>');
       } else if (order.binding) {
-        settingsBadges.push('<span class="badge-chip badge-binding" style="background: rgba(233,69,96,.1); color: #ec7c8b; border: 1px solid rgba(233,69,96,.3); padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight:600;">' + escHtml(order.binding) + '</span>');
+        settingsBadges.push('<span class="hist-badge hist-badge-binding">' + escHtml(order.binding) + '</span>');
       }
 
       return `
@@ -1159,7 +1192,7 @@
           </div>
           <div class="history-item-badges">
             ${settingsBadges.join('')}
-            <span style="font-size: 10px; padding: 2px 6px; border-radius: 6px; background: rgba(0, 100, 148, 0.08); color: var(--primary); font-weight:600;">${order.total_pages} 頁</span>
+            <span class="hist-badge hist-badge-pages">${order.total_pages} 頁</span>
           </div>
           <div class="history-item-details">
             <div class="history-item-price">NT$ ${(order.total_price || 0).toLocaleString()} 元</div>
@@ -1254,6 +1287,35 @@
       updatePriceSummary();
     }
   });
+
+  // ── 本地 PDF 頁數解析（避免重複上傳至 /api/check-pages）──
+  async function getLocalPdfPageCount(file) {
+    try {
+      const buffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      // 使用 latin1 保留原始位元值
+      const text = new TextDecoder('latin1').decode(bytes);
+
+      // 策略 1：搜尋所有 /Count N，取最大值（根 Pages 節點持有總頁數）
+      const countRegex = /\/Count\s+(\d+)/g;
+      let maxCount = 0;
+      let match;
+      while ((match = countRegex.exec(text)) !== null) {
+        const count = parseInt(match[1]);
+        if (count > maxCount) maxCount = count;
+      }
+      if (maxCount > 0) return maxCount;
+
+      // 策略 2：計算獨立 /Type /Page（非 /Pages）物件數
+      const pageRegex = /\/Type\s*\/Page\b(?!s)/g;
+      const pages = text.match(pageRegex);
+      if (pages && pages.length > 0) return pages.length;
+
+      return null; // 無法判斷，交由 API fallback
+    } catch (e) {
+      return null;
+    }
+  }
 
   // ── 即時試算金額 ──
   const PRICE_MAP = { bw: 1, color: 2 };

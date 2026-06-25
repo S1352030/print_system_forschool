@@ -2,8 +2,10 @@ import os
 import shutil
 import tempfile
 import secrets
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Depends, status
-from fastapi.responses import JSONResponse, FileResponse
+import hashlib
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Depends, status, Request
+from fastapi.responses import JSONResponse, FileResponse, Response
+from starlette.middleware.gzip import GZipMiddleware
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pypdf import PdfReader
 from sqlalchemy.orm import Session
@@ -22,6 +24,9 @@ Base.metadata.create_all(bind=engine)
 ensure_order_columns()
 
 app = FastAPI(title="影印計價與通知系統")
+
+# ── Gzip 壓縮中介軟體（文字類傳輸量降低 60-70%）──────────────────
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # ── 後台管理帳密與驗證設定 ──────────────────────────────────────
 # 建議於生產環境使用環境變數設定帳密。
@@ -51,16 +56,31 @@ PRICE_PER_PAGE_BY_COLOR: dict[str, int] = {
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+# ── 靜態 HTML 快取工具（ETag 條件式快取，回訪時 304 = 0 流量）──
+def _serve_html_with_etag(file_path: str, request: Request):
+    stat = os.stat(file_path)
+    etag_raw = f"{stat.st_mtime}-{stat.st_size}".encode()
+    etag = f'"{ hashlib.md5(etag_raw).hexdigest() }"'
+
+    if_none_match = request.headers.get("if-none-match")
+    if if_none_match and if_none_match == etag:
+        return Response(status_code=304, headers={"ETag": etag})
+
+    return FileResponse(
+        file_path,
+        headers={"Cache-Control": "public, max-age=60", "ETag": etag},
+    )
+
 # ── 網頁畫面路由 ──────────────────────────────────────────
 @app.get("/")
-async def serve_frontend():
+async def serve_frontend(request: Request):
     """提供使用者上傳頁面"""
-    return FileResponse("index.html", headers={"Cache-Control": "no-cache"})
+    return _serve_html_with_etag("index.html", request)
 
 @app.get("/admin")
-async def serve_admin(username: str = Depends(authenticate_admin)):
+async def serve_admin(request: Request, username: str = Depends(authenticate_admin)):
     """提供後台管理頁面"""
-    return FileResponse("admin.html", headers={"Cache-Control": "no-cache"})
+    return _serve_html_with_etag("admin.html", request)
 
 # ── 工具函式 ──────────────────────────────────────────────
 def count_pdf_pages(file_path: str) -> int:
@@ -176,9 +196,12 @@ async def get_user_orders(user_name: str, db: Session = Depends(get_db)):
 
 @app.get("/api/announcements")
 async def get_active_announcements(db: Session = Depends(get_db)):
-    """前台 API：取得啟用中公告"""
+    """前台 API：取得啟用中公告（5 分鐘快取，公告不需要即時性）"""
     announcements = db.query(Announcement).filter(Announcement.is_active == True).order_by(Announcement.id.desc()).all()
-    return announcements
+    return JSONResponse(
+        content=[{"id": a.id, "content": a.content, "is_active": a.is_active, "created_at": str(a.created_at) if a.created_at else None} for a in announcements],
+        headers={"Cache-Control": "public, max-age=300"},
+    )
 
 @app.get("/api/admin/announcements")
 async def get_all_announcements(db: Session = Depends(get_db), username: str = Depends(authenticate_admin)):
