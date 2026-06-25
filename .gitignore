@@ -3,3 +3,6 @@ db.sqlite3
 uploads/
 how to open.txt
 .env
+git_commit_guidelines_v1.pdf
+AI_CHANGELOG.md
+.agents

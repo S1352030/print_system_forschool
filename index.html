@@ -356,6 +356,75 @@
       background: var(--outline);
       border-radius: 3px;
     }
+
+    /* 即時試算金額卡片 */
+    .price-summary-card {
+      background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+      border: 1.5px solid #a5d6a7;
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 20px;
+      animation: fadeSlideIn 0.3s ease;
+    }
+    .price-summary-card .price-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #2e7d32;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 10px;
+    }
+    .price-summary-card .price-header .material-symbols-outlined {
+      font-size: 18px;
+    }
+    .price-summary-card .price-file-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12.5px;
+      color: #33691e;
+      padding: 4px 0;
+    }
+    .price-summary-card .price-file-row .file-label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 65%;
+    }
+    .price-summary-card .price-file-row .file-price {
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .price-summary-card .price-divider {
+      height: 1px;
+      background: rgba(46, 125, 50, 0.25);
+      margin: 8px 0;
+    }
+    .price-summary-card .price-total-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 15px;
+      font-weight: 700;
+      color: #1b5e20;
+      padding-top: 4px;
+    }
+    .price-summary-card .price-total-row .total-amount {
+      font-size: 20px;
+    }
+    .price-summary-card .price-pending {
+      font-size: 11.5px;
+      color: #558b2f;
+      font-style: italic;
+      margin-top: 4px;
+    }
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
   </style>
 </head>
 <body>
@@ -419,9 +488,24 @@
           <div id="pickup-error" style="color: #ba1a1a; font-size: 12px; margin-top: 4px; display: none;">⚠️ 抱歉，輸入字數最多只能 20 個字喔！</div>
         </div>
 
+        <!-- 即時試算金額 -->
+        <div id="price-summary" class="price-summary-card hidden">
+          <div class="price-header">
+            <span class="material-symbols-outlined">calculate</span>
+            <span>預估金額試算</span>
+          </div>
+          <div id="price-breakdown"></div>
+          <div class="price-divider"></div>
+          <div class="price-total-row">
+            <span>結算總金額</span>
+            <span class="total-amount" id="price-total-amount">NT$ 0 元</span>
+          </div>
+          <div class="price-pending hidden" id="price-pending-hint">⏳ 部分檔案頁數計算中，金額可能更新...</div>
+        </div>
+
         <button type="submit" class="md3-btn-filled" id="submit-btn" disabled>
           <span class="material-symbols-outlined" style="font-size:18px;line-height:1">send</span>
-          <span id="btn-text">確認送出並試算金額</span>
+          <span id="btn-text">確認上傳</span>
           <div id="btn-spinner" class="spinner hidden"></div>
         </button>
       </form>
@@ -598,6 +682,7 @@
 
     renderFileList();
     checkFormValidity();
+    updatePriceSummary();
     
     if (selectedFiles.length > 0) {
       showPreview(selectedFiles[selectedFiles.length - 1].file);
@@ -624,6 +709,7 @@
       }
       renderFileList();
       checkFormValidity();
+      updatePriceSummary();
     });
   }
 
@@ -741,6 +827,7 @@
       selectedFiles[idx][key] = value;
       renderFileList();
       checkFormValidity();
+      updatePriceSummary();
     }
   };
 
@@ -757,6 +844,7 @@
     selectedFiles.splice(idx, 1);
     renderFileList();
     checkFormValidity();
+    updatePriceSummary();
     if (selectedFiles.length > 0) {
       showPreview(selectedFiles[selectedFiles.length - 1].file);
     } else {
@@ -860,7 +948,7 @@
         clearInterval(cooldownTimer);
         isCooldown = false;
         toggleFormInputs(false);
-        btnText.textContent = '確認送出並試算金額';
+        btnText.textContent = '確認上傳';
         banner.classList.add('hidden'); // 隱藏冷卻橫幅
         checkFormValidity();
       }
@@ -926,13 +1014,7 @@
     }
 
     if (uploadedCount > 0) {
-      let msg = `✅ 上傳成功！共成功上傳 ${uploadedCount} 個檔案。\n`;
-      if (uploadedCount === 1) {
-        msg += `訂單編號：${firstOrderId}\n`;
-      } else {
-        msg += `訂單編號：${firstOrderId} ~ ${firstOrderId + uploadedCount - 1}\n`;
-      }
-      msg += `結算總金額：${totalPaidPrice} 元\n通知已發送給管理員。`;
+      let msg = `✅ 上傳成功！共成功上傳 ${uploadedCount} 個檔案。\n通知已發送給管理員。`;
       alert(msg);
 
       localStorage.setItem('print_user_name', nameVal);
@@ -942,6 +1024,7 @@
       userNameInput.value = nameVal;
       selectedFiles = [];
       renderFileList();
+      updatePriceSummary();
 
       resetPreview();
       startCooldown();
@@ -950,7 +1033,7 @@
         fetchHistory();
       }
     } else {
-      btnText.textContent = '確認送出並試算金額';
+      btnText.textContent = '確認上傳';
       btnSpinner.classList.add('hidden');
       toggleFormInputs(false);
       checkFormValidity();
@@ -1168,8 +1251,62 @@
       userNameInput.value = savedName;
       document.getElementById('history_search_name').value = savedName;
       checkFormValidity();
+      updatePriceSummary();
     }
   });
+
+  // ── 即時試算金額 ──
+  const PRICE_MAP = { bw: 1, color: 2 };
+
+  function updatePriceSummary() {
+    const summaryCard = document.getElementById('price-summary');
+    const breakdownDiv = document.getElementById('price-breakdown');
+    const totalAmountSpan = document.getElementById('price-total-amount');
+    const pendingHint = document.getElementById('price-pending-hint');
+
+    if (selectedFiles.length === 0) {
+      summaryCard.classList.add('hidden');
+      return;
+    }
+
+    summaryCard.classList.remove('hidden');
+
+    let totalPrice = 0;
+    let hasPending = false;
+    let rows = '';
+
+    selectedFiles.forEach((fileObj, idx) => {
+      const fileName = fileObj.file.name;
+      const shortName = fileName.length > 25 ? fileName.substring(0, 22) + '...' : fileName;
+      const pricePerPage = PRICE_MAP[fileObj.colorMode] || 1;
+
+      if (fileObj.pages === null) {
+        hasPending = true;
+        rows += `<div class="price-file-row">
+          <span class="file-label" title="${escHtml(fileName)}">${escHtml(shortName)}</span>
+          <span class="file-price" style="color: #558b2f; font-style: italic;">計算中...</span>
+        </div>`;
+      } else {
+        const filePrice = fileObj.pages * pricePerPage;
+        totalPrice += filePrice;
+        const colorLabel = fileObj.colorMode === 'color' ? '彩色' : '黑白';
+        rows += `<div class="price-file-row">
+          <span class="file-label" title="${escHtml(fileName)}">${escHtml(shortName)}</span>
+          <span class="file-price">${fileObj.pages} 頁 × ${pricePerPage} 元 (${colorLabel}) = ${filePrice} 元</span>
+        </div>`;
+      }
+    });
+
+    breakdownDiv.innerHTML = rows;
+    totalAmountSpan.textContent = 'NT$ ' + totalPrice.toLocaleString() + ' 元';
+
+    if (hasPending) {
+      pendingHint.classList.remove('hidden');
+      totalAmountSpan.textContent += '+';
+    } else {
+      pendingHint.classList.add('hidden');
+    }
+  }
 </script>
 </body>
 </html>
