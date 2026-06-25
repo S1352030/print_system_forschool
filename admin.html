@@ -426,13 +426,8 @@
       const res = await fetch(API_BASE + '/api/orders/' + orderId + '/file');
       if (!res.ok) throw new Error('無法串流 PDF 檔案，HTTP ' + res.status);
       
-      const blob = await res.blob();
-      // 強制將 Blob 轉為 application/pdf 類型的物件網址
-      const pdfBlob = new Blob([blob], { type: 'application/pdf' });
-      const blobUrl = URL.createObjectURL(pdfBlob);
-      
-      iframe.src = blobUrl;
-      iframe.dataset.blobUrl = blobUrl; // 儲存指標以便關閉時釋放記憶體
+      // 直接使用包含檔名的 API 網址，確保下載時瀏覽器能對應正確的檔案名稱
+      iframe.src = API_BASE + '/api/orders/' + orderId + '/file/' + encodeURIComponent(order.file_name);
       
       document.getElementById('pdf-modal').classList.add('open');
     } catch (e) {

@@ -269,7 +269,8 @@ async def update_order_status(order_id: int, payload: dict, db: Session = Depend
     return {"status": "success"}
 
 @app.get("/api/orders/{order_id}/file")
-async def get_order_file(order_id: int, db: Session = Depends(get_db), username: str = Depends(authenticate_admin)):
+@app.get("/api/orders/{order_id}/file/{file_name}")
+async def get_order_file(order_id: int, file_name: str | None = None, db: Session = Depends(get_db), username: str = Depends(authenticate_admin)):
     """給後台用的 API：串流 PDF 檔案以供下載或預覽"""
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
@@ -282,11 +283,13 @@ async def get_order_file(order_id: int, db: Session = Depends(get_db), username:
     return FileResponse(
         file_path,
         media_type="application/pdf",
-        filename=order.file_name
+        filename=order.file_name,
+        content_disposition_type="inline"
     )
 
 @app.get("/api/orders/{order_id}/preview")
-async def preview_order_file(order_id: int, user_name: str, db: Session = Depends(get_db)):
+@app.get("/api/orders/{order_id}/preview/{file_name}")
+async def preview_order_file(order_id: int, user_name: str, file_name: str | None = None, db: Session = Depends(get_db)):
     """前台使用者預覽 PDF 檔案，需提供正確的 user_name"""
     if not user_name or not user_name.strip():
         raise HTTPException(status_code=400, detail="請提供姓名或學號以供驗證")
