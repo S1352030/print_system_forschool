@@ -651,6 +651,42 @@
     }
   });
 
+  // ── 檔名重複後綴檢查與清除工具 ──
+  function hasDuplicationPatterns(filename) {
+    const lastDotIndex = filename.lastIndexOf('.');
+    if (lastDotIndex === -1) return false;
+    const name = filename.substring(0, lastDotIndex);
+    
+    const hasBrowserSuffix = /\s*\(\d+\)$/.test(name);
+    const hasWindowsSuffix = /\s*-\s*(副本|複製|Copy)$/i.test(name);
+    const hasMacSuffix = /\s*的(副本|複本|複製)$/.test(name);
+    const hasDoubleExt = name.toLowerCase().endsWith('.pdf');
+    
+    return hasBrowserSuffix || hasWindowsSuffix || hasMacSuffix || hasDoubleExt;
+  }
+
+  function sanitizeFilename(filename) {
+    const lastDotIndex = filename.lastIndexOf('.');
+    if (lastDotIndex === -1) return filename;
+    let name = filename.substring(0, lastDotIndex);
+    const ext = filename.substring(lastDotIndex);
+    
+    while (true) {
+      const prevName = name;
+      name = name.replace(/\s*\(\d+\)$/, '');
+      name = name.replace(/\s*-\s*(副本|複製|Copy)$/i, '');
+      name = name.replace(/\s*的(副本|複本|複製)$/, '');
+      name = name.replace(/[\s\-_]+$/, '');
+      if (name.toLowerCase().endsWith('.pdf')) {
+        name = name.substring(0, name.length - 4);
+      }
+      if (name === prevName) {
+        break;
+      }
+    }
+    return name + ext;
+  }
+
   function addFiles(files) {
     if (isCooldown) return;
     
@@ -666,13 +702,22 @@
         nonPdfFound = true;
         continue;
       }
-      if (selectedFiles.some(f => f.file.name === file.name && f.file.size === file.size)) {
+
+      let fileToUpload = file;
+      if (hasDuplicationPatterns(file.name)) {
+        const cleanName = sanitizeFilename(file.name);
+        if (confirm(`系統發現檔案「${file.name}」的名稱似乎是複製產生的，是否需要自動還原為乾淨檔名「${cleanName}」再上傳？`)) {
+          fileToUpload = new File([file], cleanName, { type: file.type, lastModified: file.lastModified });
+        }
+      }
+
+      if (selectedFiles.some(f => f.file.name === fileToUpload.name && f.file.size === fileToUpload.size)) {
         duplicateFound = true;
         continue;
       }
       if (selectedFiles.length < 5) {
         const fileObj = {
-          file: file,
+          file: fileToUpload,
           colorMode: 'bw',
           duplex: 'single',
           binding: 'top_left',

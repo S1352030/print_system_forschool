@@ -37,6 +37,8 @@ class Order(Base):
     pickup_location = Column(String, nullable=True)             # 取件地點
     is_paid     = Column(Boolean, default=False, nullable=False)    # 是否已付款
     is_printed  = Column(Boolean, default=False, nullable=False)    # 是否已列印
+    display_name  = Column(String,  nullable=True)               # 顯示用檔名
+    physical_path = Column(String,  nullable=True)               # 系統實體檔名
     created_at  = Column(DateTime, default=get_taipei_now)        # 訂單建立時間
 
 
@@ -68,6 +70,8 @@ def ensure_order_columns():
         "duplex": "ALTER TABLE orders ADD COLUMN duplex VARCHAR NOT NULL DEFAULT 'single'",
         "binding": "ALTER TABLE orders ADD COLUMN binding VARCHAR",
         "pickup_location": "ALTER TABLE orders ADD COLUMN pickup_location VARCHAR",
+        "display_name": "ALTER TABLE orders ADD COLUMN display_name VARCHAR",
+        "physical_path": "ALTER TABLE orders ADD COLUMN physical_path VARCHAR",
     }
 
     with engine.begin() as conn:

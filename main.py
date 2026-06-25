@@ -3,6 +3,7 @@ import shutil
 import tempfile
 import secrets
 import hashlib
+import uuid
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Depends, status, Request
 from fastapi.responses import JSONResponse, FileResponse, Response
 from starlette.middleware.gzip import GZipMiddleware
@@ -147,10 +148,15 @@ async def upload_order(
             
         total_price = total_pages * PRICE_PER_PAGE_BY_COLOR[color_mode]
 
+        # 生成 UUID 實體檔名
+        physical_filename = f"{uuid.uuid4()}.pdf"
+
         # 寫入資料庫
         new_order = Order(
             user_name=user_name,
             file_name=file.filename,
+            display_name=file.filename,
+            physical_path=physical_filename,
             total_pages=total_pages,
             total_price=total_price,
             color_mode=color_mode,
@@ -163,7 +169,7 @@ async def upload_order(
         db.refresh(new_order) # 取得產生的 id
 
         # 儲存上傳的 PDF 檔案以供後台下載/預覽
-        file_path = os.path.join(UPLOAD_DIR, f"order_{new_order.id}.pdf")
+        file_path = os.path.join(UPLOAD_DIR, physical_filename)
         shutil.copy2(tmp_path, file_path)
 
         # 觸發 LINE 通知
@@ -276,14 +282,15 @@ async def get_order_file(order_id: int, file_name: str | None = None, db: Sessio
     if not order:
         raise HTTPException(status_code=404, detail="找不到該訂單")
     
-    file_path = os.path.join(UPLOAD_DIR, f"order_{order_id}.pdf")
+    physical_filename = order.physical_path if order.physical_path else f"order_{order_id}.pdf"
+    file_path = os.path.join(UPLOAD_DIR, physical_filename)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="找不到該訂單的 PDF 檔案")
     
     return FileResponse(
         file_path,
         media_type="application/pdf",
-        filename=order.file_name,
+        filename=order.display_name if order.display_name else order.file_name,
         content_disposition_type="inline"
     )
 
@@ -301,14 +308,15 @@ async def preview_order_file(order_id: int, user_name: str, file_name: str | Non
     if order.user_name.strip() != user_name.strip():
         raise HTTPException(status_code=403, detail="無權存取此訂單的檔案")
         
-    file_path = os.path.join(UPLOAD_DIR, f"order_{order_id}.pdf")
+    physical_filename = order.physical_path if order.physical_path else f"order_{order_id}.pdf"
+    file_path = os.path.join(UPLOAD_DIR, physical_filename)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="找不到該訂單的 PDF 檔案")
         
     return FileResponse(
         file_path,
         media_type="application/pdf",
-        filename=order.file_name,
+        filename=order.display_name if order.display_name else order.file_name,
         content_disposition_type="inline"
     )
 
@@ -321,7 +329,8 @@ async def delete_order(order_id: int, db: Session = Depends(get_db), username: s
         raise HTTPException(status_code=404, detail="找不到該訂單")
     
     # 刪除實體檔案
-    file_path = os.path.join(UPLOAD_DIR, f"order_{order_id}.pdf")
+    physical_filename = order.physical_path if order.physical_path else f"order_{order_id}.pdf"
+    file_path = os.path.join(UPLOAD_DIR, physical_filename)
     if os.path.exists(file_path):
         try:
             os.remove(file_path)
