@@ -194,11 +194,34 @@ async def upload_order(
 
 @app.get("/api/orders/history")
 async def get_user_orders(user_name: str, db: Session = Depends(get_db)):
-    """取得特定使用者的訂單歷史"""
+    """取得特定使用者的訂單歷史（精簡欄位 + 短快取）"""
     if not user_name or not user_name.strip():
         raise HTTPException(status_code=400, detail="請提供姓名或學號以供查詢")
-    orders = db.query(Order).filter(Order.user_name == user_name.strip()).order_by(Order.id.desc()).all()
-    return orders
+    rows = (
+        db.query(
+            Order.id, Order.file_name, Order.total_pages, Order.total_price,
+            Order.color_mode, Order.duplex, Order.binding, Order.pickup_location,
+            Order.is_paid, Order.is_printed, Order.created_at,
+        )
+        .filter(Order.user_name == user_name.strip())
+        .order_by(Order.id.desc())
+        .all()
+    )
+    result = [
+        {
+            "id": r.id, "file_name": r.file_name,
+            "total_pages": r.total_pages, "total_price": r.total_price,
+            "color_mode": r.color_mode, "duplex": r.duplex,
+            "binding": r.binding, "pickup_location": r.pickup_location,
+            "is_paid": r.is_paid, "is_printed": r.is_printed,
+            "created_at": str(r.created_at) if r.created_at else None,
+        }
+        for r in rows
+    ]
+    return JSONResponse(
+        content=result,
+        headers={"Cache-Control": "private, max-age=30"},
+    )
 
 @app.get("/api/announcements")
 async def get_active_announcements(db: Session = Depends(get_db)):

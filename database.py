@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, text
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Index, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 from datetime import datetime, timezone, timedelta
 
@@ -27,7 +27,7 @@ class Order(Base):
     __tablename__ = "orders"
 
     id          = Column(Integer, primary_key=True, autoincrement=True)
-    user_name   = Column(String,  nullable=False)               # 上傳者姓名
+    user_name   = Column(String,  nullable=False, index=True)   # 上傳者姓名（建立索引加速查詢）
     file_name   = Column(String,  nullable=False)               # PDF 檔名
     total_pages = Column(Integer, nullable=False)               # 總頁數
     total_price = Column(Integer, nullable=False)               # 總金額（元）
@@ -82,6 +82,9 @@ def ensure_order_columns():
         for column_name, statement in required_columns.items():
             if column_name not in existing_columns:
                 conn.execute(text(statement))
+
+        # 確保 user_name 索引存在（加速歷史訂單查詢）
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_orders_user_name ON orders (user_name)"))
 
 
 # ── 初始化：直接執行此檔案時建立資料表 ───────────────────

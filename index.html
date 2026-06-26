@@ -1108,6 +1108,7 @@
       startCooldown();
 
       if (document.getElementById('history-list').children.length > 0) {
+        invalidateHistoryCache();
         fetchHistory();
       }
     } else {
@@ -1150,7 +1151,13 @@
     }
   }
 
-  async function fetchHistory() {
+  // ── 前端快取：30 秒內相同姓名查詢直接從記憶體返回 ──
+  const _historyCache = { name: '', data: null, ts: 0 };
+  const CACHE_TTL_MS = 30000; // 30 秒
+
+  function invalidateHistoryCache() { _historyCache.ts = 0; }
+
+  async function fetchHistory(forceRefresh) {
     const searchName = document.getElementById('history_search_name').value.trim();
     if (!searchName) {
       alert('請輸入您的姓名或學號以供查詢！');
@@ -1166,6 +1173,21 @@
     const emptyDiv = document.getElementById('history-empty');
     const listDiv = document.getElementById('history-list');
 
+    // 快取命中：同名 + 未過期 → 直接渲染，0ms
+    if (!forceRefresh && _historyCache.name === searchName && (Date.now() - _historyCache.ts) < CACHE_TTL_MS && _historyCache.data) {
+      emptyDiv.classList.add('hidden');
+      loadingDiv.classList.add('hidden');
+      listDiv.innerHTML = '';
+      if (_historyCache.data.length === 0) {
+        listDiv.classList.add('hidden');
+        emptyDiv.classList.remove('hidden');
+      } else {
+        renderHistoryList(_historyCache.data);
+        listDiv.classList.remove('hidden');
+      }
+      return;
+    }
+
     loadingDiv.classList.remove('hidden');
     emptyDiv.classList.add('hidden');
     listDiv.classList.add('hidden');
@@ -1175,6 +1197,11 @@
       const response = await fetch('/api/orders/history?user_name=' + encodeURIComponent(searchName));
       if (response.ok) {
         const orders = await response.json();
+        // 寫入快取
+        _historyCache.name = searchName;
+        _historyCache.data = orders;
+        _historyCache.ts = Date.now();
+
         loadingDiv.classList.add('hidden');
         if (orders.length === 0) {
           emptyDiv.classList.remove('hidden');
