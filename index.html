@@ -12,6 +12,17 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
   </noscript>
+  <script>
+    (function() {
+      const savedTheme = localStorage.getItem('theme');
+      const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (savedTheme === 'dark' || (!savedTheme && systemPrefersDark)) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    })();
+  </script>
   <style>
     :root {
       --primary: #006494;
@@ -23,6 +34,80 @@
       --on-surface: #1a1c1e;
       --on-surface-variant: #43474e;
       --outline: #73777f;
+      
+      /* Status badges */
+      --status-paid-bg: #e8f5e9;
+      --status-paid-text: #2e7d32;
+      --status-unpaid-bg: #ffebee;
+      --status-unpaid-text: #c62828;
+      --status-queued-bg: #fff8e1;
+      --status-queued-text: #b78103;
+      
+      /* Cooldown banner */
+      --cooldown-bg: #fbe9e7;
+      --cooldown-text: #d84315;
+      --cooldown-border: #ffccbc;
+      
+      /* Price summary */
+      --price-bg: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+      --price-border: #a5d6a7;
+      --price-text: #2e7d32;
+      --price-total: #1b5e20;
+      --price-subtext: #558b2f;
+      --price-divider: rgba(46, 125, 50, 0.25);
+      
+      /* Hover states */
+      --tab-hover-bg: rgba(0, 100, 148, 0.05);
+      --tab-active-bg: rgba(0, 100, 148, 0.08);
+      
+      /* Error indicator */
+      --error: #ba1a1a;
+      
+      /* Color channels for opacity calculations */
+      --on-surface-rgb: 26, 28, 30;
+    }
+    
+    html.dark {
+      --primary: #8ecdff;
+      --on-primary: #003450;
+      --primary-container: #004b71;
+      --on-primary-container: #cae6ff;
+      --surface: #111416;
+      --surface-container: #1b1e22;
+      --on-surface: #e2e2e6;
+      --on-surface-variant: #c3c7cf;
+      --outline: #8d9199;
+      
+      /* Status badges */
+      --status-paid-bg: rgba(46, 125, 50, 0.18);
+      --status-paid-text: #81c784;
+      --status-unpaid-bg: rgba(198, 40, 40, 0.18);
+      --status-unpaid-text: #e57373;
+      --status-queued-bg: rgba(183, 129, 3, 0.18);
+      --status-queued-text: #ffd54f;
+      
+      /* Cooldown banner */
+      --cooldown-bg: rgba(216, 67, 21, 0.18);
+      --cooldown-text: #ff8a65;
+      --cooldown-border: rgba(216, 67, 21, 0.35);
+      
+      /* Price summary */
+      --price-bg: linear-gradient(135deg, #182a1c 0%, #0d1a10 100%);
+      --price-border: #2c4d32;
+      --price-text: #81c784;
+      --price-total: #a5d6a7;
+      --price-subtext: #81c784;
+      --price-divider: rgba(129, 199, 132, 0.15);
+      
+      /* Hover states */
+      --tab-hover-bg: rgba(255, 255, 255, 0.05);
+      --tab-active-bg: rgba(255, 255, 255, 0.08);
+      
+      /* Error indicator */
+      --error: #ffb4ab;
+      
+      /* Color channels for opacity calculations */
+      --on-surface-rgb: 226, 226, 230;
     }
     * { box-sizing: border-box; }
     body {
@@ -145,12 +230,14 @@
       width: 100%; background: var(--primary); color: var(--on-primary);
       border: none; border-radius: 100px; padding: 15px; font-size: 15px;
       font-weight: 600; cursor: pointer; display: flex; justify-content: center;
-      align-items: center; gap: 8px; transition: background-color .2s, box-shadow .2s;
+      align-items: center; gap: 8px; transition: background-color .2s, filter .2s, box-shadow .2s;
       font-family: inherit;
     }
-    .md3-btn-filled:hover { background: #005a87; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
+    .md3-btn-filled:hover { filter: brightness(0.9); box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
     .md3-btn-filled:disabled {
-      background: rgba(26,28,30,.12); color: rgba(26,28,30,.38); cursor: not-allowed;
+      background: rgba(var(--on-surface-rgb), 0.12);
+      color: rgba(var(--on-surface-rgb), 0.38);
+      cursor: not-allowed;
     }
     .spinner {
       border: 2px solid rgba(255,255,255,.3); border-top: 2px solid #fff;
@@ -216,12 +303,12 @@
     }
     .md3-tab:hover {
       color: var(--primary);
-      background-color: rgba(0, 100, 148, 0.05);
+      background-color: var(--tab-hover-bg);
     }
     .md3-tab.active {
       color: var(--primary);
       font-weight: 700;
-      background-color: rgba(0, 100, 148, 0.08);
+      background-color: var(--tab-active-bg);
     }
     .md3-tab-indicator {
       position: absolute;
@@ -280,7 +367,7 @@
       word-break: break-all;
     }
     .history-item-filename:hover {
-      color: #005a87;
+      filter: brightness(0.85);
     }
     .history-item-filename .material-symbols-outlined {
       font-size: 15px;
@@ -314,20 +401,20 @@
       font-weight: 700;
     }
     .status-paid {
-      background-color: #e8f5e9;
-      color: #2e7d32;
+      background-color: var(--status-paid-bg);
+      color: var(--status-paid-text);
     }
     .status-unpaid {
-      background-color: #ffebee;
-      color: #c62828;
+      background-color: var(--status-unpaid-bg);
+      color: var(--status-unpaid-text);
     }
     .status-printed {
-      background-color: #e8f5e9;
-      color: #2e7d32;
+      background-color: var(--status-paid-bg);
+      color: var(--status-paid-text);
     }
     .status-queued {
-      background-color: #fff8e1;
-      color: #b78103;
+      background-color: var(--status-queued-bg);
+      color: var(--status-queued-text);
     }
     #history-list::-webkit-scrollbar {
       width: 6px;
@@ -365,8 +452,8 @@
 
     /* 即時試算金額卡片 */
     .price-summary-card {
-      background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
-      border: 1.5px solid #a5d6a7;
+      background: var(--price-bg);
+      border: 1.5px solid var(--price-border);
       border-radius: 16px;
       padding: 16px;
       margin-bottom: 20px;
@@ -378,7 +465,7 @@
       gap: 8px;
       font-size: 12px;
       font-weight: 700;
-      color: #2e7d32;
+      color: var(--price-text);
       text-transform: uppercase;
       letter-spacing: 0.05em;
       margin-bottom: 10px;
@@ -391,7 +478,7 @@
       justify-content: space-between;
       align-items: center;
       font-size: 12.5px;
-      color: #33691e;
+      color: var(--price-subtext);
       padding: 4px 0;
     }
     .price-summary-card .price-file-row .file-label {
@@ -406,7 +493,7 @@
     }
     .price-summary-card .price-divider {
       height: 1px;
-      background: rgba(46, 125, 50, 0.25);
+      background: var(--price-divider);
       margin: 8px 0;
     }
     .price-summary-card .price-total-row {
@@ -415,7 +502,7 @@
       align-items: center;
       font-size: 15px;
       font-weight: 700;
-      color: #1b5e20;
+      color: var(--price-total);
       padding-top: 4px;
     }
     .price-summary-card .price-total-row .total-amount {
@@ -423,7 +510,7 @@
     }
     .price-summary-card .price-pending {
       font-size: 11.5px;
-      color: #558b2f;
+      color: var(--price-subtext);
       font-style: italic;
       margin-top: 4px;
     }
@@ -438,14 +525,97 @@
       display: inline-flex; align-items: center;
     }
     .hist-badge-bw { background: rgba(122,138,176,.15); color: var(--outline); border: 1px solid rgba(122,138,176,.3); }
-    .hist-badge-color { background: rgba(52,152,219,.15); color: #5dade2; border: 1px solid rgba(52,152,219,.3); }
-    .hist-badge-single { background: rgba(46,204,113,.1); color: #58d68d; border: 1px solid rgba(46,204,113,.3); }
-    .hist-badge-double { background: rgba(243,156,18,.1); color: #f5b041; border: 1px solid rgba(243,156,18,.3); }
-    .hist-badge-binding { background: rgba(233,69,96,.1); color: #ec7c8b; border: 1px solid rgba(233,69,96,.3); }
-    .hist-badge-pages { background: rgba(0, 100, 148, 0.08); color: var(--primary); }
+    .hist-badge-color { background: rgba(52,152,219,.15); color: var(--primary); border: 1px solid rgba(52,152,219,.3); }
+    .hist-badge-single { background: var(--status-paid-bg); color: var(--status-paid-text); border: 1px solid rgba(46,204,113,.15); }
+    .hist-badge-double { background: var(--status-queued-bg); color: var(--status-queued-text); border: 1px solid rgba(243,156,18,.15); }
+    .hist-badge-binding { background: var(--status-unpaid-bg); color: var(--status-unpaid-text); border: 1px solid rgba(233,69,96,.15); }
+    .hist-badge-pages { background: var(--tab-active-bg); color: var(--primary); }
+
+    /* Cooldown banner class */
+    .cooldown-banner {
+      background-color: var(--cooldown-bg);
+      color: var(--cooldown-text);
+      border: 1.5px solid var(--cooldown-border);
+      padding: 12px 16px;
+      border-radius: 16px;
+      margin-bottom: 20px;
+      font-size: 13.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 500;
+      transition: all 0.3s ease;
+    }
+
+    /* Theme Toggle Button Styles */
+    .theme-toggle-btn {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      background: var(--surface-container);
+      border: 1px solid var(--outline);
+      color: var(--on-surface);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 1000;
+    }
+    .theme-toggle-btn:hover {
+      background: var(--primary-container);
+      color: var(--on-primary-container);
+      border-color: var(--primary);
+      transform: scale(1.05);
+    }
+    .theme-toggle-btn .material-symbols-outlined {
+      font-size: 22px;
+      transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s;
+      position: absolute;
+    }
+    
+    /* Sun/Moon transition effect */
+    html:not(.dark) .theme-icon-sun {
+      opacity: 0;
+      transform: rotate(90deg) scale(0);
+    }
+    html:not(.dark) .theme-icon-moon {
+      opacity: 1;
+      transform: rotate(0) scale(1);
+    }
+    html.dark .theme-icon-sun {
+      opacity: 1;
+      transform: rotate(0) scale(1);
+    }
+    html.dark .theme-icon-moon {
+      opacity: 0;
+      transform: rotate(-90deg) scale(0);
+    }
+    
+    @media (max-width: 680px) {
+      .theme-toggle-btn {
+        top: 16px;
+        right: 16px;
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+      }
+      .theme-toggle-btn .material-symbols-outlined {
+        font-size: 20px;
+      }
+    }
   </style>
 </head>
 <body>
+<button id="theme-toggle" class="theme-toggle-btn" title="切換深淺模式">
+  <span class="material-symbols-outlined theme-icon-sun">light_mode</span>
+  <span class="material-symbols-outlined theme-icon-moon">dark_mode</span>
+</button>
+
 <div class="page-wrapper">
 
 
@@ -474,8 +644,8 @@
     <div id="upload-panel">
       <form id="uploadForm">
         <!-- 上傳冷卻提示橫幅 -->
-        <div id="cooldown-banner" class="hidden" style="background-color: #fbe9e7; color: #d84315; border: 1.5px solid #ffccbc; padding: 12px 16px; border-radius: 16px; margin-bottom: 20px; font-size: 13.5px; display: flex; align-items: center; gap: 8px; font-weight: 500; transition: all 0.3s ease;">
-          <span class="material-symbols-outlined" style="font-size: 20px; color: #d84315; animation: spin 2s linear infinite;">hourglass_empty</span>
+        <div id="cooldown-banner" class="cooldown-banner hidden">
+          <span class="material-symbols-outlined" style="font-size: 20px; color: var(--cooldown-text); animation: spin 2s linear infinite;">hourglass_empty</span>
           <span id="cooldown-banner-text">上傳已完成！為避免重複提交，系統冷卻中，請稍候 7 秒...</span>
         </div>
 
@@ -503,7 +673,7 @@
         <div class="md3-text-field" style="margin-bottom: 24px;">
           <input type="text" id="pickup_location" name="pickup_location" placeholder=" " maxlength="100" required>
           <label for="pickup_location">你要什麼時候拿? (例如: 明天中午、下午3點，限20字)</label>
-          <div id="pickup-error" style="color: #ba1a1a; font-size: 12px; margin-top: 4px; display: none;">⚠️ 抱歉，輸入字數最多只能 20 個字喔！</div>
+          <div id="pickup-error" style="color: var(--error); font-size: 12px; margin-top: 4px; display: none;">⚠️ 抱歉，輸入字數最多只能 20 個字喔！</div>
         </div>
 
         <!-- 即時試算金額 -->
@@ -1351,6 +1521,16 @@
   // 網頁載入時讀取 localStorage
   window.addEventListener('DOMContentLoaded', () => {
     loadActiveAnnouncements(); // 載入系統公告
+    
+    // 主題切換按鈕事件
+    const themeToggleBtn = document.getElementById('theme-toggle');
+    if (themeToggleBtn) {
+      themeToggleBtn.addEventListener('click', () => {
+        const isDark = document.documentElement.classList.toggle('dark');
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      });
+    }
+
     const savedName = localStorage.getItem('print_user_name');
     if (savedName) {
       userNameInput.value = savedName;
