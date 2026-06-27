@@ -6,11 +6,9 @@
   <title>自助影印上傳</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" media="print" onload="this.media='all'" />
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
   <noscript>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet" />
   </noscript>
   <script>
     (function() {
@@ -608,12 +606,83 @@
         font-size: 20px;
       }
     }
+
+    /* SVG Icon System (replaces Material Symbols font) */
+    .material-symbols-outlined {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1em;
+      height: 1em;
+      vertical-align: middle;
+      fill: currentColor;
+      flex-shrink: 0;
+    }
+    .material-symbols-outlined svg {
+      width: 100%;
+      height: 100%;
+      fill: inherit;
+    }
+
+    /* Offline banner */
+    .offline-banner {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(135deg, #d32f2f 0%, #c62828 100%);
+      color: #fff;
+      text-align: center;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      z-index: 9999;
+      transform: translateY(-100%);
+      transition: transform 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .offline-banner.show {
+      transform: translateY(0);
+    }
   </style>
 </head>
 <body>
+<!-- Offline status banner -->
+<div id="offline-banner" class="offline-banner">
+  ⚠️ 您目前處於離線狀態，部分功能可能無法使用
+</div>
+<!-- SVG Icon Sprite (all Material Symbols replaced with inline SVG) -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="i-upload_file" viewBox="0 -960 960 960"><path d="M440-200h80v-167l64 64 56-57-160-160-160 160 57 56 63-63v167ZM240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z"/></symbol>
+  <symbol id="i-history" viewBox="0 -960 960 960"><path d="M480-120q-138 0-240.5-91.5T122-440h82q14 104 92.5 172T480-200q117 0 198.5-81.5T760-480q0-117-81.5-198.5T480-760q-69 0-129 32t-101 88h110v80H120v-240h80v94q51-64 124.5-99T480-840q75 0 140.5 28.5t114 77q48.5 48.5 77 114T840-480q0 75-28.5 140.5t-77 114q-48.5 48.5-114 77T480-120Zm112-192L440-464v-216h80v184l128 128-56 56Z"/></symbol>
+  <symbol id="i-preview" viewBox="0 -960 960 960"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-480H200v480Zm133.5-124.5Q269-369 240-440q29-71 93.5-115.5T480-600q82 0 146.5 44.5T720-440q-29 71-93.5 115.5T480-280q-82 0-146.5-44.5Zm248.5-42q46-26.5 72-73.5-26-47-72-73.5T480-540q-56 0-102 26.5T306-440q26 47 72 73.5T480-340q56 0 102-26.5ZM480-440Zm42.5 42.5Q540-415 540-440t-17.5-42.5Q505-500 480-500t-42.5 17.5Q420-465 420-440t17.5 42.5Q455-380 480-380t42.5-17.5Z"/></symbol>
+  <symbol id="i-picture_as_pdf" viewBox="0 -960 960 960"><path d="M360-460h40v-80h40q17 0 28.5-11.5T480-580v-40q0-17-11.5-28.5T440-660h-80v200Zm40-120v-40h40v40h-40Zm120 120h80q17 0 28.5-11.5T640-500v-120q0-17-11.5-28.5T600-660h-80v200Zm40-40v-120h40v120h-40Zm120 40h40v-80h40v-40h-40v-40h40v-40h-80v200ZM320-240q-33 0-56.5-23.5T240-320v-480q0-33 23.5-56.5T320-880h480q33 0 56.5 23.5T880-800v480q0 33-23.5 56.5T800-240H320Zm0-80h480v-480H320v480ZM160-80q-33 0-56.5-23.5T80-160v-560h80v560h560v80H160Zm160-720v480-480Z"/></symbol>
+  <symbol id="i-draft" viewBox="0 -960 960 960"><path d="M240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z"/></symbol>
+  <symbol id="i-straighten" viewBox="0 -960 960 960"><path d="M160-240q-33 0-56.5-23.5T80-320v-320q0-33 23.5-56.5T160-720h640q33 0 56.5 23.5T880-640v320q0 33-23.5 56.5T800-240H160Zm0-80h640v-320H680v160h-80v-160h-80v160h-80v-160h-80v160h-80v-160H160v320Zm120-160h80-80Zm160 0h80-80Zm160 0h80-80Zm-120 0Z"/></symbol>
+  <symbol id="i-description" viewBox="0 -960 960 960"><path d="M320-240h320v-80H320v80Zm0-160h320v-80H320v80ZM240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z"/></symbol>
+  <symbol id="i-close" viewBox="0 -960 960 960"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></symbol>
+  <symbol id="i-north_west" viewBox="0 -960 960 960"><path d="M744-160 280-624v264h-80v-400h400v80H336l464 464-56 56Z"/></symbol>
+  <symbol id="i-north_east" viewBox="0 -960 960 960"><path d="m216-160-56-56 464-464H360v-80h400v400h-80v-264L216-160Z"/></symbol>
+  <symbol id="i-edit" viewBox="0 -960 960 960"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></symbol>
+  <symbol id="i-invert_colors" viewBox="0 -960 960 960"><path d="M480-120q-133 0-226.5-92.5T160-436q0-66 25-122t69-100l226-222 226 222q44 44 69 100t25 122q0 131-93.5 223.5T480-120Zm0-80v-568L310-600q-35 33-52.5 74.5T240-436q0 97 70 166.5T480-200Z"/></symbol>
+  <symbol id="i-palette" viewBox="0 -960 960 960"><path d="M480-80q-82 0-155-31.5t-127.5-86Q143-252 111.5-325T80-480q0-83 32.5-156t88-127Q256-817 330-848.5T488-880q80 0 151 27.5t124.5 76q53.5 48.5 85 115T880-518q0 115-70 176.5T640-280h-74q-9 0-12.5 5t-3.5 11q0 12 15 34.5t15 51.5q0 50-27.5 74T480-80Zm0-400Zm-177 23q17-17 17-43t-17-43q-17-17-43-17t-43 17q-17 17-17 43t17 43q17 17 43 17t43-17Zm120-160q17-17 17-43t-17-43q-17-17-43-17t-43 17q-17 17-17 43t17 43q17 17 43 17t43-17Zm200 0q17-17 17-43t-17-43q-17-17-43-17t-43 17q-17 17-17 43t17 43q17 17 43 17t43-17Zm120 160q17-17 17-43t-17-43q-17-17-43-17t-43 17q-17 17-17 43t17 43q17 17 43 17t43-17ZM480-160q9 0 14.5-5t5.5-13q0-14-15-33t-15-57q0-42 29-67t71-25h70q66 0 113-38.5T800-518q0-121-92.5-201.5T488-800q-136 0-232 93t-96 227q0 133 93.5 226.5T480-160Z"/></symbol>
+  <symbol id="i-article" viewBox="0 -960 960 960"><path d="M280-280h280v-80H280v80Zm0-160h400v-80H280v80Zm0-160h400v-80H280v80Zm-80 480q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm0-560v560-560Z"/></symbol>
+  <symbol id="i-menu_book" viewBox="0 -960 960 960"><path d="M560-564v-68q33-14 67.5-21t72.5-7q26 0 51 4t49 10v64q-24-9-48.5-13.5T700-600q-38 0-73 9.5T560-564Zm0 220v-68q33-14 67.5-21t72.5-7q26 0 51 4t49 10v64q-24-9-48.5-13.5T700-380q-38 0-73 9t-67 27Zm0-110v-68q33-14 67.5-21t72.5-7q26 0 51 4t49 10v64q-24-9-48.5-13.5T700-490q-38 0-73 9.5T560-454ZM260-320q47 0 91.5 10.5T440-278v-394q-41-24-87-36t-93-12q-36 0-71.5 7T120-692v396q35-12 69.5-18t70.5-6Zm260 42q44-21 88.5-31.5T700-320q36 0 70.5 6t69.5 18v-396q-33-14-68.5-21t-71.5-7q-47 0-93 12t-87 36v394Zm-40 118q-48-38-104-59t-116-21q-42 0-82.5 11T100-198q-21 11-40.5-1T40-234v-482q0-11 5.5-21T62-752q46-24 96-36t102-12q58 0 113.5 15T480-740q51-30 106.5-45T700-800q52 0 102 12t96 36q11 5 16.5 15t5.5 21v482q0 23-19.5 35t-40.5 1q-37-20-77.5-31T700-240q-60 0-116 21t-104 59ZM280-494Z"/></symbol>
+  <symbol id="i-calculate" viewBox="0 -960 960 960"><path d="M320-240h60v-80h80v-60h-80v-80h-60v80h-80v60h80v80Zm200-30h200v-60H520v60Zm0-100h200v-60H520v60Zm44-152 56-56 56 56 42-42-56-58 56-56-42-42-56 56-56-56-42 42 56 56-56 58 42 42Zm-314-70h200v-60H250v60Zm-50 472q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm0-560v560-560Z"/></symbol>
+  <symbol id="i-send" viewBox="0 -960 960 960"><path d="M120-160v-640l760 320-760 320Zm80-120 474-200-474-200v140l240 60-240 60v140Zm0 0v-400 400Z"/></symbol>
+  <symbol id="i-light_mode" viewBox="0 -960 960 960"><path d="M565-395q35-35 35-85t-35-85q-35-35-85-35t-85 35q-35 35-35 85t35 85q35 35 85 35t85-35Zm-226.5 56.5Q280-397 280-480t58.5-141.5Q397-680 480-680t141.5 58.5Q680-563 680-480t-58.5 141.5Q563-280 480-280t-141.5-58.5ZM200-440H40v-80h160v80Zm720 0H760v-80h160v80ZM440-760v-160h80v160h-80Zm0 720v-160h80v160h-80ZM256-650l-101-97 57-59 96 100-52 56Zm492 496-97-101 53-55 101 97-57 59Zm-98-550 97-101 59 57-100 96-56-52ZM154-212l101-97 55 53-97 101-59-57Zm326-268Z"/></symbol>
+  <symbol id="i-dark_mode" viewBox="0 -960 960 960"><path d="M480-120q-150 0-255-105T120-480q0-150 105-255t255-105q14 0 27.5 1t26.5 3q-41 29-65.5 75.5T444-660q0 90 63 153t153 63q55 0 101-24.5t75-65.5q2 13 3 26.5t1 27.5q0 150-105 255T480-120Zm0-80q88 0 158-48.5T740-375q-20 5-40 8t-40 3q-123 0-209.5-86.5T364-660q0-20 3-40t8-40q-78 32-126.5 102T200-480q0 116 82 198t198 82Zm-10-270Z"/></symbol>
+  <symbol id="i-campaign" viewBox="0 -960 960 960"><path d="M720-440v-80h160v80H720Zm48 280-128-96 48-64 128 96-48 64Zm-80-480-48-64 128-96 48 64-128 96ZM200-200v-160h-40q-33 0-56.5-23.5T80-440v-80q0-33 23.5-56.5T160-600h160l200-120v480L320-360h-40v160h-80Zm240-182v-196l-98 58H160v80h182l98 58Zm120 36v-268q27 24 43.5 58.5T620-480q0 41-16.5 75.5T560-346ZM300-480Z"/></symbol>
+  <symbol id="i-search" viewBox="0 -960 960 960"><path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/></symbol>
+  <symbol id="i-search_off" viewBox="0 -960 960 960"><path d="M138.5-138.5Q80-197 80-280t58.5-141.5Q197-480 280-480t141.5 58.5Q480-363 480-280t-58.5 141.5Q363-80 280-80t-141.5-58.5ZM824-120 568-376q-12-13-25.5-26.5T516-428q38-24 61-64t23-88q0-75-52.5-127.5T420-760q-75 0-127.5 52.5T240-580q0 6 .5 11.5T242-557q-18 2-39.5 8T164-535q-2-11-3-22t-1-23q0-109 75.5-184.5T420-840q109 0 184.5 75.5T680-580q0 43-13.5 81.5T629-428l251 252-56 56Zm-615-61 71-71 70 71 29-28-71-71 71-71-28-28-71 71-71-71-28 28 71 71-71 71 28 28Z"/></symbol>
+  <symbol id="i-hourglass_empty" viewBox="0 -960 960 960"><path d="M320-160h320v-120q0-66-47-113t-113-47q-66 0-113 47t-47 113v120Zm273-407q47-47 47-113v-120H320v120q0 66 47 113t113 47q66 0 113-47ZM160-80v-80h80v-120q0-61 28.5-114.5T348-480q-51-32-79.5-85.5T240-680v-120h-80v-80h640v80h-80v120q0 61-28.5 114.5T612-480q51 32 79.5 85.5T720-280v120h80v80H160Z"/></symbol>
+</svg>
 <button id="theme-toggle" class="theme-toggle-btn" title="切換深淺模式">
-  <span class="material-symbols-outlined theme-icon-sun">light_mode</span>
-  <span class="material-symbols-outlined theme-icon-moon">dark_mode</span>
+  <span class="material-symbols-outlined theme-icon-sun"><svg><use href="#i-light_mode"/></svg></span>
+  <span class="material-symbols-outlined theme-icon-moon"><svg><use href="#i-dark_mode"/></svg></span>
 </button>
 
 <div class="page-wrapper">
@@ -629,12 +698,12 @@
     <!-- M3 Tabs -->
     <div class="md3-tabs">
       <div class="md3-tab active" id="tab-upload" onclick="switchTab('upload')">
-        <span class="material-symbols-outlined">upload_file</span>
+        <span class="material-symbols-outlined"><svg><use href="#i-upload_file"/></svg></span>
         <span>檔案上傳</span>
         <div class="md3-tab-indicator"></div>
       </div>
       <div class="md3-tab" id="tab-history" onclick="switchTab('history')">
-        <span class="material-symbols-outlined">history</span>
+        <span class="material-symbols-outlined"><svg><use href="#i-history"/></svg></span>
         <span>歷史訂單</span>
         <div class="md3-tab-indicator"></div>
       </div>
@@ -645,7 +714,7 @@
       <form id="uploadForm">
         <!-- 上傳冷卻提示橫幅 -->
         <div id="cooldown-banner" class="cooldown-banner hidden">
-          <span class="material-symbols-outlined" style="font-size: 20px; color: var(--cooldown-text); animation: spin 2s linear infinite;">hourglass_empty</span>
+          <span class="material-symbols-outlined" style="font-size: 20px; color: var(--cooldown-text); animation: spin 2s linear infinite;"><svg><use href="#i-hourglass_empty"/></svg></span>
           <span id="cooldown-banner-text">上傳已完成！為避免重複提交，系統冷卻中，請稍候 7 秒...</span>
         </div>
 
@@ -655,7 +724,7 @@
         </div>
 
         <label class="file-upload-container" id="drop-area">
-          <span class="material-symbols-outlined">upload_file</span>
+          <span class="material-symbols-outlined"><svg><use href="#i-upload_file"/></svg></span>
           <p>點擊選擇 PDF 檔案<br>或將檔案拖曳至此處</p>
           <input type="file" id="pdf_file" name="file" accept="application/pdf" multiple>
         </label>
@@ -679,7 +748,7 @@
         <!-- 即時試算金額 -->
         <div id="price-summary" class="price-summary-card hidden">
           <div class="price-header">
-            <span class="material-symbols-outlined">calculate</span>
+            <span class="material-symbols-outlined"><svg><use href="#i-calculate"/></svg></span>
             <span>預估金額試算</span>
           </div>
           <div id="price-breakdown"></div>
@@ -692,7 +761,7 @@
         </div>
 
         <button type="submit" class="md3-btn-filled" id="submit-btn" disabled>
-          <span class="material-symbols-outlined" style="font-size:18px;line-height:1">send</span>
+          <span class="material-symbols-outlined" style="font-size:18px;line-height:1"><svg><use href="#i-send"/></svg></span>
           <span id="btn-text">確認上傳</span>
           <div id="btn-spinner" class="spinner hidden"></div>
         </button>
@@ -706,7 +775,7 @@
         <label for="history_search_name">請輸入您的姓名或學號</label>
       </div>
       <button type="button" class="md3-btn-filled" id="history-search-btn">
-        <span class="material-symbols-outlined" style="font-size:18px;line-height:1">search</span>
+        <span class="material-symbols-outlined" style="font-size:18px;line-height:1"><svg><use href="#i-search"/></svg></span>
         <span>開始查詢訂單</span>
       </button>
 
@@ -716,7 +785,7 @@
       </div>
 
       <div id="history-empty" class="hidden" style="text-align: center; margin-top: 24px; padding: 20px; color: var(--on-surface-variant);">
-        <span class="material-symbols-outlined" style="font-size: 44px; opacity: .35; display: block; margin-bottom: 8px;">search_off</span>
+        <span class="material-symbols-outlined" style="font-size: 44px; opacity: .35; display: block; margin-bottom: 8px;"><svg><use href="#i-search_off"/></svg></span>
         <span>找不到您的歷史訂單紀錄</span>
       </div>
 
@@ -731,21 +800,21 @@
     <!-- PDF Preview -->
     <div class="preview-card" style="flex: 1;">
       <h2>
-        <span class="material-symbols-outlined">preview</span>
+        <span class="material-symbols-outlined"><svg><use href="#i-preview"/></svg></span>
         PDF 預覽
       </h2>
       <div class="pdf-placeholder" id="pdf-placeholder">
-        <span class="material-symbols-outlined">picture_as_pdf</span>
+        <span class="material-symbols-outlined"><svg><use href="#i-picture_as_pdf"/></svg></span>
         <span>選擇 PDF 後顯示預覽</span>
       </div>
       <iframe id="pdf-preview-iframe" class="hidden" title="PDF預覽"></iframe>
       <div class="preview-meta hidden" id="preview-meta">
         <span>
-          <span class="material-symbols-outlined">draft</span>
+          <span class="material-symbols-outlined"><svg><use href="#i-draft"/></svg></span>
           <span id="meta-name">—</span>
         </span>
         <span>
-          <span class="material-symbols-outlined">straighten</span>
+          <span class="material-symbols-outlined"><svg><use href="#i-straighten"/></svg></span>
           <span id="meta-size">—</span>
         </span>
       </div>
@@ -754,7 +823,7 @@
     <!-- Announcement Card -->
     <div id="announce-card" class="preview-card hidden" style="max-height: 280px; display: flex; flex-direction: column;">
       <h2>
-        <span class="material-symbols-outlined" style="color: #f39c12;">campaign</span>
+        <span class="material-symbols-outlined" style="color: #f39c12;"><svg><use href="#i-campaign"/></svg></span>
         系統公告
       </h2>
       <div id="announce-items-container" style="flex: 1; overflow-y: auto; padding-right: 6px; font-size: 13.5px; line-height: 1.6; color: var(--on-surface-variant);">
@@ -989,17 +1058,17 @@
               <div class="chip-group">
                 <label>
                   <input type="radio" name="binding_${idx}" value="top_left" ${fileObj.binding === 'top_left' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'binding', 'top_left')">
-                  <span class="material-symbols-outlined" style="font-size: 17px;">north_west</span>
+                  <span class="material-symbols-outlined" style="font-size: 17px;"><svg><use href="#i-north_west"/></svg></span>
                   <span>左上角</span>
                 </label>
                 <label>
                   <input type="radio" name="binding_${idx}" value="top_right" ${fileObj.binding === 'top_right' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'binding', 'top_right')">
-                  <span class="material-symbols-outlined" style="font-size: 17px;">north_east</span>
+                  <span class="material-symbols-outlined" style="font-size: 17px;"><svg><use href="#i-north_east"/></svg></span>
                   <span>右上角</span>
                 </label>
                 <label>
                   <input type="radio" name="binding_${idx}" value="other" ${fileObj.binding === 'other' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'binding', 'other')">
-                  <span class="material-symbols-outlined" style="font-size: 17px;">edit</span>
+                  <span class="material-symbols-outlined" style="font-size: 17px;"><svg><use href="#i-edit"/></svg></span>
                   <span>其他</span>
                 </label>
               </div>
@@ -1014,12 +1083,12 @@
                 <div class="chip-group">
                   <label>
                     <input type="radio" name="duplex_${idx}" value="single" ${fileObj.duplex === 'single' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'duplex', 'single')">
-                    <span class="material-symbols-outlined" style="font-size: 17px;">article</span>
+                    <span class="material-symbols-outlined" style="font-size: 17px;"><svg><use href="#i-article"/></svg></span>
                     <span>單面</span>
                   </label>
                   <label>
                     <input type="radio" name="duplex_${idx}" value="double" ${fileObj.duplex === 'double' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'duplex', 'double')">
-                    <span class="material-symbols-outlined" style="font-size: 17px;">menu_book</span>
+                    <span class="material-symbols-outlined" style="font-size: 17px;"><svg><use href="#i-menu_book"/></svg></span>
                     <span>雙面</span>
                   </label>
                 </div>
@@ -1031,11 +1100,11 @@
           <!-- 標題欄：檔名、大小、預覽、刪除 -->
           <div style="display: flex; align-items: center; justify-content: space-between; min-width: 0;">
             <div style="display: flex; align-items: center; gap: 8px; cursor: pointer; flex: 1; min-width: 0;" onclick="previewFile(${idx})">
-              <span class="material-symbols-outlined" style="color: var(--primary); font-size: 20px;">description</span>
+              <span class="material-symbols-outlined" style="color: var(--primary); font-size: 20px;"><svg><use href="#i-description"/></svg></span>
               <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; color: var(--primary);" title="${escHtml(file.name)}">${escHtml(file.name)} (${(file.size / 1024).toFixed(0)} KB) ${pagesText}</span>
             </div>
             <button type="button" onclick="removeFile(${idx})" style="background: transparent; border: none; color: var(--on-surface-variant); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px; border-radius: 50%; width: 28px; height: 28px; transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.06)'" onmouseout="this.style.background='transparent'">
-              <span class="material-symbols-outlined" style="font-size: 20px;">close</span>
+              <span class="material-symbols-outlined" style="font-size: 20px;"><svg><use href="#i-close"/></svg></span>
             </button>
           </div>
 
@@ -1048,12 +1117,12 @@
                 <div class="chip-group">
                   <label>
                     <input type="radio" name="color_mode_${idx}" value="bw" ${fileObj.colorMode === 'bw' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'colorMode', 'bw')">
-                    <span class="material-symbols-outlined" style="font-size: 17px;">invert_colors</span>
+                    <span class="material-symbols-outlined" style="font-size: 17px;"><svg><use href="#i-invert_colors"/></svg></span>
                     <span>黑白</span>
                   </label>
                   <label>
                     <input type="radio" name="color_mode_${idx}" value="color" ${fileObj.colorMode === 'color' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'colorMode', 'color')">
-                    <span class="material-symbols-outlined" style="font-size: 17px;">palette</span>
+                    <span class="material-symbols-outlined" style="font-size: 17px;"><svg><use href="#i-palette"/></svg></span>
                     <span>彩色</span>
                   </label>
                 </div>
@@ -1429,7 +1498,7 @@
             <span class="history-item-date">${formatDate(order.created_at)}</span>
           </div>
           <div class="history-item-filename" onclick="previewPastOrder(${order.id}, '${escJsString(order.file_name)}')" title="點擊預覽此檔案">
-            <span class="material-symbols-outlined">picture_as_pdf</span>
+            <span class="material-symbols-outlined"><svg><use href="#i-picture_as_pdf"/></svg></span>
             <span>${escHtml(order.file_name)}</span>
           </div>
           <div class="history-item-badges">
@@ -1621,6 +1690,27 @@
       pendingHint.classList.add('hidden');
     }
   }
+
+  // ── Service Worker 註冊（離線快取支援）──
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(function(err) {
+      console.log('[SW] 註冊失敗：', err);
+    });
+  }
+
+  // ── 離線狀態偵測 ──
+  function updateOnlineStatus() {
+    const banner = document.getElementById('offline-banner');
+    if (!navigator.onLine) {
+      banner.classList.add('show');
+    } else {
+      banner.classList.remove('show');
+    }
+  }
+  window.addEventListener('online', updateOnlineStatus);
+  window.addEventListener('offline', updateOnlineStatus);
+  updateOnlineStatus();
+
 </script>
 </body>
 </html>

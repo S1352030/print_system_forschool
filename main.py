@@ -4,7 +4,7 @@ import tempfile
 import secrets
 import hashlib
 import uuid
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Depends, status, Request
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Depends, status, Request, BackgroundTasks
 from fastapi.responses import JSONResponse, FileResponse, Response
 from starlette.middleware.gzip import GZipMiddleware
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
@@ -28,6 +28,16 @@ app = FastAPI(title="影印計價與通知系統")
 
 # ── Gzip 壓縮中介軟體（文字類傳輸量降低 60-70%）──────────────────
 app.add_middleware(GZipMiddleware, minimum_size=500)
+
+# ── Service Worker 路由（必須在最前面，從根目錄提供）────────────
+@app.get("/sw.js")
+async def serve_service_worker():
+    """提供 Service Worker（必須從根目錄提供以獲得完整 scope）"""
+    return FileResponse(
+        "sw.js",
+        media_type="application/javascript",
+        headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"},
+    )
 
 # ── 後台管理帳密與驗證設定 ──────────────────────────────────────
 # 建議於生產環境使用環境變數設定帳密。
@@ -69,7 +79,7 @@ def _serve_html_with_etag(file_path: str, request: Request):
 
     return FileResponse(
         file_path,
-        headers={"Cache-Control": "public, max-age=60", "ETag": etag},
+        headers={"Cache-Control": "public, max-age=86400", "ETag": etag},
     )
 
 # ── 網頁畫面路由 ──────────────────────────────────────────
@@ -113,8 +123,21 @@ async def check_pdf_pages(file: UploadFile = File(...)):
         if tmp_path and os.path.exists(tmp_path):
             os.remove(tmp_path)
 
+def _send_line_notification_bg(user_name: str, file_name: str, total_pages: int, total_price: float):
+    notify_result = send_line_notification(
+        user_name=user_name,
+        file_name=file_name,
+        total_pages=total_pages,
+        total_price=total_price,
+    )
+    if "error" in notify_result:
+        print(f"[LINE Notify Error] LINE 通知發送失敗：{notify_result['error']}")
+    else:
+        print("[LINE Notify Success] LINE 通知發送成功！")
+
 @app.post("/api/upload")
 async def upload_order(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     user_name: str = Form(...),
     color_mode: str = Form("bw"),
@@ -172,17 +195,14 @@ async def upload_order(
         file_path = os.path.join(UPLOAD_DIR, physical_filename)
         shutil.copy2(tmp_path, file_path)
 
-        # 觸發 LINE 通知
-        notify_result = send_line_notification(
+        # 觸發 LINE 通知（非同步背景任務，避免阻塞前端上傳響應）
+        background_tasks.add_task(
+            _send_line_notification_bg,
             user_name=user_name,
             file_name=file.filename,
             total_pages=total_pages,
             total_price=total_price,
         )
-        if "error" in notify_result:
-            print(f"[LINE Notify Error] LINE 通知發送失敗：{notify_result['error']}")
-        else:
-            print("[LINE Notify Success] LINE 通知發送成功！")
 
         return JSONResponse(
             content={"status": "success", "order_id": new_order.id, "total_price": total_price},
