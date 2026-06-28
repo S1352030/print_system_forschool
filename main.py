@@ -40,56 +40,92 @@ log = logging.getLogger("print_system")
 # 二進位檔案（PDF/Image/Video）：自動跳過，零壓縮直傳
 app.add_middleware(BrotliGzipMiddleware, minimum_size=500)
 
-# ── 安全與快取中介軟體 ──────────────────────────────────────
-@app.middleware("http")
-async def add_security_and_cache_headers(request: Request, call_next):
-    response = await call_next(request)
-    
-    # 1. X-Content-Type-Options
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    
-    # 2. Content-Security-Policy (取代 X-Frame-Options)
-    response.headers["Content-Security-Policy"] = "frame-ancestors 'self'"
-    
-    # 3. 清理過期或不推薦的標頭
-    for h in ["Expires", "expires", "Pragma", "pragma", "X-Frame-Options", "x-frame-options", "X-XSS-Protection", "x-xss-protection"]:
-        if h in response.headers:
-            del response.headers[h]
-            
-    # 4. 快取原則處理
-    cache_control = response.headers.get("Cache-Control", "")
-    
-    # 清除不推薦的快取指令
-    if "must-revalidate" in cache_control or "no-store" in cache_control:
-        directives = [d.strip() for d in cache_control.split(",") if d.strip()]
-        cleaned = [d for d in directives if "must-revalidate" not in d and "no-store" not in d]
-        cache_control = ", ".join(cleaned)
-        
-    if request.url.path.startswith("/api/"):
-        if not cache_control:
-            cache_control = "private, no-cache"
-        else:
-            has_low_max_age = False
-            for directive in cache_control.split(","):
-                d = directive.strip().lower()
-                if d.startswith("max-age="):
-                    try:
-                        age = int(d.split("=")[1])
-                        if age <= 180:
-                            has_low_max_age = True
-                    except ValueError:
-                        pass
-            if has_low_max_age:
-                directives = [d.strip() for d in cache_control.split(",") if not d.strip().lower().startswith("max-age=")]
-                if "no-cache" not in directives:
-                    directives.append("no-cache")
-                cache_control = ", ".join(directives)
-    else:
-        if not cache_control:
-            cache_control = "no-cache"
-            
-    response.headers["Cache-Control"] = cache_control
-    return response
+from starlette.datastructures import MutableHeaders
+
+class SecurityAndCacheMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        path = scope.get("path", "")
+
+        async def send_wrapper(message):
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(raw=message["headers"])
+                
+                # 1. X-Content-Type-Options
+                headers["X-Content-Type-Options"] = "nosniff"
+                
+                # 2. Content-Security-Policy (強化防護，攔截外部腳本注入如卡巴斯基)
+                headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-src 'self'; frame-ancestors 'self'"
+                
+                # 3. 清理過期或不推薦的標頭
+                for h in ["Expires", "Pragma", "X-Frame-Options", "X-XSS-Protection"]:
+                    if h in headers:
+                        del headers[h]
+                    h_lower = h.lower()
+                    if h_lower in headers:
+                        del headers[h_lower]
+                        
+                # 4. 快取原則處理
+                cache_control = headers.get("Cache-Control", "")
+                
+                # 清除不推薦的快取指令
+                if cache_control:
+                    if "must-revalidate" in cache_control.lower() or "no-store" in cache_control.lower():
+                        directives = [d.strip() for d in cache_control.split(",") if d.strip()]
+                        cleaned = [
+                            d for d in directives 
+                            if "must-revalidate" not in d.lower() and "no-store" not in d.lower()
+                        ]
+                        cache_control = ", ".join(cleaned)
+                        
+                if path.startswith("/api/"):
+                    if not cache_control:
+                        cache_control = "private, no-cache"
+                    else:
+                        has_low_max_age = False
+                        for directive in cache_control.split(","):
+                            d = directive.strip().lower()
+                            if d.startswith("max-age="):
+                                try:
+                                    age = int(d.split("=")[1])
+                                    if age <= 180:
+                                        has_low_max_age = True
+                                except ValueError:
+                                    pass
+                        if has_low_max_age:
+                            directives = [
+                                d.strip() for d in cache_control.split(",") 
+                                if not d.strip().lower().startswith("max-age=")
+                            ]
+                            if "no-cache" not in [d.lower() for d in directives]:
+                                directives.append("no-cache")
+                            cache_control = ", ".join(directives)
+                else:
+                    if not cache_control:
+                        cache_control = "no-cache"
+                        
+                headers["Cache-Control"] = cache_control
+                
+                # 5. 強制 charset=utf-8 (文字、JSON、JS、CSS 等)
+                content_type = headers.get("content-type", "")
+                if content_type:
+                    ct_lower = content_type.lower()
+                    if ("text/" in ct_lower or "json" in ct_lower or "javascript" in ct_lower) and "charset=" not in ct_lower:
+                        headers["content-type"] = f"{content_type}; charset=utf-8"
+                        
+                message["headers"] = headers.raw
+                
+            await send(message)
+
+        await self.app(scope, receive, send_wrapper)
+
+app.add_middleware(SecurityAndCacheMiddleware)
 
 # ── Service Worker 路由（必須在最前面，從根目錄提供）────────────
 @app.get("/sw.js")

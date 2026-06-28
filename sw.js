@@ -1,5 +1,5 @@
 // Service Worker - 影印計價與通知系統
-const CACHE_NAME = 'print-system-v1';
+const CACHE_NAME = 'print-system-v2';
 
 // ── Install：預快取首頁 ──────────────────────────────────
 self.addEventListener('install', (event) => {
@@ -38,8 +38,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // API 請求：Network Only（永不快取，由應用層自行管理）
-  if (url.pathname.startsWith('/api/')) {
+  // API 請求與後台頁面：Network Only（永不快取，交由瀏覽器原生處理，避免 Basic Auth 與 520 問題）
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/admin')) {
     return; // 不攔截，讓瀏覽器正常發送
   }
 

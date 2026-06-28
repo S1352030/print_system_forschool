@@ -1,0 +1,8 @@
+{
+  "ignoredUrls": [
+    ".*kaspersky.*"
+  ],
+  "hints": {
+    "x-content-type-options": "off"
+  }
+}

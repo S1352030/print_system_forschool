@@ -268,6 +268,9 @@ class _CompressResponder:
             headers["Content-Encoding"] = encoding
             headers["Content-Length"] = str(len(compressed))
             headers.append("Vary", "Accept-Encoding")
+            
+            # 必須將修改後的 headers 寫回 initial_message 中
+            self.initial_message["headers"] = headers.raw
 
             await self.send(self.initial_message)
             await self.send(

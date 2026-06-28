@@ -45,7 +45,7 @@
     <div class="col-md-5">
       <div class="stat-card announcement-editor-card">
         <div>
-          <div class="stat-label">發佈新公告</div>
+          <label class="stat-label" for="announce-input">發佈新公告</label>
           <textarea id="announce-input" class="form-control" rows="4" placeholder="請輸入公告內容..."></textarea>
         </div>
         <button id="btn-publish-announce" class="btn-view-pdf" onclick="publishAnnouncement()">
@@ -202,14 +202,14 @@
         <td data-label="金額" class="price">NT$ ${(order.total_price || 0).toLocaleString()}</td>
         <td data-label="已付款">
           <label class="toggle" id="toggle-paid-${order.id}">
-            <input type="checkbox" ${order.is_paid ? 'checked' : ''} onchange="updateOrder(${order.id}, 'is_paid', this.checked, this)" />
+            <input type="checkbox" title="已付款" ${order.is_paid ? 'checked' : ''} onchange="updateOrder(${order.id}, 'is_paid', this.checked, this)" />
             <span class="toggle-track"></span>
             <span class="toggle-thumb"></span>
           </label>
         </td>
         <td data-label="Slide已列印">
           <label class="toggle" id="toggle-printed-${order.id}">
-            <input type="checkbox" ${order.is_printed ? 'checked' : ''} onchange="updateOrder(${order.id}, 'is_printed', this.checked, this)" />
+            <input type="checkbox" title="已列印" ${order.is_printed ? 'checked' : ''} onchange="updateOrder(${order.id}, 'is_printed', this.checked, this)" />
             <span class="toggle-track"></span>
             <span class="toggle-thumb"></span>
           </label>
@@ -339,7 +339,7 @@
         <td class="mono">${formatDate(ann.created_at)}</td>
         <td>
           <label class="toggle" id="toggle-announce-${ann.id}">
-            <input type="checkbox" ${ann.is_active ? 'checked' : ''} onchange="updateAnnouncementStatus(${ann.id}, this.checked, this)" />
+            <input type="checkbox" title="是否顯示" ${ann.is_active ? 'checked' : ''} onchange="updateAnnouncementStatus(${ann.id}, this.checked, this)" />
             <span class="toggle-track"></span>
             <span class="toggle-thumb"></span>
           </label>
