@@ -6,3 +6,8 @@ how to open.txt
 git_commit_guidelines_v1.pdf
 AI_CHANGELOG.md
 .agents
+# 預壓縮產生的靜態資源（由 precompress.py 在伺服器上生成）
+*.br
+*.gz
+# Zstd 日誌輪替目錄
+logs/

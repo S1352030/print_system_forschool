@@ -4,13 +4,18 @@ import tempfile
 import secrets
 import hashlib
 import uuid
+import logging
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Depends, status, Request, BackgroundTasks
 from fastapi.responses import JSONResponse, FileResponse, Response
-from starlette.middleware.gzip import GZipMiddleware
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pypdf import PdfReader
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
+
+# 壓縮模組（Brotli 優先 + Gzip 備用）
+from compression import BrotliGzipMiddleware, serve_precompressed
+# Zstandard 日誌系統
+from log_manager import setup_logging
 
 # 載入 .env 檔案設定
 load_dotenv()
@@ -26,17 +31,24 @@ ensure_order_columns()
 
 app = FastAPI(title="影印計價與通知系統")
 
-# ── Gzip 壓縮中介軟體（文字類傳輸量降低 60-70%）──────────────────
-app.add_middleware(GZipMiddleware, minimum_size=500)
+# ── 初始化結構化日誌系統（Zstd 壓縮輪替）────────────────────────
+setup_logging()
+log = logging.getLogger("print_system")
+
+# ── Brotli/Gzip 壓縮中介軟體 ─────────────────────────────────────
+# API 動態回應：Brotli Lv4 優先、Gzip Lv6 備用
+# 二進位檔案（PDF/Image/Video）：自動跳過，零壓縮直傳
+app.add_middleware(BrotliGzipMiddleware, minimum_size=500)
 
 # ── Service Worker 路由（必須在最前面，從根目錄提供）────────────
 @app.get("/sw.js")
-async def serve_service_worker():
+async def serve_service_worker(request: Request):
     """提供 Service Worker（必須從根目錄提供以獲得完整 scope）"""
-    return FileResponse(
+    return serve_precompressed(
         "sw.js",
+        request,
         media_type="application/javascript",
-        headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"},
+        extra_headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"},
     )
 
 # ── 後台管理帳密與驗證設定 ──────────────────────────────────────
@@ -67,31 +79,16 @@ PRICE_PER_PAGE_BY_COLOR: dict[str, int] = {
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# ── 靜態 HTML 快取工具（ETag 條件式快取，回訪時 304 = 0 流量）──
-def _serve_html_with_etag(file_path: str, request: Request):
-    stat = os.stat(file_path)
-    etag_raw = f"{stat.st_mtime}-{stat.st_size}".encode()
-    etag = f'"{ hashlib.md5(etag_raw).hexdigest() }"'
-
-    if_none_match = request.headers.get("if-none-match")
-    if if_none_match and if_none_match == etag:
-        return Response(status_code=304, headers={"ETag": etag})
-
-    return FileResponse(
-        file_path,
-        headers={"Cache-Control": "public, max-age=86400", "ETag": etag},
-    )
-
-# ── 網頁畫面路由 ──────────────────────────────────────────
+# ── 網頁畫面路由（預壓縮靜態派發 + ETag 條件式快取）──────────────
 @app.get("/")
 async def serve_frontend(request: Request):
-    """提供使用者上傳頁面"""
-    return _serve_html_with_etag("index.html", request)
+    """提供使用者上傳頁面（優先派發 .br → .gz → 原始檔）"""
+    return serve_precompressed("index.html", request, media_type="text/html")
 
 @app.get("/admin")
 async def serve_admin(request: Request, username: str = Depends(authenticate_admin)):
-    """提供後台管理頁面"""
-    return _serve_html_with_etag("admin.html", request)
+    """提供後台管理頁面（優先派發 .br → .gz → 原始檔）"""
+    return serve_precompressed("admin.html", request, media_type="text/html")
 
 # ── 工具函式 ──────────────────────────────────────────────
 def count_pdf_pages(file_path: str) -> int:
@@ -131,9 +128,9 @@ def _send_line_notification_bg(user_name: str, file_name: str, total_pages: int,
         total_price=total_price,
     )
     if "error" in notify_result:
-        print(f"[LINE Notify Error] LINE 通知發送失敗：{notify_result['error']}")
+        log.error("LINE 通知發送失敗：%s", notify_result["error"])
     else:
-        print("[LINE Notify Success] LINE 通知發送成功！")
+        log.info("LINE 通知發送成功（使用者: %s, 檔案: %s）", user_name, file_name)
 
 @app.post("/api/upload")
 async def upload_order(
@@ -378,7 +375,7 @@ async def delete_order(order_id: int, db: Session = Depends(get_db), username: s
         try:
             os.remove(file_path)
         except Exception as exc:
-            print(f"[Error] 無法刪除檔案 {file_path}: {exc}")
+            log.error("無法刪除檔案 %s: %s", file_path, exc)
             
     db.delete(order)
     db.commit()
