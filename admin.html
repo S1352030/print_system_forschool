@@ -7,191 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
-  <style>
-    :root {
-      --primary: #1a1a2e;
-      --accent: #e94560;
-      --accent2: #0f3460;
-      --surface: #16213e;
-      --card: #1e2a45;
-      --border: #2d3f6b;
-      --text: #e0e8ff;
-      --muted: #7a8ab0;
-      --success: #2ecc71;
-      --warning: #f39c12;
-      --danger: #e74c3c;
-      --info: #3498db;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: var(--primary); color: var(--text); font-family: 'Noto Sans TC', sans-serif; min-height: 100vh; }
-
-    /* Header */
-    .site-header {
-      background: var(--surface); border-bottom: 1px solid var(--border);
-      padding: 1rem 2rem; display: flex; align-items: center; gap: 1rem;
-    }
-    .site-header .logo {
-      width: 36px; height: 36px; background: var(--accent); border-radius: 8px;
-      display: flex; align-items: center; justify-content: center; font-size: 1.2rem;
-    }
-    .site-header h1 { font-size: 1.15rem; font-weight: 700; letter-spacing: .03em; }
-    .site-header small { color: var(--muted); font-size: .78rem; }
-    .btn-refresh {
-      margin-left: auto; background: transparent; border: 1px solid var(--border);
-      color: var(--muted); padding: .4rem .9rem; border-radius: 6px; font-size: .85rem;
-      cursor: pointer; transition: all .2s;
-    }
-    .btn-refresh:hover { border-color: var(--accent); color: var(--accent); }
-
-    /* Stats */
-    .stats-row { display: flex; gap: 1.25rem; padding: 1.5rem 2rem 0; flex-wrap: wrap; }
-    .stat-card {
-      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
-      padding: 1.1rem 1.5rem; flex: 1; min-width: 180px; position: relative; overflow: hidden;
-    }
-    .stat-card::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; }
-    .stat-card.unpaid::before { background: var(--danger); }
-    .stat-card.unprinted::before { background: var(--warning); }
-    .stat-card.total::before { background: var(--success); }
-    .stat-label { font-size: .78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: .35rem; }
-    .stat-value { font-family: 'JetBrains Mono', monospace; font-size: 1.7rem; font-weight: 600; }
-    .stat-card.unpaid .stat-value { color: #ff6b6b; }
-    .stat-card.unprinted .stat-value { color: var(--warning); }
-    .stat-card.total .stat-value { color: var(--success); }
-    .stat-sub { font-size: .78rem; color: var(--muted); margin-top: .2rem; }
-
-    /* Table */
-    .table-section { padding: 1.5rem 2rem 3rem; }
-    .section-title { font-size: .78rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin-bottom: 1rem; }
-    .table-wrapper { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
-    table { width: 100%; border-collapse: collapse; }
-    thead th {
-      background: var(--surface); padding: .75rem 1rem; font-size: .75rem;
-      text-transform: uppercase; letter-spacing: .08em; color: var(--muted);
-      font-weight: 600; border-bottom: 1px solid var(--border);
-    }
-    tbody tr { border-bottom: 1px solid var(--border); transition: background .15s; }
-    tbody tr:last-child { border-bottom: none; }
-    tbody tr:hover { background: rgba(255,255,255,.03); }
-    td { padding: .7rem 1rem; font-size: .88rem; vertical-align: middle; }
-    td.mono { font-family: 'JetBrains Mono', monospace; font-size: .82rem; color: var(--muted); }
-    td.price { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: var(--text); }
-
-    /* Print setting badges */
-    .setting-badges { display: flex; gap: 5px; flex-wrap: wrap; }
-    .badge-chip {
-      display: inline-flex; align-items: center; gap: 3px;
-      padding: 3px 8px; border-radius: 100px; font-size: .72rem;
-      font-weight: 600; letter-spacing: .02em; white-space: nowrap;
-    }
-    .badge-bw { background: rgba(122,138,176,.15); color: var(--muted); border: 1px solid rgba(122,138,176,.3); }
-    .badge-color { background: rgba(52,152,219,.15); color: #5dade2; border: 1px solid rgba(52,152,219,.3); }
-    .badge-single { background: rgba(46,204,113,.1); color: #58d68d; border: 1px solid rgba(46,204,113,.3); }
-    .badge-double { background: rgba(243,156,18,.1); color: #f5b041; border: 1px solid rgba(243,156,18,.3); }
-    .badge-binding { background: rgba(233,69,96,.1); color: #ec7c8b; border: 1px solid rgba(233,69,96,.3); }
-
-    /* Toggle */
-    .toggle-wrap { display: flex; align-items: center; gap: .55rem; }
-    .toggle { display: inline-block; position: relative; width: 40px; height: 22px; cursor: pointer; }
-    .toggle input { display: none; }
-    .toggle-track { width: 100%; height: 100%; border-radius: 11px; background: #2d3f6b; transition: background .2s; position: absolute; top: 0; left: 0; }
-    .toggle input:checked ~ .toggle-track { background: var(--success); }
-    .toggle-thumb {
-      position: absolute; top: 3px; left: 3px; width: 16px; height: 16px;
-      border-radius: 50%; background: #fff; transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.4);
-    }
-    .toggle input:checked ~ .toggle-thumb { transform: translateX(18px); }
-    .toggle.loading .toggle-track { background: #4a5568 !important; }
-    .toggle.loading { cursor: wait; }
-
-    /* Buttons */
-    .btn-view-pdf {
-      background: rgba(52,152,219,.15); border: 1px solid rgba(52,152,219,.3);
-      color: #5dade2; padding: 4px 10px; border-radius: 6px; font-size: .78rem;
-      cursor: pointer; transition: all .2s; white-space: nowrap;
-    }
-    .btn-view-pdf:hover { background: rgba(52,152,219,.3); }
-
-    .btn-delete {
-      background: rgba(231,76,60,.15); border: 1px solid rgba(231,76,60,.3);
-      color: #e74c3c; padding: 4px 10px; border-radius: 6px; font-size: .78rem;
-      cursor: pointer; transition: all .2s; white-space: nowrap;
-    }
-    .btn-delete:hover { background: rgba(231,76,60,.3); }
-
-    /* PDF Modal */
-    .modal-backdrop {
-      display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7);
-      z-index: 1000; align-items: center; justify-content: center; padding: 20px;
-    }
-    .modal-backdrop.open { display: flex; }
-    .modal-box {
-      background: var(--card); border: 1px solid var(--border); border-radius: 16px;
-      width: 100%; max-width: 800px; max-height: 90vh;
-      display: flex; flex-direction: column; overflow: hidden;
-    }
-    .modal-header {
-      padding: 16px 20px; border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: space-between; gap: 12px;
-      flex-shrink: 0;
-    }
-    .modal-header h3 { font-size: .95rem; font-weight: 700; margin: 0; }
-    .modal-header .modal-meta { font-size: .8rem; color: var(--muted); }
-    .btn-close-modal {
-      background: transparent; border: 1px solid var(--border); color: var(--muted);
-      width: 32px; height: 32px; border-radius: 8px; cursor: pointer; font-size: 1.1rem;
-      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-      transition: all .2s;
-    }
-    .btn-close-modal:hover { border-color: var(--accent); color: var(--accent); }
-    .modal-settings {
-      padding: 12px 20px; border-bottom: 1px solid var(--border);
-      display: flex; gap: 8px; flex-wrap: wrap; flex-shrink: 0;
-    }
-    .modal-pdf-wrap { flex: 1; overflow: hidden; background: #525659; }
-    .modal-pdf-wrap iframe { width: 100%; height: 100%; min-height: 500px; border: none; display: block; }
-
-    /* Toast */
-    #toast-container { position: fixed; bottom: 1.5rem; right: 1.5rem; display: flex; flex-direction: column; gap: .5rem; z-index: 9999; }
-    .toast-msg {
-      background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--success);
-      padding: .65rem 1rem; border-radius: 8px; font-size: .83rem; color: var(--text);
-      animation: slideIn .25s ease; min-width: 220px;
-    }
-    .toast-msg.error { border-left-color: var(--danger); }
-    @keyframes slideIn { from { opacity:0; transform: translateY(12px); } to { opacity:1; transform: none; } }
-
-    .state-row td { text-align: center; padding: 3rem; color: var(--muted); font-size: .9rem; }
-    .spinner {
-      display: inline-block; width: 18px; height: 18px;
-      border: 2px solid var(--border); border-top-color: var(--accent);
-      border-radius: 50%; animation: spin .7s linear infinite; margin-right: .5rem; vertical-align: middle;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* Bootstrap 替代 — 最小化格線與元件樣式 */
-    .row { display: flex; flex-wrap: wrap; margin: 0 -0.75rem; }
-    .g-3 { gap: 0; }
-    .g-3 > * { padding: 0 0.75rem; margin-bottom: 1rem; }
-    .col-md-5 { flex: 0 0 auto; width: 100%; }
-    .col-md-7 { flex: 0 0 auto; width: 100%; }
-    @media (min-width: 768px) {
-      .col-md-5 { width: 41.666667%; }
-      .col-md-7 { width: 58.333333%; }
-    }
-    .d-flex { display: flex; }
-    .gap-2 { gap: 0.5rem; }
-    .form-control { display: block; width: 100%; padding: 0.375rem 0.75rem; font-size: 1rem; line-height: 1.5; appearance: none; }
-
-    @media (max-width: 768px) {
-      .stats-row { flex-direction: column; }
-      .table-section, .stats-row { padding-left: 1rem; padding-right: 1rem; }
-      thead { display: none; }
-      tbody tr { display: block; padding: .75rem; border-bottom: 1px solid var(--border); }
-      td { display: flex; justify-content: space-between; align-items: center; padding: .3rem 0; border: none; }
-      td::before { content: attr(data-label); font-size: .72rem; color: var(--muted); text-transform: uppercase; }
-    }
-  </style>
+  <link rel="stylesheet" href="/admin.css?v=20260628">
 </head>
 <body>
 
@@ -222,28 +38,28 @@
   </div>
 </div>
 
-<div class="announcement-section" style="padding: 1.5rem 2rem 0;">
+<div class="announcement-section">
   <div class="section-title">系統公告管理</div>
   <div class="row g-3">
     <!-- Left: Publish Form -->
     <div class="col-md-5">
-      <div class="stat-card" style="height: 100%; min-height: 200px; display: flex; flex-direction: column; justify-content: space-between;">
+      <div class="stat-card announcement-editor-card">
         <div>
           <div class="stat-label">發佈新公告</div>
-          <textarea id="announce-input" class="form-control" rows="4" placeholder="請輸入公告內容..." style="background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 0.9rem; resize: none; margin-top: 0.5rem;"></textarea>
+          <textarea id="announce-input" class="form-control" rows="4" placeholder="請輸入公告內容..."></textarea>
         </div>
-        <button id="btn-publish-announce" class="btn-view-pdf" style="margin-top: 1rem; width: 100%; padding: 8px 16px; font-weight: 600; text-align: center; justify-content: center; display: inline-flex; align-items: center;" onclick="publishAnnouncement()">
+        <button id="btn-publish-announce" class="btn-view-pdf" onclick="publishAnnouncement()">
           📢 發布公告
         </button>
       </div>
     </div>
     <!-- Right: Announcement List -->
     <div class="col-md-7">
-      <div class="table-wrapper" style="max-height: 200px; overflow-y: auto;">
+      <div class="table-wrapper announcement-table-wrapper">
         <table>
           <thead>
             <tr>
-              <th style="width: 50%;">內容</th>
+              <th class="w-50-percent">內容</th>
               <th>發佈時間</th>
               <th>顯示</th>
               <th>操作</th>
@@ -380,7 +196,7 @@
       <tr id="row-${order.id}">
         <td data-label="#" class="mono">${order.id}</td>
         <td data-label="姓名">${escHtml(order.user_name)}</td>
-        <td data-label="檔案" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(order.file_name)}">${escHtml(order.file_name)}</td>
+        <td data-label="檔案" class="admin-file-cell" title="${escHtml(order.file_name)}">${escHtml(order.file_name)}</td>
         <td data-label="頁數" class="mono">${order.total_pages}</td>
         <td data-label="列印設定">${buildSettingBadges(order)}</td>
         <td data-label="金額" class="price">NT$ ${(order.total_price || 0).toLocaleString()}</td>
@@ -519,7 +335,7 @@
     }
     tbody.innerHTML = data.map(ann => `
       <tr id="announce-row-${ann.id}">
-        <td style="word-break: break-all; max-width: 250px; text-align: left;" title="${escHtml(ann.content)}">${escHtml(ann.content)}</td>
+        <td class="admin-announce-content-cell" title="${escHtml(ann.content)}">${escHtml(ann.content)}</td>
         <td class="mono">${formatDate(ann.created_at)}</td>
         <td>
           <label class="toggle" id="toggle-announce-${ann.id}">

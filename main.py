@@ -40,6 +40,57 @@ log = logging.getLogger("print_system")
 # 二進位檔案（PDF/Image/Video）：自動跳過，零壓縮直傳
 app.add_middleware(BrotliGzipMiddleware, minimum_size=500)
 
+# ── 安全與快取中介軟體 ──────────────────────────────────────
+@app.middleware("http")
+async def add_security_and_cache_headers(request: Request, call_next):
+    response = await call_next(request)
+    
+    # 1. X-Content-Type-Options
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    
+    # 2. Content-Security-Policy (取代 X-Frame-Options)
+    response.headers["Content-Security-Policy"] = "frame-ancestors 'self'"
+    
+    # 3. 清理過期或不推薦的標頭
+    for h in ["Expires", "expires", "Pragma", "pragma", "X-Frame-Options", "x-frame-options", "X-XSS-Protection", "x-xss-protection"]:
+        if h in response.headers:
+            del response.headers[h]
+            
+    # 4. 快取原則處理
+    cache_control = response.headers.get("Cache-Control", "")
+    
+    # 清除不推薦的快取指令
+    if "must-revalidate" in cache_control or "no-store" in cache_control:
+        directives = [d.strip() for d in cache_control.split(",") if d.strip()]
+        cleaned = [d for d in directives if "must-revalidate" not in d and "no-store" not in d]
+        cache_control = ", ".join(cleaned)
+        
+    if request.url.path.startswith("/api/"):
+        if not cache_control:
+            cache_control = "private, no-cache"
+        else:
+            has_low_max_age = False
+            for directive in cache_control.split(","):
+                d = directive.strip().lower()
+                if d.startswith("max-age="):
+                    try:
+                        age = int(d.split("=")[1])
+                        if age <= 180:
+                            has_low_max_age = True
+                    except ValueError:
+                        pass
+            if has_low_max_age:
+                directives = [d.strip() for d in cache_control.split(",") if not d.strip().lower().startswith("max-age=")]
+                if "no-cache" not in directives:
+                    directives.append("no-cache")
+                cache_control = ", ".join(directives)
+    else:
+        if not cache_control:
+            cache_control = "no-cache"
+            
+    response.headers["Cache-Control"] = cache_control
+    return response
+
 # ── Service Worker 路由（必須在最前面，從根目錄提供）────────────
 @app.get("/sw.js")
 async def serve_service_worker(request: Request):
@@ -47,7 +98,7 @@ async def serve_service_worker(request: Request):
     return serve_precompressed(
         "sw.js",
         request,
-        media_type="application/javascript",
+        media_type="text/javascript; charset=utf-8",
         extra_headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"},
     )
 
@@ -83,12 +134,22 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 @app.get("/")
 async def serve_frontend(request: Request):
     """提供使用者上傳頁面（優先派發 .br → .gz → 原始檔）"""
-    return serve_precompressed("index.html", request, media_type="text/html")
+    return serve_precompressed("index.html", request, media_type="text/html; charset=utf-8")
 
 @app.get("/admin")
 async def serve_admin(request: Request, username: str = Depends(authenticate_admin)):
     """提供後台管理頁面（優先派發 .br → .gz → 原始檔）"""
-    return serve_precompressed("admin.html", request, media_type="text/html")
+    return serve_precompressed("admin.html", request, media_type="text/html; charset=utf-8")
+
+@app.get("/style.css")
+async def serve_style(request: Request):
+    """提供首頁樣式表"""
+    return serve_precompressed("style.css", request, media_type="text/css; charset=utf-8")
+
+@app.get("/admin.css")
+async def serve_admin_style(request: Request):
+    """提供後台樣式表"""
+    return serve_precompressed("admin.css", request, media_type="text/css; charset=utf-8")
 
 # ── 工具函式 ──────────────────────────────────────────────
 def count_pdf_pages(file_path: str) -> int:
@@ -237,7 +298,7 @@ async def get_user_orders(user_name: str, db: Session = Depends(get_db)):
     ]
     return JSONResponse(
         content=result,
-        headers={"Cache-Control": "private, max-age=30"},
+        headers={"Cache-Control": "private, no-cache"},
     )
 
 @app.get("/api/announcements")

@@ -27,6 +27,8 @@ STATIC_FILES = [
     "index.html",
     "admin.html",
     "sw.js",
+    "style.css",
+    "admin.css",
 ]
 
 BROTLI_QUALITY = 11  # 最高壓縮率（僅部署時執行一次，不影響即時效能）

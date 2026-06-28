@@ -21,633 +21,7 @@
       }
     })();
   </script>
-  <style>
-    :root {
-      --primary: #006494;
-      --on-primary: #ffffff;
-      --primary-container: #cae6ff;
-      --on-primary-container: #001e30;
-      --surface: #fdfcff;
-      --surface-container: #f0f4f8;
-      --on-surface: #1a1c1e;
-      --on-surface-variant: #43474e;
-      --outline: #73777f;
-      
-      /* Status badges */
-      --status-paid-bg: #e8f5e9;
-      --status-paid-text: #2e7d32;
-      --status-unpaid-bg: #ffebee;
-      --status-unpaid-text: #c62828;
-      --status-queued-bg: #fff8e1;
-      --status-queued-text: #b78103;
-      
-      /* Cooldown banner */
-      --cooldown-bg: #fbe9e7;
-      --cooldown-text: #d84315;
-      --cooldown-border: #ffccbc;
-      
-      /* Price summary */
-      --price-bg: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
-      --price-border: #a5d6a7;
-      --price-text: #2e7d32;
-      --price-total: #1b5e20;
-      --price-subtext: #558b2f;
-      --price-divider: rgba(46, 125, 50, 0.25);
-      
-      /* Hover states */
-      --tab-hover-bg: rgba(0, 100, 148, 0.05);
-      --tab-active-bg: rgba(0, 100, 148, 0.08);
-      
-      /* Error indicator */
-      --error: #ba1a1a;
-      
-      /* Color channels for opacity calculations */
-      --on-surface-rgb: 26, 28, 30;
-    }
-    
-    html.dark {
-      --primary: #8ecdff;
-      --on-primary: #003450;
-      --primary-container: #004b71;
-      --on-primary-container: #cae6ff;
-      --surface: #111416;
-      --surface-container: #1b1e22;
-      --on-surface: #e2e2e6;
-      --on-surface-variant: #c3c7cf;
-      --outline: #8d9199;
-      
-      /* Status badges */
-      --status-paid-bg: rgba(46, 125, 50, 0.18);
-      --status-paid-text: #81c784;
-      --status-unpaid-bg: rgba(198, 40, 40, 0.18);
-      --status-unpaid-text: #e57373;
-      --status-queued-bg: rgba(183, 129, 3, 0.18);
-      --status-queued-text: #ffd54f;
-      
-      /* Cooldown banner */
-      --cooldown-bg: rgba(216, 67, 21, 0.18);
-      --cooldown-text: #ff8a65;
-      --cooldown-border: rgba(216, 67, 21, 0.35);
-      
-      /* Price summary */
-      --price-bg: linear-gradient(135deg, #182a1c 0%, #0d1a10 100%);
-      --price-border: #2c4d32;
-      --price-text: #81c784;
-      --price-total: #a5d6a7;
-      --price-subtext: #81c784;
-      --price-divider: rgba(129, 199, 132, 0.15);
-      
-      /* Hover states */
-      --tab-hover-bg: rgba(255, 255, 255, 0.05);
-      --tab-active-bg: rgba(255, 255, 255, 0.08);
-      
-      /* Error indicator */
-      --error: #ffb4ab;
-      
-      /* Color channels for opacity calculations */
-      --on-surface-rgb: 226, 226, 230;
-    }
-    * { box-sizing: border-box; }
-    body {
-      font-family: 'Noto Sans TC', 'Segoe UI', sans-serif;
-      background: var(--surface-container);
-      color: var(--on-surface);
-      min-height: 100vh;
-      margin: 0;
-      padding: 24px 16px;
-    }
-    .page-wrapper {
-      max-width: 900px;
-      margin: 0 auto;
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      gap: 20px;
-      align-items: start;
-    }
-    @media (max-width: 680px) {
-      body {
-        padding: 12px 8px;
-      }
-      .page-wrapper {
-        grid-template-columns: minmax(0, 1fr);
-        gap: 12px;
-      }
-      .md3-card, .preview-card {
-        padding: 16px 12px;
-        border-radius: 16px;
-      }
-      .chip-group {
-        gap: 6px;
-      }
-      .chip-group label {
-        padding: 6px 10px;
-        font-size: 12.5px;
-        gap: 4px;
-      }
-      .chip-group label .material-symbols-outlined {
-        font-size: 15px;
-      }
-    }
-
-    .md3-card, .preview-card {
-      background: var(--surface);
-      border-radius: 24px;
-      padding: 28px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    }
-    .header { text-align: center; margin-bottom: 24px; }
-    .header h1 { font-size: 20px; font-weight: 700; margin: 0; }
-    .header p { font-size: 13px; color: var(--on-surface-variant); margin-top: 6px; }
-
-    .md3-text-field { position: relative; margin-bottom: 20px; }
-    .md3-text-field input {
-      width: 100%; padding: 16px; padding-top: 24px; font-size: 15px;
-      background: var(--surface-container); border: none;
-      border-bottom: 1px solid var(--on-surface-variant);
-      border-radius: 4px 4px 0 0; color: var(--on-surface);
-      transition: border-color .2s; font-family: inherit;
-    }
-    .md3-text-field input:focus { outline: none; border-bottom: 2px solid var(--primary); }
-    .md3-text-field label {
-      position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
-      font-size: 15px; color: var(--on-surface-variant);
-      transition: top .2s, font-size .2s, color .2s; pointer-events: none;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: calc(100% - 32px);
-    }
-    .md3-text-field input:focus + label,
-    .md3-text-field input:not(:placeholder-shown) + label {
-      top: 12px; font-size: 11px; color: var(--primary);
-    }
-
-    .file-upload-container {
-      border: 2px dashed var(--outline); border-radius: 16px;
-      padding: 20px; text-align: center; cursor: pointer;
-      margin-bottom: 20px; transition: background-color .2s, border-color .2s;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-    }
-    .file-upload-container:hover { background: var(--primary-container); border-color: var(--primary); }
-    .file-upload-container .material-symbols-outlined {
-      font-size: 40px; color: var(--primary); margin-bottom: 6px; display: block; line-height: 1;
-    }
-    .file-upload-container p { margin: 0; font-size: 13px; color: var(--on-surface-variant); }
-    input[type="file"] { display: none; }
-
-    #file-info {
-      background: var(--primary-container); color: var(--on-primary-container);
-      padding: 12px 16px; border-radius: 12px; margin-bottom: 20px;
-      font-size: 13px; display: flex; align-items: center; gap: 10px;
-    }
-    .hidden { display: none !important; }
-
-    .section-label {
-      font-size: 11px; font-weight: 700; color: var(--primary);
-      text-transform: uppercase; letter-spacing: .1em; margin-bottom: 10px; margin-top: 4px;
-    }
-    .print-settings { display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px; }
-    .setting-row { display: flex; flex-direction: column; gap: 6px; }
-    .setting-row-label { font-size: 12px; color: var(--on-surface-variant); }
-
-    .chip-group { display: flex; gap: 8px; flex-wrap: wrap; }
-    .chip-group label {
-      display: flex; align-items: center; gap: 6px;
-      padding: 8px 14px; border: 1.5px solid var(--outline);
-      border-radius: 100px; font-size: 13px; cursor: pointer;
-      transition: all .18s; color: var(--on-surface-variant); user-select: none;
-    }
-    .chip-group input[type="radio"] { display: none; }
-    .chip-group label:has(input:checked) {
-      background: var(--primary-container); border-color: var(--primary);
-      color: var(--on-primary-container); font-weight: 600;
-    }
-    .chip-group label .material-symbols-outlined { font-size: 17px; line-height: 1; }
-
-    .md3-btn-filled {
-      width: 100%; background: var(--primary); color: var(--on-primary);
-      border: none; border-radius: 100px; padding: 15px; font-size: 15px;
-      font-weight: 600; cursor: pointer; display: flex; justify-content: center;
-      align-items: center; gap: 8px; transition: background-color .2s, filter .2s, box-shadow .2s;
-      font-family: inherit;
-    }
-    .md3-btn-filled:hover { filter: brightness(0.9); box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
-    .md3-btn-filled:disabled {
-      background: rgba(var(--on-surface-rgb), 0.12);
-      color: rgba(var(--on-surface-rgb), 0.38);
-      cursor: not-allowed;
-    }
-    .spinner {
-      border: 2px solid rgba(255,255,255,.3); border-top: 2px solid #fff;
-      border-radius: 50%; width: 18px; height: 18px; animation: spin 1s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    .binding-other-input {
-      margin-top: 8px; width: 100%; padding: 10px 14px;
-      font-size: 13px; font-family: inherit;
-      background: var(--surface-container);
-      border: 1.5px solid var(--outline); border-radius: 10px;
-      color: var(--on-surface); transition: border-color .2s;
-    }
-    .binding-other-input:focus { outline: none; border-color: var(--primary); }
-
-    /* Preview panel */
-    .preview-card { display: flex; flex-direction: column; }
-    .preview-card h2 {
-      font-size: 15px; font-weight: 700; margin: 0 0 16px;
-      display: flex; align-items: center; gap: 8px;
-    }
-    .preview-card h2 .material-symbols-outlined { font-size: 20px; color: var(--primary); line-height: 1; }
-    .pdf-placeholder {
-      flex: 1; border-radius: 12px; background: var(--surface-container);
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      min-height: 320px; color: var(--on-surface-variant); font-size: 13px; gap: 10px;
-    }
-    .pdf-placeholder .material-symbols-outlined { font-size: 48px; opacity: .35; display: block; line-height: 1; }
-    #pdf-preview-iframe {
-      width: 100%; flex: 1; min-height: 420px; border: none; border-radius: 12px;
-    }
-    .preview-meta {
-      margin-top: 12px; font-size: 12px; color: var(--on-surface-variant);
-      display: flex; gap: 16px; flex-wrap: wrap;
-    }
-    .preview-meta span { display: flex; align-items: center; gap: 4px; }
-    .preview-meta .material-symbols-outlined { font-size: 14px; line-height: 1; }
-
-    /* Tabs & History Styles */
-    .md3-tabs {
-      display: flex;
-      border-bottom: 1.5px solid rgba(115, 119, 127, 0.2);
-      margin-bottom: 24px;
-      gap: 4px;
-    }
-    .md3-tab {
-      flex: 1;
-      padding: 10px 4px;
-      text-align: center;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--on-surface-variant);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      position: relative;
-      transition: all .2s;
-      border-radius: 12px 12px 0 0;
-      user-select: none;
-    }
-    .md3-tab:hover {
-      color: var(--primary);
-      background-color: var(--tab-hover-bg);
-    }
-    .md3-tab.active {
-      color: var(--primary);
-      font-weight: 700;
-      background-color: var(--tab-active-bg);
-    }
-    .md3-tab-indicator {
-      position: absolute;
-      bottom: 0;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 48px;
-      height: 3px;
-      background-color: var(--primary);
-      border-radius: 3px 3px 0 0;
-      display: none;
-    }
-    .md3-tab.active .md3-tab-indicator {
-      display: block;
-    }
-    .md3-tab .material-symbols-outlined {
-      font-size: 18px;
-    }
-    .history-item {
-      border: 1px solid rgba(115, 119, 127, 0.3);
-      border-radius: 16px;
-      padding: 14px;
-      background: var(--surface-container);
-      transition: border-color .2s, box-shadow .2s;
-    }
-    .history-item:hover {
-      border-color: var(--primary);
-      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-    }
-    .history-item-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: start;
-      margin-bottom: 6px;
-    }
-    .history-item-id {
-      font-family: 'Noto Sans TC', sans-serif;
-      font-size: 11px;
-      color: var(--on-surface-variant);
-      font-weight: 600;
-    }
-    .history-item-date {
-      font-size: 11px;
-      color: var(--on-surface-variant);
-    }
-    .history-item-filename {
-      font-size: 13.5px;
-      font-weight: 700;
-      color: var(--primary);
-      margin-bottom: 6px;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      text-decoration: underline;
-      word-break: break-all;
-    }
-    .history-item-filename:hover {
-      filter: brightness(0.85);
-    }
-    .history-item-filename .material-symbols-outlined {
-      font-size: 15px;
-    }
-    .history-item-details {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 10px;
-      padding-top: 8px;
-      border-top: 1px dashed rgba(115, 119, 127, 0.3);
-    }
-    .history-item-price {
-      font-weight: 700;
-      font-size: 13px;
-      color: var(--on-surface);
-    }
-    .history-item-badges {
-      display: flex;
-      gap: 4px;
-      flex-wrap: wrap;
-      margin-bottom: 6px;
-    }
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      padding: 2px 6px;
-      border-radius: 6px;
-      font-size: 10.5px;
-      font-weight: 700;
-    }
-    .status-paid {
-      background-color: var(--status-paid-bg);
-      color: var(--status-paid-text);
-    }
-    .status-unpaid {
-      background-color: var(--status-unpaid-bg);
-      color: var(--status-unpaid-text);
-    }
-    .status-printed {
-      background-color: var(--status-paid-bg);
-      color: var(--status-paid-text);
-    }
-    .status-queued {
-      background-color: var(--status-queued-bg);
-      color: var(--status-queued-text);
-    }
-    #history-list::-webkit-scrollbar {
-      width: 6px;
-    }
-    #history-list::-webkit-scrollbar-track {
-      background: transparent;
-    }
-    #history-list::-webkit-scrollbar-thumb {
-      background: var(--outline);
-      border-radius: 3px;
-    }
-
-    /* Announcement Card Scroll Styles */
-    .announcement-item-text {
-      font-size: 13.5px;
-      line-height: 1.6;
-      color: var(--on-surface-variant);
-      word-break: break-all;
-    }
-    .announcement-item-divider {
-      height: 1px;
-      background: rgba(115, 119, 127, 0.2);
-      margin: 12px 0;
-    }
-    #announce-items-container::-webkit-scrollbar {
-      width: 6px;
-    }
-    #announce-items-container::-webkit-scrollbar-track {
-      background: transparent;
-    }
-    #announce-items-container::-webkit-scrollbar-thumb {
-      background: var(--outline);
-      border-radius: 3px;
-    }
-
-    /* 即時試算金額卡片 */
-    .price-summary-card {
-      background: var(--price-bg);
-      border: 1.5px solid var(--price-border);
-      border-radius: 16px;
-      padding: 16px;
-      margin-bottom: 20px;
-      animation: fadeSlideIn 0.3s ease;
-    }
-    .price-summary-card .price-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--price-text);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-bottom: 10px;
-    }
-    .price-summary-card .price-header .material-symbols-outlined {
-      font-size: 18px;
-    }
-    .price-summary-card .price-file-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 12.5px;
-      color: var(--price-subtext);
-      padding: 4px 0;
-    }
-    .price-summary-card .price-file-row .file-label {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      max-width: 65%;
-    }
-    .price-summary-card .price-file-row .file-price {
-      font-weight: 600;
-      white-space: nowrap;
-    }
-    .price-summary-card .price-divider {
-      height: 1px;
-      background: var(--price-divider);
-      margin: 8px 0;
-    }
-    .price-summary-card .price-total-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 15px;
-      font-weight: 700;
-      color: var(--price-total);
-      padding-top: 4px;
-    }
-    .price-summary-card .price-total-row .total-amount {
-      font-size: 20px;
-    }
-    .price-summary-card .price-pending {
-      font-size: 11.5px;
-      color: var(--price-subtext);
-      font-style: italic;
-      margin-top: 4px;
-    }
-    @keyframes fadeSlideIn {
-      from { opacity: 0; transform: translateY(-8px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    /* History badge chips (extracted from inline styles) */
-    .hist-badge {
-      padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight: 600;
-      display: inline-flex; align-items: center;
-    }
-    .hist-badge-bw { background: rgba(122,138,176,.15); color: var(--outline); border: 1px solid rgba(122,138,176,.3); }
-    .hist-badge-color { background: rgba(52,152,219,.15); color: var(--primary); border: 1px solid rgba(52,152,219,.3); }
-    .hist-badge-single { background: var(--status-paid-bg); color: var(--status-paid-text); border: 1px solid rgba(46,204,113,.15); }
-    .hist-badge-double { background: var(--status-queued-bg); color: var(--status-queued-text); border: 1px solid rgba(243,156,18,.15); }
-    .hist-badge-binding { background: var(--status-unpaid-bg); color: var(--status-unpaid-text); border: 1px solid rgba(233,69,96,.15); }
-    .hist-badge-pages { background: var(--tab-active-bg); color: var(--primary); }
-
-    /* Cooldown banner class */
-    .cooldown-banner {
-      background-color: var(--cooldown-bg);
-      color: var(--cooldown-text);
-      border: 1.5px solid var(--cooldown-border);
-      padding: 12px 16px;
-      border-radius: 16px;
-      margin-bottom: 20px;
-      font-size: 13.5px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-weight: 500;
-      transition: all 0.3s ease;
-    }
-
-    /* Theme Toggle Button Styles */
-    .theme-toggle-btn {
-      position: fixed;
-      top: 24px;
-      right: 24px;
-      width: 48px;
-      height: 48px;
-      border-radius: 14px;
-      background: var(--surface-container);
-      border: 1px solid var(--outline);
-      color: var(--on-surface);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      z-index: 1000;
-    }
-    .theme-toggle-btn:hover {
-      background: var(--primary-container);
-      color: var(--on-primary-container);
-      border-color: var(--primary);
-      transform: scale(1.05);
-    }
-    .theme-toggle-btn .material-symbols-outlined {
-      font-size: 22px;
-      transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s;
-      position: absolute;
-    }
-    
-    /* Sun/Moon transition effect */
-    html:not(.dark) .theme-icon-sun {
-      opacity: 0;
-      transform: rotate(90deg) scale(0);
-    }
-    html:not(.dark) .theme-icon-moon {
-      opacity: 1;
-      transform: rotate(0) scale(1);
-    }
-    html.dark .theme-icon-sun {
-      opacity: 1;
-      transform: rotate(0) scale(1);
-    }
-    html.dark .theme-icon-moon {
-      opacity: 0;
-      transform: rotate(-90deg) scale(0);
-    }
-    
-    @media (max-width: 680px) {
-      .theme-toggle-btn {
-        top: 16px;
-        right: 16px;
-        width: 40px;
-        height: 40px;
-        border-radius: 12px;
-      }
-      .theme-toggle-btn .material-symbols-outlined {
-        font-size: 20px;
-      }
-    }
-
-    /* SVG Icon System (replaces Material Symbols font) */
-    .material-symbols-outlined {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 1em;
-      height: 1em;
-      vertical-align: middle;
-      fill: currentColor;
-      flex-shrink: 0;
-    }
-    .material-symbols-outlined svg {
-      width: 100%;
-      height: 100%;
-      fill: inherit;
-    }
-
-    /* Offline banner */
-    .offline-banner {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      background: linear-gradient(135deg, #d32f2f 0%, #c62828 100%);
-      color: #fff;
-      text-align: center;
-      padding: 8px 16px;
-      font-size: 13px;
-      font-weight: 600;
-      z-index: 9999;
-      transform: translateY(-100%);
-      transition: transform 0.3s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-    }
-    .offline-banner.show {
-      transform: translateY(0);
-    }
-  </style>
+  <link rel="stylesheet" href="/style.css?v=20260628">
 </head>
 <body>
 <!-- Offline status banner -->
@@ -655,7 +29,7 @@
   ⚠️ 您目前處於離線狀態，部分功能可能無法使用
 </div>
 <!-- SVG Icon Sprite (all Material Symbols replaced with inline SVG) -->
-<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+<svg xmlns="http://www.w3.org/2000/svg" class="hidden-svg">
   <symbol id="i-upload_file" viewBox="0 -960 960 960"><path d="M440-200h80v-167l64 64 56-57-160-160-160 160 57 56 63-63v167ZM240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H240Zm280-520v-200H240v640h480v-440H520ZM240-800v200-200 640-640Z"/></symbol>
   <symbol id="i-history" viewBox="0 -960 960 960"><path d="M480-120q-138 0-240.5-91.5T122-440h82q14 104 92.5 172T480-200q117 0 198.5-81.5T760-480q0-117-81.5-198.5T480-760q-69 0-129 32t-101 88h110v80H120v-240h80v94q51-64 124.5-99T480-840q75 0 140.5 28.5t114 77q48.5 48.5 77 114T840-480q0 75-28.5 140.5t-77 114q-48.5 48.5-114 77T480-120Zm112-192L440-464v-216h80v184l128 128-56 56Z"/></symbol>
   <symbol id="i-preview" viewBox="0 -960 960 960"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-480H200v480Zm133.5-124.5Q269-369 240-440q29-71 93.5-115.5T480-600q82 0 146.5 44.5T720-440q-29 71-93.5 115.5T480-280q-82 0-146.5-44.5Zm248.5-42q46-26.5 72-73.5-26-47-72-73.5T480-540q-56 0-102 26.5T306-440q26 47 72 73.5T480-340q56 0 102-26.5ZM480-440Zm42.5 42.5Q540-415 540-440t-17.5-42.5Q505-500 480-500t-42.5 17.5Q420-465 420-440t17.5 42.5Q455-380 480-380t42.5-17.5Z"/></symbol>
@@ -714,7 +88,7 @@
       <form id="uploadForm">
         <!-- 上傳冷卻提示橫幅 -->
         <div id="cooldown-banner" class="cooldown-banner hidden">
-          <span class="material-symbols-outlined" style="font-size: 20px; color: var(--cooldown-text); animation: spin 2s linear infinite;"><svg><use href="#i-hourglass_empty"/></svg></span>
+          <span class="material-symbols-outlined cooldown-spinner"><svg><use href="#i-hourglass_empty"/></svg></span>
           <span id="cooldown-banner-text">上傳已完成！為避免重複提交，系統冷卻中，請稍候 7 秒...</span>
         </div>
 
@@ -729,9 +103,9 @@
           <input type="file" id="pdf_file" name="file" accept="application/pdf" multiple>
         </label>
 
-        <div id="file-list-container" class="hidden" style="margin-bottom: 20px;">
+        <div id="file-list-container" class="hidden">
           <div class="section-label">已選擇的檔案 (最多 5 個)</div>
-          <div id="selected-files-list" style="display: flex; flex-direction: column; gap: 8px;">
+          <div id="selected-files-list">
             <!-- 已選擇的檔案清單 -->
           </div>
         </div>
@@ -739,10 +113,10 @@
 
 
 
-        <div class="md3-text-field" style="margin-bottom: 24px;">
+        <div class="md3-text-field mb-24">
           <input type="text" id="pickup_location" name="pickup_location" placeholder=" " maxlength="100" required>
           <label for="pickup_location">你要什麼時候拿? (例如: 明天中午、下午3點，限20字)</label>
-          <div id="pickup-error" style="color: var(--error); font-size: 12px; margin-top: 4px; display: none;">⚠️ 抱歉，輸入字數最多只能 20 個字喔！</div>
+          <div id="pickup-error">⚠️ 抱歉，輸入字數最多只能 20 個字喔！</div>
         </div>
 
         <!-- 即時試算金額 -->
@@ -761,7 +135,7 @@
         </div>
 
         <button type="submit" class="md3-btn-filled" id="submit-btn" disabled>
-          <span class="material-symbols-outlined" style="font-size:18px;line-height:1"><svg><use href="#i-send"/></svg></span>
+          <span class="material-symbols-outlined btn-icon-svg"><svg><use href="#i-send"/></svg></span>
           <span id="btn-text">確認上傳</span>
           <div id="btn-spinner" class="spinner hidden"></div>
         </button>
@@ -775,30 +149,30 @@
         <label for="history_search_name">請輸入您的姓名或學號</label>
       </div>
       <button type="button" class="md3-btn-filled" id="history-search-btn">
-        <span class="material-symbols-outlined" style="font-size:18px;line-height:1"><svg><use href="#i-search"/></svg></span>
+        <span class="material-symbols-outlined btn-icon-svg"><svg><use href="#i-search"/></svg></span>
         <span>開始查詢訂單</span>
       </button>
 
-      <div id="history-loading" class="hidden" style="text-align: center; margin-top: 24px;">
-        <div class="spinner" style="border: 2px solid var(--outline); border-top: 2px solid var(--primary); display: inline-block;"></div>
-        <p style="font-size: 13px; color: var(--on-surface-variant); margin-top: 8px;">查詢中，請稍後...</p>
+      <div id="history-loading" class="hidden">
+        <div class="spinner"></div>
+        <p>查詢中，請稍後...</p>
       </div>
 
-      <div id="history-empty" class="hidden" style="text-align: center; margin-top: 24px; padding: 20px; color: var(--on-surface-variant);">
-        <span class="material-symbols-outlined" style="font-size: 44px; opacity: .35; display: block; margin-bottom: 8px;"><svg><use href="#i-search_off"/></svg></span>
+      <div id="history-empty" class="hidden">
+        <span class="material-symbols-outlined"><svg><use href="#i-search_off"/></svg></span>
         <span>找不到您的歷史訂單紀錄</span>
       </div>
 
-      <div id="history-list" class="hidden" style="margin-top: 24px; display: flex; flex-direction: column; gap: 14px; max-height: 480px; overflow-y: auto; padding-right: 4px;">
+      <div id="history-list" class="hidden">
         <!-- Dynamically populated -->
       </div>
     </div>
   </div>
 
   <!-- Right Column -->
-  <div style="display: flex; flex-direction: column; gap: 20px;">
+  <div class="right-column">
     <!-- PDF Preview -->
-    <div class="preview-card" style="flex: 1;">
+    <div class="preview-card flex-1">
       <h2>
         <span class="material-symbols-outlined"><svg><use href="#i-preview"/></svg></span>
         PDF 預覽
@@ -821,12 +195,12 @@
     </div>
 
     <!-- Announcement Card -->
-    <div id="announce-card" class="preview-card hidden" style="max-height: 280px; display: flex; flex-direction: column;">
+    <div id="announce-card" class="preview-card hidden">
       <h2>
-        <span class="material-symbols-outlined" style="color: #f39c12;"><svg><use href="#i-campaign"/></svg></span>
+        <span class="material-symbols-outlined announcement-icon"><svg><use href="#i-campaign"/></svg></span>
         系統公告
       </h2>
-      <div id="announce-items-container" style="flex: 1; overflow-y: auto; padding-right: 6px; font-size: 13.5px; line-height: 1.6; color: var(--on-surface-variant);">
+      <div id="announce-items-container">
         <!-- Dynamically loaded announcements -->
       </div>
     </div>
@@ -1044,8 +418,8 @@
     filesList.innerHTML = selectedFiles.map((fileObj, idx) => {
       const file = fileObj.file;
       const pagesText = fileObj.pages === null 
-        ? `<span style="font-size: 11.5px; color: var(--outline); font-weight: normal;">(計算頁數中...)</span>` 
-        : `<span style="font-size: 11.5px; color: var(--outline); font-weight: normal;">(${fileObj.pages} 頁)</span>`;
+        ? `<span class="file-item-pages">(計算頁數中...)</span>` 
+        : `<span class="file-item-pages">(${fileObj.pages} 頁)</span>`;
 
       // 只有在頁數未明 (null) 或是頁數大於 1 時才顯示裝訂位置與單雙面
       const showBinding = fileObj.pages === null || fileObj.pages > 1;
@@ -1053,42 +427,42 @@
 
       const bindingHtml = showBinding ? `
             <!-- 裝訂位置 -->
-            <div style="display: flex; flex-direction: column; gap: 4px;">
-              <span style="font-size: 11px; color: var(--on-surface-variant); font-weight: 600;">裝訂位置</span>
+            <div class="setting-col">
+              <span class="setting-label">裝訂位置</span>
               <div class="chip-group">
                 <label>
                   <input type="radio" name="binding_${idx}" value="top_left" ${fileObj.binding === 'top_left' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'binding', 'top_left')">
-                  <span class="material-symbols-outlined" style="font-size: 17px;"><svg><use href="#i-north_west"/></svg></span>
+                  <span class="material-symbols-outlined chip-icon"><svg><use href="#i-north_west"/></svg></span>
                   <span>左上角</span>
                 </label>
                 <label>
                   <input type="radio" name="binding_${idx}" value="top_right" ${fileObj.binding === 'top_right' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'binding', 'top_right')">
-                  <span class="material-symbols-outlined" style="font-size: 17px;"><svg><use href="#i-north_east"/></svg></span>
+                  <span class="material-symbols-outlined chip-icon"><svg><use href="#i-north_east"/></svg></span>
                   <span>右上角</span>
                 </label>
                 <label>
                   <input type="radio" name="binding_${idx}" value="other" ${fileObj.binding === 'other' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'binding', 'other')">
-                  <span class="material-symbols-outlined" style="font-size: 17px;"><svg><use href="#i-edit"/></svg></span>
+                  <span class="material-symbols-outlined chip-icon"><svg><use href="#i-edit"/></svg></span>
                   <span>其他</span>
                 </label>
               </div>
-              <input type="text" id="binding_other_text_${idx}" class="binding-other-input ${fileObj.binding === 'other' ? '' : 'hidden'}" placeholder="請說明裝訂方式… (限 10 字)" maxlength="10" value="${escHtml(fileObj.bindingOtherText || '')}" oninput="updateFileOtherText(${idx}, this.value)" style="margin-top: 6px; width: 100%; padding: 8px 12px; font-size: 12.5px; border-radius: 8px;">
+              <input type="text" id="binding_other_text_${idx}" class="binding-other-input binding-other-text-input ${fileObj.binding === 'other' ? '' : 'hidden'}" placeholder="請說明裝訂方式… (限 10 字)" maxlength="10" value="${escHtml(fileObj.bindingOtherText || '')}" oninput="updateFileOtherText(${idx}, this.value)">
             </div>
       ` : '';
 
       const duplexHtml = showDuplex ? `
               <!-- 列印方式 -->
-              <div style="display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 140px;">
-                <span style="font-size: 11px; color: var(--on-surface-variant); font-weight: 600;">列印方式</span>
+              <div class="setting-col-flex">
+                <span class="setting-label">列印方式</span>
                 <div class="chip-group">
                   <label>
                     <input type="radio" name="duplex_${idx}" value="single" ${fileObj.duplex === 'single' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'duplex', 'single')">
-                    <span class="material-symbols-outlined" style="font-size: 17px;"><svg><use href="#i-article"/></svg></span>
+                    <span class="material-symbols-outlined chip-icon"><svg><use href="#i-article"/></svg></span>
                     <span>單面</span>
                   </label>
                   <label>
                     <input type="radio" name="duplex_${idx}" value="double" ${fileObj.duplex === 'double' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'duplex', 'double')">
-                    <span class="material-symbols-outlined" style="font-size: 17px;"><svg><use href="#i-menu_book"/></svg></span>
+                    <span class="material-symbols-outlined chip-icon"><svg><use href="#i-menu_book"/></svg></span>
                     <span>雙面</span>
                   </label>
                 </div>
@@ -1096,33 +470,33 @@
       ` : '';
 
       return `
-        <div class="file-item-card" style="background: var(--surface); border: 1.5px solid rgba(115, 119, 127, 0.2); border-radius: 16px; padding: 14px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
+        <div class="file-item-card">
           <!-- 標題欄：檔名、大小、預覽、刪除 -->
-          <div style="display: flex; align-items: center; justify-content: space-between; min-width: 0;">
-            <div style="display: flex; align-items: center; gap: 8px; cursor: pointer; flex: 1; min-width: 0;" onclick="previewFile(${idx})">
-              <span class="material-symbols-outlined" style="color: var(--primary); font-size: 20px;"><svg><use href="#i-description"/></svg></span>
-              <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; color: var(--primary);" title="${escHtml(file.name)}">${escHtml(file.name)} (${(file.size / 1024).toFixed(0)} KB) ${pagesText}</span>
+          <div class="file-item-header">
+            <div class="file-item-title-wrapper" onclick="previewFile(${idx})">
+              <span class="material-symbols-outlined file-item-icon"><svg><use href="#i-description"/></svg></span>
+              <span class="file-item-name" title="${escHtml(file.name)}">${escHtml(file.name)} (${(file.size / 1024).toFixed(0)} KB) ${pagesText}</span>
             </div>
-            <button type="button" onclick="removeFile(${idx})" style="background: transparent; border: none; color: var(--on-surface-variant); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px; border-radius: 50%; width: 28px; height: 28px; transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.06)'" onmouseout="this.style.background='transparent'">
-              <span class="material-symbols-outlined" style="font-size: 20px;"><svg><use href="#i-close"/></svg></span>
+            <button type="button" onclick="removeFile(${idx})" class="file-item-remove-btn">
+              <span class="material-symbols-outlined remove-icon"><svg><use href="#i-close"/></svg></span>
             </button>
           </div>
 
           <!-- 列印設定區域 -->
-          <div style="display: flex; flex-direction: column; gap: 8px; border-top: 1px dashed rgba(115, 119, 127, 0.2); padding-top: 8px; min-width: 0;">
-            <div style="display: flex; gap: 16px; flex-wrap: wrap; min-width: 0;">
+          <div class="file-item-settings">
+            <div class="file-item-options">
               <!-- 色彩模式 -->
-              <div style="display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 140px;">
-                <span style="font-size: 11px; color: var(--on-surface-variant); font-weight: 600;">色彩模式</span>
+              <div class="setting-col-flex">
+                <span class="setting-label">色彩模式</span>
                 <div class="chip-group">
                   <label>
                     <input type="radio" name="color_mode_${idx}" value="bw" ${fileObj.colorMode === 'bw' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'colorMode', 'bw')">
-                    <span class="material-symbols-outlined" style="font-size: 17px;"><svg><use href="#i-invert_colors"/></svg></span>
+                    <span class="material-symbols-outlined chip-icon"><svg><use href="#i-invert_colors"/></svg></span>
                     <span>黑白</span>
                   </label>
                   <label>
                     <input type="radio" name="color_mode_${idx}" value="color" ${fileObj.colorMode === 'color' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'colorMode', 'color')">
-                    <span class="material-symbols-outlined" style="font-size: 17px;"><svg><use href="#i-palette"/></svg></span>
+                    <span class="material-symbols-outlined chip-icon"><svg><use href="#i-palette"/></svg></span>
                     <span>彩色</span>
                   </label>
                 </div>
@@ -1507,7 +881,7 @@
           </div>
           <div class="history-item-details">
             <div class="history-item-price">NT$ ${(order.total_price || 0).toLocaleString()} 元</div>
-            <div style="display: flex; gap: 6px;">
+            <div class="history-item-badge-row">
               ${paidBadge}
               ${printedBadge}
             </div>
@@ -1667,7 +1041,7 @@
         hasPending = true;
         rows += `<div class="price-file-row">
           <span class="file-label" title="${escHtml(fileName)}">${escHtml(shortName)}</span>
-          <span class="file-price" style="color: #558b2f; font-style: italic;">計算中...</span>
+          <span class="file-price file-price-pending">計算中...</span>
         </div>`;
       } else {
         const filePrice = fileObj.pages * pricePerPage;
