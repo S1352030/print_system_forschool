@@ -28,6 +28,16 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  // 只處理 http/https 請求（排除 chrome-extension:// 等）
+  if (!url.protocol.startsWith('http')) {
+    return;
+  }
+
+  // 只快取 GET 請求（Cache API 不支援 POST 等方法）
+  if (request.method !== 'GET') {
+    return;
+  }
+
   // API 請求：Network Only（永不快取，由應用層自行管理）
   if (url.pathname.startsWith('/api/')) {
     return; // 不攔截，讓瀏覽器正常發送
@@ -57,7 +67,7 @@ self.addEventListener('fetch', (event) => {
 async function networkFirst(request) {
   try {
     const response = await fetch(request);
-    if (response.ok) {
+    if (response.ok && canCache(request)) {
       const cache = await caches.open(CACHE_NAME);
       cache.put(request, response.clone());
     }
@@ -76,7 +86,7 @@ async function cacheFirst(request) {
   }
   try {
     const response = await fetch(request);
-    if (response.ok) {
+    if (response.ok && canCache(request)) {
       const cache = await caches.open(CACHE_NAME);
       cache.put(request, response.clone());
     }
@@ -84,4 +94,10 @@ async function cacheFirst(request) {
   } catch (err) {
     return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
   }
+}
+
+// ── 輔助：判斷請求是否可快取 ──────────────────────────────
+function canCache(request) {
+  const url = new URL(request.url);
+  return request.method === 'GET' && url.protocol.startsWith('http');
 }
