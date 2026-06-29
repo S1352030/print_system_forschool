@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8" />
@@ -12,7 +12,7 @@
   </noscript>
   <script>
     (function() {
-      const savedTheme = localStorage.getItem('theme');
+      const savedTheme = sessionStorage.getItem('theme');
       const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
       if (savedTheme === 'dark' || (!savedTheme && systemPrefersDark)) {
         document.documentElement.classList.add('dark');
@@ -708,7 +708,7 @@
       let msg = `✅ 上傳成功！共成功上傳 ${uploadedCount} 個檔案。\n通知已發送給管理員。`;
       alert(msg);
 
-      localStorage.setItem('print_user_name', nameVal);
+      sessionStorage.setItem('print_user_name', nameVal);
       document.getElementById('history_search_name').value = nameVal;
 
       uploadForm.reset();
@@ -764,11 +764,12 @@
     }
   }
 
-  // ── 前端快取：30 秒內相同姓名查詢直接從記憶體返回 ──
-  const _historyCache = { name: '', data: null, ts: 0 };
-  const CACHE_TTL_MS = 30000; // 30 秒
+  // ── 歷史訂單快取 (Stale-While-Revalidate) ──
+  const CACHE_TTL_MS = 30000; // 30 秒內不重複發送背景請求
+  let _historyFetchTime = 0;
+  let _lastFetchedName = '';
 
-  function invalidateHistoryCache() { _historyCache.ts = 0; }
+  function invalidateHistoryCache() { _historyFetchTime = 0; }
 
   async function fetchHistory(forceRefresh) {
     const searchName = document.getElementById('history_search_name').value.trim();
@@ -777,8 +778,8 @@
       return;
     }
 
-    // 儲存於 localStorage，方便下次使用
-    localStorage.setItem('print_user_name', searchName);
+    // 儲存於 sessionStorage，方便下次使用
+    sessionStorage.setItem('print_user_name', searchName);
     userNameInput.value = searchName;
     checkFormValidity();
 
@@ -786,47 +787,77 @@
     const emptyDiv = document.getElementById('history-empty');
     const listDiv = document.getElementById('history-list');
 
-    // 快取命中：同名 + 未過期 → 直接渲染，0ms
-    if (!forceRefresh && _historyCache.name === searchName && (Date.now() - _historyCache.ts) < CACHE_TTL_MS && _historyCache.data) {
-      emptyDiv.classList.add('hidden');
-      loadingDiv.classList.add('hidden');
-      listDiv.innerHTML = '';
-      if (_historyCache.data.length === 0) {
-        listDiv.classList.add('hidden');
-        emptyDiv.classList.remove('hidden');
-      } else {
-        renderHistoryList(_historyCache.data);
-        listDiv.classList.remove('hidden');
+    // 1. 嘗試從 sessionStorage 讀取舊資料並立即渲染 (SWR)
+    const cacheKey = `history_cache_${searchName}`;
+    const cachedDataStr = sessionStorage.getItem(cacheKey);
+    let hasRenderedCache = false;
+
+    if (cachedDataStr) {
+      try {
+        const cachedOrders = JSON.parse(cachedDataStr);
+        emptyDiv.classList.add('hidden');
+        loadingDiv.classList.add('hidden');
+        listDiv.innerHTML = '';
+        if (cachedOrders.length === 0) {
+          listDiv.classList.add('hidden');
+          emptyDiv.classList.remove('hidden');
+        } else {
+          renderHistoryList(cachedOrders);
+          listDiv.classList.remove('hidden');
+        }
+        hasRenderedCache = true;
+      } catch (e) {
+        console.warn('解析歷史訂單快取失敗', e);
       }
+    }
+
+    // 限制：30 秒內若已查詢過同姓名且非強制更新，直接結束
+    if (!forceRefresh && _lastFetchedName === searchName && (Date.now() - _historyFetchTime) < CACHE_TTL_MS) {
       return;
     }
 
-    loadingDiv.classList.remove('hidden');
-    emptyDiv.classList.add('hidden');
-    listDiv.classList.add('hidden');
-    listDiv.innerHTML = '';
+    // 2. 在背景發送請求取得最新資料
+    if (!hasRenderedCache) {
+      loadingDiv.classList.remove('hidden');
+      emptyDiv.classList.add('hidden');
+      listDiv.classList.add('hidden');
+      listDiv.innerHTML = '';
+    }
 
     try {
       const response = await fetch('/api/orders/history?user_name=' + encodeURIComponent(searchName));
       if (response.ok) {
         const orders = await response.json();
-        // 寫入快取
-        _historyCache.name = searchName;
-        _historyCache.data = orders;
-        _historyCache.ts = Date.now();
+        const newOrdersStr = JSON.stringify(orders);
 
-        loadingDiv.classList.add('hidden');
+        _lastFetchedName = searchName;
+        _historyFetchTime = Date.now();
+        sessionStorage.setItem(cacheKey, newOrdersStr);
+
+        // 如果舊資料與新資料完全相同，則不需重新渲染，避免畫面閃爍
+        if (hasRenderedCache && cachedDataStr === newOrdersStr) {
+          return;
+        }
+
+        if (!hasRenderedCache) {
+          loadingDiv.classList.add('hidden');
+        }
+
         if (orders.length === 0) {
+          listDiv.classList.add('hidden');
           emptyDiv.classList.remove('hidden');
         } else {
           renderHistoryList(orders);
           listDiv.classList.remove('hidden');
+          emptyDiv.classList.add('hidden'); // Ensure emptyDiv is hidden when we have results
         }
       } else {
         throw new Error('HTTP ' + response.status);
       }
     } catch (e) {
-      loadingDiv.classList.add('hidden');
+      if (!hasRenderedCache) {
+        loadingDiv.classList.add('hidden');
+      }
       alert('❌ 查詢失敗：' + e.message);
     }
   }
@@ -892,7 +923,7 @@
   }
 
   function previewPastOrder(orderId, fileName) {
-    const searchName = document.getElementById('history_search_name').value.trim() || localStorage.getItem('print_user_name');
+    const searchName = document.getElementById('history_search_name').value.trim() || sessionStorage.getItem('print_user_name');
     if (!searchName) {
       alert('請先輸入您的姓名或學號！');
       return;
@@ -961,7 +992,7 @@
     }
   });
 
-  // 網頁載入時讀取 localStorage
+  // 網頁載入時讀取 sessionStorage
   window.addEventListener('DOMContentLoaded', () => {
     loadActiveAnnouncements(); // 載入系統公告
     
@@ -970,11 +1001,11 @@
     if (themeToggleBtn) {
       themeToggleBtn.addEventListener('click', () => {
         const isDark = document.documentElement.classList.toggle('dark');
-        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        sessionStorage.setItem('theme', isDark ? 'dark' : 'light');
       });
     }
 
-    const savedName = localStorage.getItem('print_user_name');
+    const savedName = sessionStorage.getItem('print_user_name');
     if (savedName) {
       userNameInput.value = savedName;
       document.getElementById('history_search_name').value = savedName;
