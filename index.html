@@ -11,9 +11,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet" />
   </noscript>
   <!-- PDF.js 載入 -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+  <script src="/static/pdfjs/build/pdf.js"></script>
   <script>
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '/static/pdfjs/build/pdf.worker.js';
   </script>
   <script>
     (function() {
@@ -629,7 +629,7 @@
     try {
       const loadingTask = pdfjsLib.getDocument({
         url: url,
-        cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/cmaps/',
+        cMapUrl: '/static/pdfjs/web/cmaps/',
         cMapPacked: true,
       });
       currentPdfDoc = await loadingTask.promise;

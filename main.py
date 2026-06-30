@@ -7,6 +7,7 @@ import uuid
 import logging
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Depends, status, Request, BackgroundTasks
 from fastapi.responses import JSONResponse, FileResponse, Response
+from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pypdf import PdfReader
 from sqlalchemy.orm import Session
@@ -30,6 +31,9 @@ Base.metadata.create_all(bind=engine)
 ensure_order_columns()
 
 app = FastAPI(title="影印計價與通知系統")
+
+# 提供靜態檔案服務 (用於 PDF.js 等)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # ── 初始化結構化日誌系統（Zstd 壓縮輪替）────────────────────────
 setup_logging()
