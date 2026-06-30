@@ -61,7 +61,11 @@ class SecurityAndCacheMiddleware:
                 headers["X-Content-Type-Options"] = "nosniff"
                 
                 # 2. Content-Security-Policy (強化防護，攔截外部腳本注入如卡巴斯基)
-                headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-src 'self'; frame-ancestors 'self'"
+                content_type = headers.get("content-type", "")
+                csp = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-src 'self' blob: data:; object-src 'self' blob: data:"
+                if "application/pdf" not in content_type.lower():
+                    csp += "; frame-ancestors 'self'"
+                headers["Content-Security-Policy"] = csp
                 
                 # 3. 清理過期或不推薦的標頭
                 for h in ["Expires", "Pragma", "X-Frame-Options", "X-XSS-Protection"]:
