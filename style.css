@@ -83,6 +83,129 @@ html.dark {
   /* Color channels for opacity calculations */
   --on-surface-rgb: 226, 226, 230;
 }
+
+/* --- Color Palette Themes --- */
+
+/* Blue Theme (Default) */
+.theme-blue {
+  --primary: #006494;
+  --on-primary: #ffffff;
+  --primary-container: #cae6ff;
+  --on-primary-container: #001e30;
+  --surface: #fdfcff;
+  --surface-container: #f0f4f8;
+  --tab-hover-bg: rgba(0, 100, 148, 0.05);
+  --tab-active-bg: rgba(0, 100, 148, 0.08);
+}
+html.dark.theme-blue, html.dark .theme-blue {
+  --primary: #8ecdff;
+  --on-primary: #003450;
+  --primary-container: #004b71;
+  --on-primary-container: #cae6ff;
+  --surface: #111416;
+  --surface-container: #1b1e22;
+}
+
+/* Green Theme */
+.theme-green {
+  --primary: #0b6b3a;
+  --on-primary: #ffffff;
+  --primary-container: #a3f4c1;
+  --on-primary-container: #00210c;
+  --surface: #f7fcf7;
+  --surface-container: #edf5ed;
+  --tab-hover-bg: rgba(11, 107, 58, 0.05);
+  --tab-active-bg: rgba(11, 107, 58, 0.08);
+}
+html.dark.theme-green, html.dark .theme-green {
+  --primary: #87d8a6;
+  --on-primary: #003819;
+  --primary-container: #005228;
+  --on-primary-container: #a3f4c1;
+  --surface: #0f1411;
+  --surface-container: #181e1a;
+}
+
+/* Purple Theme */
+.theme-purple {
+  --primary: #684fa3;
+  --on-primary: #ffffff;
+  --primary-container: #e8ddff;
+  --on-primary-container: #23005c;
+  --surface: #fdfaff;
+  --surface-container: #f3eff7;
+  --tab-hover-bg: rgba(104, 79, 163, 0.05);
+  --tab-active-bg: rgba(104, 79, 163, 0.08);
+}
+html.dark.theme-purple, html.dark .theme-purple {
+  --primary: #cfbdff;
+  --on-primary: #391e72;
+  --primary-container: #4f378a;
+  --on-primary-container: #e8ddff;
+  --surface: #141218;
+  --surface-container: #1e1b22;
+}
+
+/* Teal Theme */
+.theme-teal {
+  --primary: #00696b;
+  --on-primary: #ffffff;
+  --primary-container: #9ef0f2;
+  --on-primary-container: #002021;
+  --surface: #fafdfd;
+  --surface-container: #eef5f5;
+  --tab-hover-bg: rgba(0, 105, 107, 0.05);
+  --tab-active-bg: rgba(0, 105, 107, 0.08);
+}
+html.dark.theme-teal, html.dark .theme-teal {
+  --primary: #82d4d6;
+  --on-primary: #003738;
+  --primary-container: #004f51;
+  --on-primary-container: #9ef0f2;
+  --surface: #0e1414;
+  --surface-container: #171e1e;
+}
+
+/* Rose Theme */
+.theme-rose {
+  --primary: #a23e5c;
+  --on-primary: #ffffff;
+  --primary-container: #ffd9e1;
+  --on-primary-container: #3e0016;
+  --surface: #fffbff;
+  --surface-container: #f9edf0;
+  --tab-hover-bg: rgba(162, 62, 92, 0.05);
+  --tab-active-bg: rgba(162, 62, 92, 0.08);
+}
+html.dark.theme-rose, html.dark .theme-rose {
+  --primary: #ffb2c4;
+  --on-primary: #63002a;
+  --primary-container: #822644;
+  --on-primary-container: #ffd9e1;
+  --surface: #161113;
+  --surface-container: #201a1c;
+}
+
+/* Orange Theme */
+.theme-orange {
+  --primary: #904d00;
+  --on-primary: #ffffff;
+  --primary-container: #ffdbbf;
+  --on-primary-container: #2e1500;
+  --surface: #fffbff;
+  --surface-container: #fbf0ea;
+  --tab-hover-bg: rgba(144, 77, 0, 0.05);
+  --tab-active-bg: rgba(144, 77, 0, 0.08);
+}
+html.dark.theme-orange, html.dark .theme-orange {
+  --primary: #ffb77c;
+  --on-primary: #4d2200;
+  --primary-container: #703800;
+  --on-primary-container: #ffdbbf;
+  --surface: #151311;
+  --surface-container: #201b18;
+}
+
 * { box-sizing: border-box; }
 body {
   font-family: 'Noto Sans TC', 'Segoe UI', sans-serif;
@@ -144,6 +267,14 @@ body {
   transition: border-color .2s; font-family: inherit;
 }
 .md3-text-field input:focus { outline: none; border-bottom: 2px solid var(--primary); }
+.md3-text-field input:-webkit-autofill,
+.md3-text-field input:-webkit-autofill:hover, 
+.md3-text-field input:-webkit-autofill:focus, 
+.md3-text-field input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px var(--surface-container) inset !important;
+  -webkit-text-fill-color: var(--on-surface) !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
 .md3-text-field label {
   position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
   font-size: 15px; color: var(--on-surface-variant);

@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8" />
@@ -12,6 +12,7 @@
   </noscript>
   <script>
     (function() {
+      // 1. Dark/Light mode theme
       const savedTheme = sessionStorage.getItem('theme');
       const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
       if (savedTheme === 'dark' || (!savedTheme && systemPrefersDark)) {
@@ -19,9 +20,18 @@
       } else {
         document.documentElement.classList.remove('dark');
       }
+
+      // 2. Random color palette theme
+      const palettes = ['theme-blue', 'theme-green', 'theme-purple', 'theme-teal', 'theme-rose', 'theme-orange'];
+      let selectedPalette = sessionStorage.getItem('selected-palette');
+      if (!selectedPalette || !palettes.includes(selectedPalette)) {
+        selectedPalette = palettes[Math.floor(Math.random() * palettes.length)];
+        sessionStorage.setItem('selected-palette', selectedPalette);
+      }
+      document.documentElement.classList.add(selectedPalette);
     })();
   </script>
-  <link rel="stylesheet" href="/style.css?v=20260628">
+  <link rel="stylesheet" href="/style.css?v=20260630a">
 </head>
 <body>
 <!-- Offline status banner -->
