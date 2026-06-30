@@ -627,13 +627,18 @@
     document.getElementById('meta-size').textContent = (file.size / 1024).toFixed(0) + ' KB';
 
     try {
-      const loadingTask = pdfjsLib.getDocument(url);
+      const loadingTask = pdfjsLib.getDocument({
+        url: url,
+        cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
+        cMapPacked: true,
+      });
       currentPdfDoc = await loadingTask.promise;
       document.getElementById('pdf-page-count').textContent = currentPdfDoc.numPages;
       currentPdfPage = 1;
       await renderPdfPage(currentPdfPage);
     } catch (e) {
       console.error('PDF Load Error', e);
+      alert('PDF 載入失敗: ' + (e.message || e));
     }
   }
 
@@ -1015,7 +1020,11 @@
     document.getElementById('meta-name').textContent = fileName;
     document.getElementById('meta-size').textContent = '歷史訂單 #' + orderId;
 
-    pdfjsLib.getDocument(url).promise.then(pdf => {
+    pdfjsLib.getDocument({
+      url: url,
+      cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
+      cMapPacked: true,
+    }).promise.then(pdf => {
       currentPdfDoc = pdf;
       document.getElementById('pdf-page-count').textContent = currentPdfDoc.numPages;
       currentPdfPage = 1;

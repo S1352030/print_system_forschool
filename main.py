@@ -62,7 +62,7 @@ class SecurityAndCacheMiddleware:
                 
                 # 2. Content-Security-Policy (強化防護，攔截外部腳本注入如卡巴斯基)
                 content_type = headers.get("content-type", "")
-                csp = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-src 'self' blob: data:; object-src 'self' blob: data:"
+                csp = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://cdnjs.cloudflare.com blob:; worker-src 'self' blob:; frame-src 'self' blob: data:; object-src 'self' blob: data:"
                 if "application/pdf" not in content_type.lower():
                     csp += "; frame-ancestors 'self'"
                 headers["Content-Security-Policy"] = csp
