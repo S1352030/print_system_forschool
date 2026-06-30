@@ -8,6 +8,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
   <link rel="stylesheet" href="/admin.css?v=20260628">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  </script>
 </head>
 <body>
 
@@ -108,8 +112,15 @@
       <button class="btn-close-modal" onclick="closePdfModal()">✕</button>
     </div>
     <div class="modal-settings" id="modal-settings"></div>
-    <div class="modal-pdf-wrap">
-      <iframe id="modal-pdf-iframe" title="PDF預覽" src=""></iframe>
+    <div class="modal-pdf-wrap" style="position: relative; display: flex; flex-direction: column; align-items: center; overflow: hidden;">
+      <div style="flex: 1; overflow: auto; width: 100%; display: flex; justify-content: center; align-items: flex-start; padding: 10px;">
+        <canvas id="admin-pdf-canvas" style="max-width: 100%; height: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.3); background: white;"></canvas>
+      </div>
+      <div style="display: flex; gap: 15px; align-items: center; padding: 8px 16px; background: rgba(0,0,0,0.6); color: white; border-radius: 20px; position: absolute; bottom: 10px; z-index: 10;">
+        <button type="button" id="admin-pdf-prev" style="background: none; border: none; color: white; cursor: pointer; font-size: 16px;">◀</button>
+        <span style="font-size: 14px;"><span id="admin-pdf-num">1</span> / <span id="admin-pdf-count">1</span></span>
+        <button type="button" id="admin-pdf-next" style="background: none; border: none; color: white; cursor: pointer; font-size: 16px;">▶</button>
+      </div>
     </div>
   </div>
 </div>
@@ -224,6 +235,46 @@
     `).join('');
   }
 
+  let adminPdfDoc = null;
+  let adminPdfPage = 1;
+  let adminPdfRenderTask = null;
+  const adminPdfCanvas = document.getElementById('admin-pdf-canvas');
+  const adminPdfCtx = adminPdfCanvas ? adminPdfCanvas.getContext('2d') : null;
+
+  if (document.getElementById('admin-pdf-prev')) {
+    document.getElementById('admin-pdf-prev').addEventListener('click', () => {
+      if (adminPdfPage <= 1) return;
+      adminPdfPage--;
+      renderAdminPdfPage(adminPdfPage);
+    });
+  }
+  if (document.getElementById('admin-pdf-next')) {
+    document.getElementById('admin-pdf-next').addEventListener('click', () => {
+      if (!adminPdfDoc || adminPdfPage >= adminPdfDoc.numPages) return;
+      adminPdfPage++;
+      renderAdminPdfPage(adminPdfPage);
+    });
+  }
+
+  async function renderAdminPdfPage(num) {
+    if (!adminPdfDoc) return;
+    if (adminPdfRenderTask) return;
+    try {
+      const page = await adminPdfDoc.getPage(num);
+      const viewport = page.getViewport({ scale: 1.5 });
+      adminPdfCanvas.height = viewport.height;
+      adminPdfCanvas.width = viewport.width;
+
+      adminPdfRenderTask = page.render({ canvasContext: adminPdfCtx, viewport: viewport });
+      await adminPdfRenderTask.promise;
+      adminPdfRenderTask = null;
+      document.getElementById('admin-pdf-num').textContent = num;
+    } catch (e) {
+      console.error('PDF render error:', e);
+      adminPdfRenderTask = null;
+    }
+  }
+
   async function openPdfModal(orderId) {
     const order = orders.find(o => o.id === orderId);
     if (!order) return;
@@ -234,18 +285,22 @@
 
     document.getElementById('modal-settings').innerHTML = buildSettingBadges(order);
 
-    const iframe = document.getElementById('modal-pdf-iframe');
-    iframe.src = ''; // 先清空舊內容避免殘留
+    if (adminPdfCtx) adminPdfCtx.clearRect(0, 0, adminPdfCanvas.width, adminPdfCanvas.height);
+    adminPdfDoc = null;
 
     try {
       showToast('正在載入 PDF 檔案...');
-      const res = await fetch(API_BASE + '/api/orders/' + orderId + '/file');
-      if (!res.ok) throw new Error('無法串流 PDF 檔案，HTTP ' + res.status);
+      const url = API_BASE + '/api/orders/' + orderId + '/file/' + encodeURIComponent(order.file_name);
       
-      // 直接使用包含檔名的 API 網址，確保下載時瀏覽器能對應正確的檔案名稱
-      iframe.src = API_BASE + '/api/orders/' + orderId + '/file/' + encodeURIComponent(order.file_name);
-      
-      document.getElementById('pdf-modal').classList.add('open');
+      pdfjsLib.getDocument(url).promise.then(pdf => {
+        adminPdfDoc = pdf;
+        document.getElementById('admin-pdf-count').textContent = pdf.numPages;
+        adminPdfPage = 1;
+        renderAdminPdfPage(adminPdfPage);
+        document.getElementById('pdf-modal').classList.add('open');
+      }).catch(err => {
+        showToast('PDF 解析失敗：' + err.message, true);
+      });
     } catch (e) {
       showToast('檔案載入失敗：' + e.message, true);
     }
@@ -253,13 +308,8 @@
 
   function closePdfModal() {
     document.getElementById('pdf-modal').classList.remove('open');
-    const iframe = document.getElementById('modal-pdf-iframe');
-    // 釋放記憶體，避免瀏覽器頁面越來越肥
-    if (iframe.dataset.blobUrl) {
-      URL.revokeObjectURL(iframe.dataset.blobUrl);
-      iframe.removeAttribute('data-blobUrl');
-    }
-    iframe.src = '';
+    if (adminPdfCtx) adminPdfCtx.clearRect(0, 0, adminPdfCanvas.width, adminPdfCanvas.height);
+    adminPdfDoc = null;
   }
 
   function closeModal(e) {

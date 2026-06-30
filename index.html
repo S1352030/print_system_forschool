@@ -10,6 +10,11 @@
   <noscript>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet" />
   </noscript>
+  <!-- PDF.js 載入 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  </script>
   <script>
     (function() {
       // 1. Dark/Light mode theme
@@ -191,7 +196,16 @@
         <span class="material-symbols-outlined"><svg><use href="#i-picture_as_pdf"/></svg></span>
         <span>選擇 PDF 後顯示預覽</span>
       </div>
-      <iframe id="pdf-preview-iframe" class="hidden" title="PDF預覽"></iframe>
+      <div id="pdf-preview-container" class="hidden" style="position: relative; display: flex; flex-direction: column; align-items: center; width: 100%; height: 100%; min-height: 400px; background: var(--bg-card); border-radius: 8px; overflow: hidden;">
+        <div style="flex: 1; overflow: auto; width: 100%; display: flex; justify-content: center; align-items: flex-start; padding: 10px;">
+          <canvas id="pdf-canvas" style="max-width: 100%; height: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.3); background: white;"></canvas>
+        </div>
+        <div id="pdf-controls" style="display: flex; gap: 15px; align-items: center; padding: 8px 16px; background: rgba(0,0,0,0.6); color: white; border-radius: 20px; margin-bottom: 10px; z-index: 10; position: absolute; bottom: 10px;">
+          <button type="button" id="pdf-prev" style="background: none; border: none; color: white; cursor: pointer; padding: 5px; font-size: 16px; display: flex; align-items: center;">◀</button>
+          <span style="font-size: 14px;"><span id="pdf-page-num">1</span> / <span id="pdf-page-count">1</span></span>
+          <button type="button" id="pdf-next" style="background: none; border: none; color: white; cursor: pointer; padding: 5px; font-size: 16px; display: flex; align-items: center;">▶</button>
+        </div>
+      </div>
       <div class="preview-meta hidden" id="preview-meta">
         <span>
           <span class="material-symbols-outlined"><svg><use href="#i-draft"/></svg></span>
@@ -226,7 +240,51 @@
   const btnText = document.getElementById('btn-text');
   const btnSpinner = document.getElementById('btn-spinner');
   const pdfPlaceholder = document.getElementById('pdf-placeholder');
-  const pdfIframe = document.getElementById('pdf-preview-iframe');
+  
+  const pdfContainer = document.getElementById('pdf-preview-container');
+  const pdfCanvas = document.getElementById('pdf-canvas');
+  const pdfCtx = pdfCanvas ? pdfCanvas.getContext('2d') : null;
+
+  let currentPdfDoc = null;
+  let currentPdfPage = 1;
+  let pdfRenderTask = null;
+
+  if (document.getElementById('pdf-prev')) {
+    document.getElementById('pdf-prev').addEventListener('click', () => {
+      if (currentPdfPage <= 1) return;
+      currentPdfPage--;
+      renderPdfPage(currentPdfPage);
+    });
+  }
+  if (document.getElementById('pdf-next')) {
+    document.getElementById('pdf-next').addEventListener('click', () => {
+      if (!currentPdfDoc || currentPdfPage >= currentPdfDoc.numPages) return;
+      currentPdfPage++;
+      renderPdfPage(currentPdfPage);
+    });
+  }
+
+  async function renderPdfPage(num) {
+    if (!currentPdfDoc) return;
+    if (pdfRenderTask) return; // 避免重複渲染
+    try {
+      const page = await currentPdfDoc.getPage(num);
+      const viewport = page.getViewport({ scale: 1.5 });
+      pdfCanvas.height = viewport.height;
+      pdfCanvas.width = viewport.width;
+
+      const renderContext = { canvasContext: pdfCtx, viewport: viewport };
+      pdfRenderTask = page.render(renderContext);
+      await pdfRenderTask.promise;
+      pdfRenderTask = null;
+
+      document.getElementById('pdf-page-num').textContent = num;
+    } catch (e) {
+      console.error('PDF rendering error', e);
+      pdfRenderTask = null;
+    }
+  }
+
   const previewMeta = document.getElementById('preview-meta');
   const pickupLocationInput = document.getElementById('pickup_location');
 
@@ -559,20 +617,31 @@
     }
   };
 
-  function showPreview(file) {
+  async function showPreview(file) {
     const url = URL.createObjectURL(file);
-    pdfIframe.src = url;
+    
     pdfPlaceholder.classList.add('hidden');
-    pdfIframe.classList.remove('hidden');
+    pdfContainer.classList.remove('hidden');
     previewMeta.classList.remove('hidden');
     document.getElementById('meta-name').textContent = file.name;
     document.getElementById('meta-size').textContent = (file.size / 1024).toFixed(0) + ' KB';
+
+    try {
+      const loadingTask = pdfjsLib.getDocument(url);
+      currentPdfDoc = await loadingTask.promise;
+      document.getElementById('pdf-page-count').textContent = currentPdfDoc.numPages;
+      currentPdfPage = 1;
+      await renderPdfPage(currentPdfPage);
+    } catch (e) {
+      console.error('PDF Load Error', e);
+    }
   }
 
   function resetPreview() {
-    pdfIframe.src = '';
+    currentPdfDoc = null;
+    pdfCtx.clearRect(0, 0, pdfCanvas.width, pdfCanvas.height);
     pdfPlaceholder.classList.remove('hidden');
-    pdfIframe.classList.add('hidden');
+    pdfContainer.classList.add('hidden');
     previewMeta.classList.add('hidden');
   }
 
@@ -939,12 +1008,19 @@
       return;
     }
     const url = '/api/orders/' + orderId + '/preview/' + encodeURIComponent(fileName) + '?user_name=' + encodeURIComponent(searchName);
-    pdfIframe.src = url;
+    
     pdfPlaceholder.classList.add('hidden');
-    pdfIframe.classList.remove('hidden');
+    pdfContainer.classList.remove('hidden');
     previewMeta.classList.remove('hidden');
     document.getElementById('meta-name').textContent = fileName;
     document.getElementById('meta-size').textContent = '歷史訂單 #' + orderId;
+
+    pdfjsLib.getDocument(url).promise.then(pdf => {
+      currentPdfDoc = pdf;
+      document.getElementById('pdf-page-count').textContent = currentPdfDoc.numPages;
+      currentPdfPage = 1;
+      renderPdfPage(currentPdfPage);
+    }).catch(e => console.error('PDF Load Error', e));
   }
 
   function formatDate(dateStr) {
