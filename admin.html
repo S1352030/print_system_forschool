@@ -261,9 +261,17 @@
     if (adminPdfRenderTask) return;
     try {
       const page = await adminPdfDoc.getPage(num);
-      const viewport = page.getViewport({ scale: 1.5 });
+      
+      // 動態計算縮放比例，最高限制在 1.0 以大幅提升預覽載入速度 (原本為固定 1.5)
+      const containerWidth = document.querySelector('.modal-pdf-wrap').clientWidth || 600;
+      const unscaledViewport = page.getViewport({ scale: 1.0 });
+      const scale = Math.min(containerWidth / unscaledViewport.width, 1.0);
+
+      const viewport = page.getViewport({ scale: scale });
       adminPdfCanvas.height = viewport.height;
       adminPdfCanvas.width = viewport.width;
+      adminPdfCanvas.style.width = '100%';
+      adminPdfCanvas.style.maxWidth = `${unscaledViewport.width}px`;
 
       adminPdfRenderTask = page.render({ canvasContext: adminPdfCtx, viewport: viewport });
       await adminPdfRenderTask.promise;

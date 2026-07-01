@@ -269,9 +269,17 @@
     if (pdfRenderTask) return; // 避免重複渲染
     try {
       const page = await currentPdfDoc.getPage(num);
-      const viewport = page.getViewport({ scale: 1.5 });
+      
+      // 動態計算縮放比例，最高限制在 1.0 以大幅提升預覽載入速度 (原本為固定 1.5)
+      const containerWidth = pdfContainer.clientWidth || 400;
+      const unscaledViewport = page.getViewport({ scale: 1.0 });
+      const scale = Math.min(containerWidth / unscaledViewport.width, 1.0);
+
+      const viewport = page.getViewport({ scale: scale });
       pdfCanvas.height = viewport.height;
       pdfCanvas.width = viewport.width;
+      pdfCanvas.style.width = '100%';
+      pdfCanvas.style.maxWidth = `${unscaledViewport.width}px`;
 
       const renderContext = { canvasContext: pdfCtx, viewport: viewport };
       pdfRenderTask = page.render(renderContext);
