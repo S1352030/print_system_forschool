@@ -437,7 +437,7 @@
     updatePriceSummary();
     
     if (selectedFiles.length > 0) {
-      showPreview(selectedFiles[selectedFiles.length - 1].file);
+      showPreview(selectedFiles[selectedFiles.length - 1]);
     }
 
     // 非同步獲取每一份文件的頁數（優先本地解析，失敗才呼叫 API）
@@ -608,12 +608,18 @@
 
   window.removeFile = function(idx) {
     if (isCooldown) return;
+    // 釋放被移除檔案已快取的 PDF 資源，避免記憶體持續累積
+    const removed = selectedFiles[idx];
+    if (removed && removed.pdfDoc) {
+      removed.pdfDoc.destroy();
+      removed.pdfDoc = null;
+    }
     selectedFiles.splice(idx, 1);
     renderFileList();
     checkFormValidity();
     updatePriceSummary();
     if (selectedFiles.length > 0) {
-      showPreview(selectedFiles[selectedFiles.length - 1].file);
+      showPreview(selectedFiles[selectedFiles.length - 1]);
     } else {
       resetPreview();
     }
@@ -621,13 +627,18 @@
 
   window.previewFile = function(idx) {
     if (selectedFiles[idx]) {
-      showPreview(selectedFiles[idx].file);
+      showPreview(selectedFiles[idx]);
     }
   };
 
-  async function showPreview(file) {
-    const url = URL.createObjectURL(file);
-    
+  // 遞增版本號，用來判斷「使用者是否已經切到別的檔案」，
+  // 避免上一份還沒解析完的 PDF 在解析完成後，蓋掉使用者目前正在看的預覽（競態問題）。
+  let previewToken = 0;
+
+  async function showPreview(fileObj) {
+    const file = fileObj.file;
+    const myToken = ++previewToken;
+
     pdfPlaceholder.classList.add('hidden');
     pdfContainer.classList.remove('hidden');
     previewMeta.classList.remove('hidden');
@@ -635,22 +646,45 @@
     document.getElementById('meta-size').textContent = (file.size / 1024).toFixed(0) + ' KB';
 
     try {
-      const loadingTask = pdfjsLib.getDocument({
-        url: url,
-        cMapUrl: '/static/pdfjs/web/cmaps/',
-        cMapPacked: true,
-      });
-      currentPdfDoc = await loadingTask.promise;
+      // 已經解析過的檔案直接複用快取的 PDF 文件物件，不用重新剖析一次，
+      // 切換檔案清單時可以幾乎是瞬間顯示預覽。
+      if (fileObj.pdfDoc) {
+        currentPdfDoc = fileObj.pdfDoc;
+      } else {
+        // 直接把本地檔案讀成 ArrayBuffer 餵給 PDF.js（data 模式），
+        // 跳過 blob URL 需要經過瀏覽器網路層以 Range 請求分批讀取的開銷，
+        // 本地檔案一次讀取、一次剖析，開啟速度更快。
+        const arrayBuffer = await file.arrayBuffer();
+        if (myToken !== previewToken) return; // 使用者已切換到其他檔案，放棄這次結果
+
+        const loadingTask = pdfjsLib.getDocument({
+          data: arrayBuffer,
+          cMapUrl: '/static/pdfjs/web/cmaps/',
+          cMapPacked: true,
+        });
+        const pdfDoc = await loadingTask.promise;
+
+        if (myToken !== previewToken) {
+          // 使用者已切換到其他檔案，這份文件用不到了，直接釋放避免浪費記憶體
+          pdfDoc.destroy();
+          return;
+        }
+        fileObj.pdfDoc = pdfDoc;
+        currentPdfDoc = pdfDoc;
+      }
+
       document.getElementById('pdf-page-count').textContent = currentPdfDoc.numPages;
       currentPdfPage = 1;
       await renderPdfPage(currentPdfPage);
     } catch (e) {
+      if (myToken !== previewToken) return;
       console.error('PDF Load Error', e);
       alert('PDF 載入失敗: ' + (e.message || e));
     }
   }
 
   function resetPreview() {
+    previewToken++; // 讓所有還在進行中的載入工作失效
     currentPdfDoc = null;
     pdfCtx.clearRect(0, 0, pdfCanvas.width, pdfCanvas.height);
     pdfPlaceholder.classList.remove('hidden');

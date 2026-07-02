@@ -92,7 +92,12 @@ class SecurityAndCacheMiddleware:
                         ]
                         cache_control = ", ".join(cleaned)
                         
-                if path.startswith("/api/"):
+                if path.startswith("/static/"):
+                    # /static/ 底下是 PDF.js 函式庫本體、worker 與 cmaps 等版本固定的靜態資源，
+                    # 內容不會變動，設定長效快取（1 年 + immutable）讓瀏覽器直接使用本地快取，
+                    # 不必每次開啟 PDF 預覽都重新走一次 304 驗證流程，可明顯縮短 PDF.js 的載入時間。
+                    cache_control = "public, max-age=31536000, immutable"
+                elif path.startswith("/api/"):
                     if not cache_control:
                         cache_control = "private, no-cache"
                     else:

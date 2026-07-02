@@ -283,9 +283,28 @@
     }
   }
 
+  // 快取每張訂單已解析過的 PDF 文件物件（key: orderId），
+  // 重複點開同一張訂單時就不用再重新下載、重新剖析一次，秒開預覽。
+  // 用 Map 是因為要保留插入順序，方便超過上限時把最舊的丟掉釋放記憶體。
+  const adminPdfCache = new Map();
+  const ADMIN_PDF_CACHE_LIMIT = 8;
+  let adminPdfLoadToken = 0; // 用來判斷「管理員是否已經點開別張訂單」，避免舊的載入結果蓋掉新的畫面
+
+  function cacheAdminPdf(orderId, pdf) {
+    if (adminPdfCache.size >= ADMIN_PDF_CACHE_LIMIT) {
+      const oldestKey = adminPdfCache.keys().next().value;
+      const oldest = adminPdfCache.get(oldestKey);
+      if (oldest) oldest.destroy();
+      adminPdfCache.delete(oldestKey);
+    }
+    adminPdfCache.set(orderId, pdf);
+  }
+
   async function openPdfModal(orderId) {
     const order = orders.find(o => o.id === orderId);
     if (!order) return;
+
+    const myToken = ++adminPdfLoadToken;
 
     document.getElementById('modal-title').textContent = escHtml(order.file_name);
     document.getElementById('modal-meta').textContent =
@@ -296,6 +315,17 @@
     if (adminPdfCtx) adminPdfCtx.clearRect(0, 0, adminPdfCanvas.width, adminPdfCanvas.height);
     adminPdfDoc = null;
 
+    // 已經看過這張訂單的 PDF，直接用快取，跳過下載與剖析，幾乎瞬間顯示
+    const cached = adminPdfCache.get(orderId);
+    if (cached) {
+      adminPdfDoc = cached;
+      document.getElementById('admin-pdf-count').textContent = cached.numPages;
+      adminPdfPage = 1;
+      renderAdminPdfPage(adminPdfPage);
+      document.getElementById('pdf-modal').classList.add('open');
+      return;
+    }
+
     try {
       showToast('正在載入 PDF 檔案...');
       const url = API_BASE + '/api/orders/' + orderId + '/file/' + encodeURIComponent(order.file_name);
@@ -305,12 +335,19 @@
         cMapUrl: '/static/pdfjs/web/cmaps/',
         cMapPacked: true,
       }).promise.then(pdf => {
+        if (myToken !== adminPdfLoadToken) {
+          // 管理員已經切去看別張訂單了，這份資料還是先快取起來，下次點回來就秒開
+          cacheAdminPdf(orderId, pdf);
+          return;
+        }
+        cacheAdminPdf(orderId, pdf);
         adminPdfDoc = pdf;
         document.getElementById('admin-pdf-count').textContent = pdf.numPages;
         adminPdfPage = 1;
         renderAdminPdfPage(adminPdfPage);
         document.getElementById('pdf-modal').classList.add('open');
       }).catch(err => {
+        if (myToken !== adminPdfLoadToken) return;
         showToast('PDF 解析失敗：' + err.message, true);
       });
     } catch (e) {
