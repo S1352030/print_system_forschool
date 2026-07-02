@@ -109,7 +109,10 @@
         <h3 id="modal-title">PDF 預覽</h3>
         <div class="modal-meta" id="modal-meta"></div>
       </div>
-      <button class="btn-close-modal" onclick="closePdfModal()">✕</button>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <button class="btn-download-pdf" id="btn-download-pdf" style="display: none;" onclick="downloadCurrentPdf()">📥 下載 PDF</button>
+        <button class="btn-close-modal" onclick="closePdfModal()">✕</button>
+      </div>
     </div>
     <div class="modal-settings" id="modal-settings"></div>
     <div class="modal-pdf-wrap" style="position: relative; display: flex; flex-direction: column; align-items: center; overflow: hidden;">
@@ -238,6 +241,7 @@
   let adminPdfDoc = null;
   let adminPdfPage = 1;
   let adminPdfRenderTask = null;
+  let currentPreviewOrderId = null;
   const adminPdfCanvas = document.getElementById('admin-pdf-canvas');
   const adminPdfCtx = adminPdfCanvas ? adminPdfCanvas.getContext('2d') : null;
 
@@ -304,6 +308,10 @@
     const order = orders.find(o => o.id === orderId);
     if (!order) return;
 
+    currentPreviewOrderId = orderId;
+    const dlBtn = document.getElementById('btn-download-pdf');
+    if (dlBtn) dlBtn.style.display = 'inline-flex';
+
     const myToken = ++adminPdfLoadToken;
 
     document.getElementById('modal-title').textContent = escHtml(order.file_name);
@@ -359,6 +367,33 @@
     document.getElementById('pdf-modal').classList.remove('open');
     if (adminPdfCtx) adminPdfCtx.clearRect(0, 0, adminPdfCanvas.width, adminPdfCanvas.height);
     adminPdfDoc = null;
+    currentPreviewOrderId = null;
+    const dlBtn = document.getElementById('btn-download-pdf');
+    if (dlBtn) dlBtn.style.display = 'none';
+  }
+
+  async function downloadCurrentPdf() {
+    if (!currentPreviewOrderId) return;
+    const order = orders.find(o => o.id === currentPreviewOrderId);
+    if (!order) return;
+    try {
+      showToast('準備下載 PDF...');
+      const url = API_BASE + '/api/orders/' + currentPreviewOrderId + '/file/' + encodeURIComponent(order.file_name);
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = order.file_name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+      showToast('下載成功');
+    } catch (e) {
+      showToast('下載失敗：' + e.message, true);
+    }
   }
 
   function closeModal(e) {

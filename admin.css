@@ -109,6 +109,13 @@ td.price { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: va
 }
 .btn-delete:hover { background: rgba(231,76,60,.3); }
 
+.btn-download-pdf {
+  background: rgba(46,204,113,.15); border: 1px solid rgba(46,204,113,.3);
+  color: #2ecc71; padding: 4px 10px; border-radius: 6px; font-size: .78rem;
+  cursor: pointer; transition: all .2s; white-space: nowrap;
+}
+.btn-download-pdf:hover { background: rgba(46,204,113,.3); }
+
 /* PDF Modal */
 .modal-backdrop {
   display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7);
