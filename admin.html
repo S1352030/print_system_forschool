@@ -190,11 +190,11 @@
     } else if (binding === 'other') {
       badges.push('<span class="badge-chip badge-binding">其他裝訂</span>');
     } else if (binding) {
-      badges.push('<span class="badge-chip badge-binding">' + escHtml(binding) + '</span>');
+      badges.push('<span class="badge-chip badge-binding" title="' + escHtml(binding) + '">' + escHtml(binding) + '</span>');
     }
 
     if (order.pickup_location) {
-      badges.push('<span class="badge-chip badge-binding">時間：' + escHtml(order.pickup_location) + '</span>');
+      badges.push('<span class="badge-chip badge-binding" title="時間：' + escHtml(order.pickup_location) + '">時間：' + escHtml(order.pickup_location) + '</span>');
     }
 
     return '<div class="setting-badges">' + badges.join('') + '</div>';

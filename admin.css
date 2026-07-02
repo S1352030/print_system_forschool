@@ -53,7 +53,7 @@ body { background: var(--primary); color: var(--text); font-family: 'Noto Sans T
 /* Table */
 .table-section { padding: 1.5rem 2rem 3rem; }
 .section-title { font-size: .78rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin-bottom: 1rem; }
-.table-wrapper { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.table-wrapper { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 table { width: 100%; border-collapse: collapse; }
 thead th {
   background: var(--surface); padding: .75rem 1rem; font-size: .75rem;
@@ -73,6 +73,7 @@ td.price { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: va
   display: inline-flex; align-items: center; gap: 3px;
   padding: 3px 8px; border-radius: 100px; font-size: .72rem;
   font-weight: 600; letter-spacing: .02em; white-space: nowrap;
+  max-width: 240px; overflow: hidden; text-overflow: ellipsis;
 }
 .badge-bw { background: rgba(122,138,176,.15); color: var(--muted); border: 1px solid rgba(122,138,176,.3); }
 .badge-color { background: rgba(52,152,219,.15); color: #5dade2; border: 1px solid rgba(52,152,219,.3); }
