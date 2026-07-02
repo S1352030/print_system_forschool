@@ -81,7 +81,7 @@ def serve_precompressed(
 
     # ── 組裝回應標頭 ─────────────────────────────────────────
     headers: dict[str, str] = {
-        "Cache-Control": "public, max-age=86400",
+        "Cache-Control": "no-cache",  # 改為 no-cache，讓瀏覽器每次都用 ETag 詢問，解決 F5 緩存不更新問題
         "ETag": etag,
         "Vary": "Accept-Encoding",
     }
@@ -93,14 +93,15 @@ def serve_precompressed(
     # ── 優先嘗試 Brotli (.br) ────────────────────────────────
     if HAS_BROTLI and "br" in accept_encoding:
         br_path = file_path + ".br"
-        if os.path.exists(br_path):
+        # 確保 .br 檔存在，且修改時間不早於原始檔案（避免原始檔更新了，卻還送出舊的預壓縮檔）
+        if os.path.exists(br_path) and os.path.getmtime(br_path) >= stat.st_mtime:
             headers["Content-Encoding"] = "br"
             return FileResponse(br_path, media_type=media_type, headers=headers)
 
     # ── 次選 Gzip (.gz) ─────────────────────────────────────
     if "gzip" in accept_encoding:
         gz_path = file_path + ".gz"
-        if os.path.exists(gz_path):
+        if os.path.exists(gz_path) and os.path.getmtime(gz_path) >= stat.st_mtime:
             headers["Content-Encoding"] = "gzip"
             return FileResponse(gz_path, media_type=media_type, headers=headers)
 
