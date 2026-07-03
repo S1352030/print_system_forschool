@@ -68,6 +68,8 @@
   <symbol id="i-search" viewBox="0 -960 960 960"><path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/></symbol>
   <symbol id="i-search_off" viewBox="0 -960 960 960"><path d="M138.5-138.5Q80-197 80-280t58.5-141.5Q197-480 280-480t141.5 58.5Q480-363 480-280t-58.5 141.5Q363-80 280-80t-141.5-58.5ZM824-120 568-376q-12-13-25.5-26.5T516-428q38-24 61-64t23-88q0-75-52.5-127.5T420-760q-75 0-127.5 52.5T240-580q0 6 .5 11.5T242-557q-18 2-39.5 8T164-535q-2-11-3-22t-1-23q0-109 75.5-184.5T420-840q109 0 184.5 75.5T680-580q0 43-13.5 81.5T629-428l251 252-56 56Zm-615-61 71-71 70 71 29-28-71-71 71-71-28-28-71 71-71-71-28 28 71 71-71 71 28 28Z"/></symbol>
   <symbol id="i-hourglass_empty" viewBox="0 -960 960 960"><path d="M320-160h320v-120q0-66-47-113t-113-47q-66 0-113 47t-47 113v120Zm273-407q47-47 47-113v-120H320v120q0 66 47 113t113 47q66 0 113-47ZM160-80v-80h80v-120q0-61 28.5-114.5T348-480q-51-32-79.5-85.5T240-680v-120h-80v-80h640v80h-80v120q0 61-28.5 114.5T612-480q51 32 79.5 85.5T720-280v120h80v80H160Z"/></symbol>
+  <symbol id="i-chevron_left" viewBox="0 -960 960 960"><path d="M560-240 320-480l240-240 56 56-184 184 184 184-56 56Z"/></symbol>
+  <symbol id="i-chevron_right" viewBox="0 -960 960 960"><path d="M384-240 328-296 512-480 328-664l56-56 240 240-240 240Z"/></symbol>
 </svg>
 <button id="theme-toggle" class="theme-toggle-btn" title="切換深淺模式">
   <span class="material-symbols-outlined theme-icon-sun"><svg><use href="#i-light_mode"/></svg></span>
@@ -119,7 +121,19 @@
         </label>
 
         <div id="file-list-container" class="hidden">
-          <div class="section-label">已選擇的檔案 (最多 5 個)</div>
+          <div class="file-pager-header">
+            <div class="section-label">已選擇的檔案 (最多 5 個)</div>
+            <div class="file-pager-bar">
+              <button type="button" class="pager-arrow-btn" id="file-pager-prev" onclick="changeActiveFile(-1)">
+                <span class="material-symbols-outlined"><svg><use href="#i-chevron_left"/></svg></span>
+              </button>
+              <span class="file-pager-indicator" id="file-pager-info">1 / 1</span>
+              <button type="button" class="pager-arrow-btn" id="file-pager-next" onclick="changeActiveFile(1)">
+                <span class="material-symbols-outlined"><svg><use href="#i-chevron_right"/></svg></span>
+              </button>
+            </div>
+          </div>
+          <div id="pager-warning-message" class="pager-warning hidden">⚠️ 請檢查並填寫所有檔案的裝訂說明</div>
           <div id="selected-files-list">
             <!-- 已選擇的檔案清單 -->
           </div>
@@ -297,6 +311,7 @@
   const pickupLocationInput = document.getElementById('pickup_location');
 
   let selectedFiles = [];
+  let activeFileIndex = 0;
   let isCooldown = false;
   let cooldownTimer = null;
 
@@ -432,12 +447,16 @@
       alert('⚠️ 最多只能選擇 5 個檔案！');
     }
 
+    if (selectedFiles.length > 0) {
+      activeFileIndex = selectedFiles.length - 1;
+    }
+
     renderFileList();
     checkFormValidity();
     updatePriceSummary();
     
     if (selectedFiles.length > 0) {
-      showPreview(selectedFiles[selectedFiles.length - 1]);
+      showPreview(selectedFiles[activeFileIndex]);
     }
 
     // 非同步獲取每一份文件的頁數（優先本地解析，失敗才呼叫 API）
@@ -491,101 +510,145 @@
     }
 
     listContainer.classList.remove('hidden');
-    filesList.innerHTML = selectedFiles.map((fileObj, idx) => {
-      const file = fileObj.file;
-      const pagesText = fileObj.pages === null 
-        ? `<span class="file-item-pages">(計算頁數中...)</span>` 
-        : `<span class="file-item-pages">(${fileObj.pages} 頁)</span>`;
 
-      // 只有在頁數未明 (null) 或是頁數大於 1 時才顯示裝訂位置與單雙面
-      const showBinding = fileObj.pages === null || fileObj.pages > 1;
-      const showDuplex = fileObj.pages === null || fileObj.pages > 1;
+    // 確保 activeFileIndex 在合理範圍內
+    if (activeFileIndex >= selectedFiles.length) {
+      activeFileIndex = Math.max(0, selectedFiles.length - 1);
+    }
+    if (activeFileIndex < 0) {
+      activeFileIndex = 0;
+    }
 
-      const bindingHtml = showBinding ? `
-            <!-- 裝訂位置 -->
-            <div class="setting-col">
-              <span class="setting-label">裝訂位置</span>
+    // 更新分頁控制條
+    const pagerInfo = document.getElementById('file-pager-info');
+    const prevBtn = document.getElementById('file-pager-prev');
+    const nextBtn = document.getElementById('file-pager-next');
+    
+    if (pagerInfo) {
+      pagerInfo.textContent = `${activeFileIndex + 1} / ${selectedFiles.length}`;
+    }
+    if (prevBtn) {
+      prevBtn.disabled = (activeFileIndex === 0);
+    }
+    if (nextBtn) {
+      nextBtn.disabled = (activeFileIndex === selectedFiles.length - 1);
+    }
+
+    // 檢查是否有任何檔案存在裝訂選項設定未完成的情況
+    let hasSettingsError = false;
+    for (let i = 0; i < selectedFiles.length; i++) {
+      const f = selectedFiles[i];
+      if (f.binding === 'other' && !f.bindingOtherText.trim()) {
+        hasSettingsError = true;
+        break;
+      }
+    }
+    const warningMsg = document.getElementById('pager-warning-message');
+    if (warningMsg) {
+      if (hasSettingsError) {
+        warningMsg.classList.remove('hidden');
+      } else {
+        warningMsg.classList.add('hidden');
+      }
+    }
+
+    // 僅渲染當前啟動的檔案設定卡片
+    const fileObj = selectedFiles[activeFileIndex];
+    const idx = activeFileIndex;
+
+    const file = fileObj.file;
+    const pagesText = fileObj.pages === null 
+      ? `<span class="file-item-pages">(計算頁數中...)</span>` 
+      : `<span class="file-item-pages">(${fileObj.pages} 頁)</span>`;
+
+    // 只有在頁數未明 (null) 或是頁數大於 1 時才顯示裝訂位置與單雙面
+    const showBinding = fileObj.pages === null || fileObj.pages > 1;
+    const showDuplex = fileObj.pages === null || fileObj.pages > 1;
+
+    const bindingHtml = showBinding ? `
+          <!-- 裝訂位置 -->
+          <div class="setting-col">
+            <span class="setting-label">裝訂位置</span>
+            <div class="chip-group">
+              <label>
+                <input type="radio" name="binding_${idx}" value="top_left" ${fileObj.binding === 'top_left' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'binding', 'top_left')">
+                <span class="material-symbols-outlined chip-icon"><svg><use href="#i-north_west"/></svg></span>
+                <span>左上角</span>
+              </label>
+              <label>
+                <input type="radio" name="binding_${idx}" value="top_right" ${fileObj.binding === 'top_right' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'binding', 'top_right')">
+                <span class="material-symbols-outlined chip-icon"><svg><use href="#i-north_east"/></svg></span>
+                <span>右上角</span>
+              </label>
+              <label>
+                <input type="radio" name="binding_${idx}" value="other" ${fileObj.binding === 'other' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'binding', 'other')">
+                <span class="material-symbols-outlined chip-icon"><svg><use href="#i-edit"/></svg></span>
+                <span>其他</span>
+              </label>
+            </div>
+            <input type="text" id="binding_other_text_${idx}" class="binding-other-input binding-other-text-input ${fileObj.binding === 'other' ? '' : 'hidden'}" placeholder="請說明裝訂方式… (限 10 字)" maxlength="10" value="${escHtml(fileObj.bindingOtherText || '')}" oninput="updateFileOtherText(${idx}, this.value)">
+          </div>
+    ` : '';
+
+    const duplexHtml = showDuplex ? `
+            <!-- 列印方式 -->
+            <div class="setting-col-flex">
+              <span class="setting-label">列印方式</span>
               <div class="chip-group">
                 <label>
-                  <input type="radio" name="binding_${idx}" value="top_left" ${fileObj.binding === 'top_left' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'binding', 'top_left')">
-                  <span class="material-symbols-outlined chip-icon"><svg><use href="#i-north_west"/></svg></span>
-                  <span>左上角</span>
+                  <input type="radio" name="duplex_${idx}" value="single" ${fileObj.duplex === 'single' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'duplex', 'single')">
+                  <span class="material-symbols-outlined chip-icon"><svg><use href="#i-article"/></svg></span>
+                  <span>單面</span>
                 </label>
                 <label>
-                  <input type="radio" name="binding_${idx}" value="top_right" ${fileObj.binding === 'top_right' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'binding', 'top_right')">
-                  <span class="material-symbols-outlined chip-icon"><svg><use href="#i-north_east"/></svg></span>
-                  <span>右上角</span>
-                </label>
-                <label>
-                  <input type="radio" name="binding_${idx}" value="other" ${fileObj.binding === 'other' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'binding', 'other')">
-                  <span class="material-symbols-outlined chip-icon"><svg><use href="#i-edit"/></svg></span>
-                  <span>其他</span>
+                  <input type="radio" name="duplex_${idx}" value="double" ${fileObj.duplex === 'double' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'duplex', 'double')">
+                  <span class="material-symbols-outlined chip-icon"><svg><use href="#i-menu_book"/></svg></span>
+                  <span>雙面</span>
                 </label>
               </div>
-              <input type="text" id="binding_other_text_${idx}" class="binding-other-input binding-other-text-input ${fileObj.binding === 'other' ? '' : 'hidden'}" placeholder="請說明裝訂方式… (限 10 字)" maxlength="10" value="${escHtml(fileObj.bindingOtherText || '')}" oninput="updateFileOtherText(${idx}, this.value)">
             </div>
-      ` : '';
+    ` : '';
 
-      const duplexHtml = showDuplex ? `
-              <!-- 列印方式 -->
-              <div class="setting-col-flex">
-                <span class="setting-label">列印方式</span>
-                <div class="chip-group">
-                  <label>
-                    <input type="radio" name="duplex_${idx}" value="single" ${fileObj.duplex === 'single' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'duplex', 'single')">
-                    <span class="material-symbols-outlined chip-icon"><svg><use href="#i-article"/></svg></span>
-                    <span>單面</span>
-                  </label>
-                  <label>
-                    <input type="radio" name="duplex_${idx}" value="double" ${fileObj.duplex === 'double' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'duplex', 'double')">
-                    <span class="material-symbols-outlined chip-icon"><svg><use href="#i-menu_book"/></svg></span>
-                    <span>雙面</span>
-                  </label>
-                </div>
-              </div>
-      ` : '';
-
-      return `
-        <div class="file-item-card">
-          <!-- 標題欄：檔名、大小、預覽、刪除 -->
-          <div class="file-item-header">
-            <div class="file-item-title-wrapper" onclick="previewFile(${idx})">
-              <span class="material-symbols-outlined file-item-icon"><svg><use href="#i-description"/></svg></span>
-              <span class="file-item-name" title="${escHtml(file.name)}">${escHtml(file.name)} (${(file.size / 1024).toFixed(0)} KB) ${pagesText}</span>
-            </div>
-            <button type="button" onclick="removeFile(${idx})" class="file-item-remove-btn">
-              <span class="material-symbols-outlined remove-icon"><svg><use href="#i-close"/></svg></span>
-            </button>
+    filesList.innerHTML = `
+      <div class="file-item-card">
+        <!-- 標題欄：檔名、大小、預覽、刪除 -->
+        <div class="file-item-header">
+          <div class="file-item-title-wrapper" onclick="previewFile(${idx})">
+            <span class="material-symbols-outlined file-item-icon"><svg><use href="#i-description"/></svg></span>
+            <span class="file-item-name" title="${escHtml(file.name)}">${escHtml(file.name)} (${(file.size / 1024).toFixed(0)} KB) ${pagesText}</span>
           </div>
-
-          <!-- 列印設定區域 -->
-          <div class="file-item-settings">
-            <div class="file-item-options">
-              <!-- 色彩模式 -->
-              <div class="setting-col-flex">
-                <span class="setting-label">色彩模式</span>
-                <div class="chip-group">
-                  <label>
-                    <input type="radio" name="color_mode_${idx}" value="bw" ${fileObj.colorMode === 'bw' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'colorMode', 'bw')">
-                    <span class="material-symbols-outlined chip-icon"><svg><use href="#i-invert_colors"/></svg></span>
-                    <span>黑白</span>
-                  </label>
-                  <label>
-                    <input type="radio" name="color_mode_${idx}" value="color" ${fileObj.colorMode === 'color' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'colorMode', 'color')">
-                    <span class="material-symbols-outlined chip-icon"><svg><use href="#i-palette"/></svg></span>
-                    <span>彩色</span>
-                  </label>
-                </div>
-              </div>
-
-              ${duplexHtml}
-            </div>
-
-            ${bindingHtml}
-          </div>
+          <button type="button" onclick="removeFile(${idx})" class="file-item-remove-btn">
+            <span class="material-symbols-outlined remove-icon"><svg><use href="#i-close"/></svg></span>
+          </button>
         </div>
-      `;
-    }).join('');
+
+        <!-- 列印設定區域 -->
+        <div class="file-item-settings">
+          <div class="file-item-options">
+            <!-- 色彩模式 -->
+            <div class="setting-col-flex">
+              <span class="setting-label">色彩模式</span>
+              <div class="chip-group">
+                <label>
+                  <input type="radio" name="color_mode_${idx}" value="bw" ${fileObj.colorMode === 'bw' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'colorMode', 'bw')">
+                  <span class="material-symbols-outlined chip-icon"><svg><use href="#i-invert_colors"/></svg></span>
+                  <span>黑白</span>
+                </label>
+                <label>
+                  <input type="radio" name="color_mode_${idx}" value="color" ${fileObj.colorMode === 'color' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'colorMode', 'color')">
+                  <span class="material-symbols-outlined chip-icon"><svg><use href="#i-palette"/></svg></span>
+                  <span>彩色</span>
+                </label>
+              </div>
+            </div>
+
+            ${duplexHtml}
+          </div>
+
+          ${bindingHtml}
+        </div>
+      </div>
+    `;
   }
 
   window.updateFileSetting = function(idx, key, value) {
@@ -615,13 +678,29 @@
       removed.pdfDoc = null;
     }
     selectedFiles.splice(idx, 1);
+    
+    // 更新 activeFileIndex
+    if (activeFileIndex >= selectedFiles.length) {
+      activeFileIndex = Math.max(0, selectedFiles.length - 1);
+    }
+    
     renderFileList();
     checkFormValidity();
     updatePriceSummary();
     if (selectedFiles.length > 0) {
-      showPreview(selectedFiles[selectedFiles.length - 1]);
+      showPreview(selectedFiles[activeFileIndex]);
     } else {
       resetPreview();
+    }
+  };
+
+  window.changeActiveFile = function(direction) {
+    if (isCooldown) return;
+    const newIdx = activeFileIndex + direction;
+    if (newIdx >= 0 && newIdx < selectedFiles.length) {
+      activeFileIndex = newIdx;
+      renderFileList();
+      showPreview(selectedFiles[activeFileIndex]);
     }
   };
 
@@ -710,6 +789,15 @@
       }
     }
 
+    const warningMsg = document.getElementById('pager-warning-message');
+    if (warningMsg) {
+      if (!allSettingsOk) {
+        warningMsg.classList.remove('hidden');
+      } else {
+        warningMsg.classList.add('hidden');
+      }
+    }
+
     const pickupVal = pickupLocationInput.value.trim();
     const pickupLengthOk = pickupVal.length > 0 && pickupVal.length <= 20;
     const pickupError = document.getElementById('pickup-error');
@@ -727,7 +815,7 @@
     userNameInput.disabled = disabled;
     pickupLocationInput.disabled = disabled;
     
-    const listContainer = document.getElementById('selected-files-list');
+    const listContainer = document.getElementById('file-list-container');
     if (disabled) {
       listContainer.style.pointerEvents = 'none';
       listContainer.style.opacity = '0.6';

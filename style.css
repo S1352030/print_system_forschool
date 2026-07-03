@@ -876,6 +876,80 @@ html.dark .theme-icon-moon {
   flex: 1;
   min-width: 140px;
 }
+/* --- File Pager Controls (Material 3 Style) --- */
+.file-pager-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.file-pager-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface-container);
+  border-radius: 100px;
+  padding: 4px 8px;
+}
+.pager-arrow-btn {
+  background: transparent;
+  border: none;
+  color: var(--primary);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s, opacity 0.2s;
+  padding: 0;
+}
+.pager-arrow-btn:hover {
+  background: var(--primary-container);
+  color: var(--on-primary-container);
+}
+.pager-arrow-btn:disabled {
+  color: var(--outline);
+  opacity: 0.38;
+  cursor: not-allowed;
+  background: transparent;
+}
+.pager-arrow-btn .material-symbols-outlined {
+  font-size: 20px;
+  line-height: 1;
+}
+.file-pager-indicator {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--on-surface-variant);
+  min-width: 40px;
+  text-align: center;
+  user-select: none;
+}
+.pager-warning {
+  color: var(--error);
+  font-size: 13px;
+  margin-top: -4px;
+  margin-bottom: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+}
+
+@media (max-width: 480px) {
+  .file-pager-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .file-pager-bar {
+    align-self: flex-end;
+  }
+}
+
 .file-item-card {
   background: var(--surface);
   border: 1.5px solid rgba(115, 119, 127, 0.2);
