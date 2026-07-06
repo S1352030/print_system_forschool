@@ -36,6 +36,7 @@
       document.documentElement.classList.add(selectedPalette);
     })();
   </script>
+  <script src="/static/dialog.js"></script>
   <link rel="stylesheet" href="/style.css?v=20260630a">
 </head>
 <body>
@@ -391,7 +392,7 @@
     return name + ext;
   }
 
-  function addFiles(files) {
+  async function addFiles(files) {
     if (isCooldown) return;
     
     let addedCount = 0;
@@ -410,7 +411,7 @@
       let fileToUpload = file;
       if (hasDuplicationPatterns(file.name)) {
         const cleanName = sanitizeFilename(file.name);
-        if (confirm(`系統發現檔案「${file.name}」的名稱似乎是複製產生的，是否需要自動還原為乾淨檔名「${cleanName}」再上傳？`)) {
+        if (await showConfirm(`系統發現檔案「${file.name}」的名稱似乎是複製產生的，是否需要自動還原為乾淨檔名「${cleanName}」再上傳？`)) {
           fileToUpload = new File([file], cleanName, { type: file.type, lastModified: file.lastModified });
         }
       }
@@ -438,13 +439,13 @@
     }
 
     if (nonPdfFound) {
-      alert('⚠️ 僅接受 PDF 格式的檔案！');
+      await showAlert('⚠️ 僅接受 PDF 格式的檔案！');
     }
     if (duplicateFound) {
-      alert('⚠️ 已忽略重複選擇的檔案。');
+      await showAlert('⚠️ 已忽略重複選擇的檔案。');
     }
     if (overLimit) {
-      alert('⚠️ 最多只能選擇 5 個檔案！');
+      await showAlert('⚠️ 最多只能選擇 5 個檔案！');
     }
 
     if (selectedFiles.length > 0) {
@@ -758,7 +759,7 @@
     } catch (e) {
       if (myToken !== previewToken) return;
       console.error('PDF Load Error', e);
-      alert('PDF 載入失敗: ' + (e.message || e));
+      await showAlert('PDF 載入失敗: ' + (e.message || e), 'error');
     }
   }
 
@@ -907,12 +908,12 @@
         } else {
           const errData = await response.json().catch(() => ({}));
           const errMsg = errData.detail || '上傳失敗';
-          alert(`❌ 檔案「${fileObj.file.name}」上傳失敗：${errMsg}`);
+          await showAlert(`❌ 檔案「${fileObj.file.name}」上傳失敗：${errMsg}`);
           hasError = true;
           break;
         }
       } catch (error) {
-        alert(`❌ 網路錯誤，無法上傳「${fileObj.file.name}」。`);
+        await showAlert(`❌ 網路錯誤，無法上傳「${fileObj.file.name}」。`);
         hasError = true;
         break;
       }
@@ -920,7 +921,7 @@
 
     if (uploadedCount > 0) {
       let msg = `✅ 上傳成功！共成功上傳 ${uploadedCount} 個檔案。\n通知已發送給管理員。`;
-      alert(msg);
+      await showAlert(msg);
 
       sessionStorage.setItem('print_user_name', nameVal);
       document.getElementById('history_search_name').value = nameVal;
@@ -988,7 +989,7 @@
   async function fetchHistory(forceRefresh) {
     const searchName = document.getElementById('history_search_name').value.trim();
     if (!searchName) {
-      alert('請輸入您的姓名或學號以供查詢！');
+      await showAlert('請輸入您的姓名或學號以供查詢！', 'warning');
       return;
     }
 
@@ -1072,7 +1073,7 @@
       if (!hasRenderedCache) {
         loadingDiv.classList.add('hidden');
       }
-      alert('❌ 查詢失敗：' + e.message);
+      await showAlert('❌ 查詢失敗：' + e.message);
     }
   }
 
@@ -1136,10 +1137,10 @@
     }).join('');
   }
 
-  function previewPastOrder(orderId, fileName) {
+  async function previewPastOrder(orderId, fileName) {
     const searchName = document.getElementById('history_search_name').value.trim() || sessionStorage.getItem('print_user_name');
     if (!searchName) {
-      alert('請先輸入您的姓名或學號！');
+      await showAlert('請先輸入您的姓名或學號！', 'warning');
       return;
     }
     const url = '/api/orders/' + orderId + '/preview/' + encodeURIComponent(fileName) + '?user_name=' + encodeURIComponent(searchName);

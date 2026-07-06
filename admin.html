@@ -12,6 +12,7 @@
   <script>
     pdfjsLib.GlobalWorkerOptions.workerSrc = '/static/pdfjs/build/pdf.worker.js';
   </script>
+  <script src="/static/dialog.js"></script>
 </head>
 <body>
 
@@ -426,7 +427,7 @@
   }
 
   async function deleteOrder(orderId) {
-    if (!confirm(`⚠️ 確定要刪除訂單 #${orderId} 嗎？此操作將無法復原。`)) return;
+    if (!await showConfirm(`⚠️ 確定要刪除訂單 #${orderId} 嗎？此操作將無法復原。`)) return;
 
     try {
       const res = await fetch(API_BASE + '/api/orders/' + orderId, {
@@ -540,7 +541,7 @@
   }
 
   async function deleteAnnouncement(id) {
-    if (!confirm(`確定要刪除公告 #${id} 嗎？此操作將無法復原。`)) return;
+    if (!await showConfirm(`確定要刪除公告 #${id} 嗎？此操作將無法復原。`)) return;
 
     try {
       const res = await fetch(API_BASE + '/api/announcements/' + id, {

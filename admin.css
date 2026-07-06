@@ -239,3 +239,128 @@ td.price { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: va
   max-width: 250px;
   text-align: left;
 }
+
+/* --- Material 3 Dialog Styles --- */
+.m3-dialog {
+  border: none;
+  border-radius: 28px;
+  padding: 24px;
+  max-width: 320px;
+  width: calc(100% - 48px);
+  background-color: var(--card);
+  color: var(--text);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3), 0 4px 8px rgba(0, 0, 0, 0.2);
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.9);
+  margin: 0;
+  opacity: 0;
+  transition: opacity 0.15s cubic-bezier(0.2, 0, 0, 1), transform 0.15s cubic-bezier(0.2, 0, 0, 1);
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.m3-dialog[open] {
+  display: flex;
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.m3-dialog.m3-dialog-closing {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.9);
+}
+
+.m3-dialog::backdrop {
+  background-color: rgba(0, 0, 0, 0);
+  backdrop-filter: blur(0);
+  transition: background-color 0.15s cubic-bezier(0.2, 0, 0, 1), backdrop-filter 0.15s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.m3-dialog[open]::backdrop {
+  background-color: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.m3-dialog.m3-dialog-closing::backdrop {
+  background-color: rgba(0, 0, 0, 0);
+  backdrop-filter: blur(0);
+}
+
+.m3-dialog-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.m3-dialog-icon {
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.m3-dialog-icon-svg {
+  width: 28px;
+  height: 28px;
+}
+
+.m3-dialog-type-info { color: var(--info); }
+.m3-dialog-type-success { color: var(--success); }
+.m3-dialog-type-warning { color: var(--warning); }
+.m3-dialog-type-error { color: var(--danger); }
+.m3-dialog-type-question { color: var(--info); }
+
+.m3-dialog-title {
+  font-size: 1.5rem;
+  font-weight: 400;
+  line-height: 2rem;
+  color: var(--text);
+  margin-bottom: 16px;
+}
+
+.m3-dialog-no-title .m3-dialog-content {
+  margin-top: 8px;
+}
+
+.m3-dialog-content {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: var(--muted);
+  margin-bottom: 24px;
+  text-align: left;
+  width: 100%;
+}
+
+.m3-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+}
+
+.m3-dialog-btn {
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  padding: 10px 16px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  border-radius: 100px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+}
+
+.m3-dialog-btn:hover {
+  background-color: rgba(233, 69, 96, 0.08);
+}
+
+.m3-dialog-btn:active {
+  background-color: rgba(233, 69, 96, 0.16);
+}
+
