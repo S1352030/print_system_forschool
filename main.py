@@ -5,6 +5,9 @@ import secrets
 import hashlib
 import uuid
 import logging
+import asyncio
+import time
+from collections import defaultdict
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Depends, status, Request, BackgroundTasks
 from fastapi.responses import JSONResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -22,9 +25,51 @@ from log_manager import setup_logging
 load_dotenv()
 
 # 引入資料庫模塊
-from database import Order, Announcement, get_db, engine, Base, ensure_order_columns
+from database import Order, Announcement, get_db, engine, Base, ensure_order_columns, SessionLocal
 # 引入通知模塊
 from notify import send_line_notification
+
+# ── 輕量級 Rate Limiter（滑動視窗，適用免費層級，無需 Redis）─────
+class RateLimiter:
+    """基於 IP 的滑動視窗速率限制器（記憶體內）"""
+    def __init__(self):
+        self._hits: dict[str, list[float]] = defaultdict(list)
+        self._last_cleanup = time.monotonic()
+
+    def is_allowed(self, key: str, max_hits: int, window_seconds: int) -> bool:
+        now = time.monotonic()
+        # 每 60 秒清理過期記錄，防止記憶體洩漏
+        if now - self._last_cleanup > 60:
+            self._cleanup(now, window_seconds)
+        hits = self._hits[key]
+        # 移除視窗外的舊記錄
+        cutoff = now - window_seconds
+        while hits and hits[0] < cutoff:
+            hits.pop(0)
+        if len(hits) >= max_hits:
+            return False
+        hits.append(now)
+        return True
+
+    def _cleanup(self, now: float, default_window: int):
+        self._last_cleanup = now
+        cutoff = now - default_window
+        expired_keys = [k for k, v in self._hits.items() if not v or v[-1] < cutoff]
+        for k in expired_keys:
+            del self._hits[k]
+
+rate_limiter = RateLimiter()
+
+def _get_client_ip(request: Request) -> str:
+    """取得客戶端 IP（支援反向代理 X-Forwarded-For）"""
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+# ── 上傳檔案限制常數 ─────────────────────────────────────────
+MAX_UPLOAD_SIZE = 20 * 1024 * 1024  # 20 MB
+PDF_MAGIC_BYTES = b"%PDF-"
 
 # 啟動時自動建立資料表
 Base.metadata.create_all(bind=engine)
@@ -61,8 +106,10 @@ class SecurityAndCacheMiddleware:
             if message["type"] == "http.response.start":
                 headers = MutableHeaders(raw=message["headers"])
                 
-                # 1. X-Content-Type-Options
+                # 1. 安全 Headers
                 headers["X-Content-Type-Options"] = "nosniff"
+                headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+                headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
                 
                 # 2. Content-Security-Policy (強化防護，攔截外部腳本注入如卡巴斯基)
                 content_type = headers.get("content-type", "")
@@ -201,17 +248,27 @@ async def serve_admin_style(request: Request):
     return serve_precompressed("admin.css", request, media_type="text/css; charset=utf-8")
 
 # ── 工具函式 ──────────────────────────────────────────────
-def count_pdf_pages(file_path: str) -> int:
+def _count_pdf_pages_sync(file_path: str) -> int:
+    """同步版本的 PDF 頁數計算（CPU 密集型，應在線程池中執行）"""
     try:
         reader = PdfReader(file_path)
         return len(reader.pages)
     except Exception as exc:
         raise ValueError(f"無法讀取 PDF 頁數：{exc}") from exc
 
+async def count_pdf_pages(file_path: str) -> int:
+    """非同步版本：在線程池中執行 PDF 解析，避免阻塞事件循環"""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _count_pdf_pages_sync, file_path)
+
 # ── API 路由 ──────────────────────────────────────────────
 @app.post("/api/check-pages")
-async def check_pdf_pages(file: UploadFile = File(...)):
+async def check_pdf_pages(request: Request, file: UploadFile = File(...)):
     """臨時解析 PDF 檔並返回頁數"""
+    # Rate Limiting：每 IP 每分鐘最多 30 次
+    client_ip = _get_client_ip(request)
+    if not rate_limiter.is_allowed(f"api:{client_ip}", 30, 60):
+        raise HTTPException(status_code=429, detail="請求過於頻繁，請稍後再試。")
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="僅接受 PDF 格式的檔案。")
     
@@ -222,7 +279,7 @@ async def check_pdf_pages(file: UploadFile = File(...)):
             tmp_path = tmp.name
         
         try:
-            total_pages = count_pdf_pages(tmp_path)
+            total_pages = await count_pdf_pages(tmp_path)
             return {"status": "success", "pages": total_pages}
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
@@ -244,6 +301,7 @@ def _send_line_notification_bg(user_name: str, file_name: str, total_pages: int,
 
 @app.post("/api/upload")
 async def upload_order(
+    request: Request,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     user_name: str = Form(...),
@@ -253,7 +311,11 @@ async def upload_order(
     pickup_location: str | None = Form(None),
     db: Session = Depends(get_db)  # 注入資料庫 Session
 ) -> JSONResponse:
-    
+    # ── Rate Limiting：每 IP 每分鐘最多 5 次上傳 ─────────────
+    client_ip = _get_client_ip(request)
+    if not rate_limiter.is_allowed(f"upload:{client_ip}", 5, 60):
+        raise HTTPException(status_code=429, detail="上傳過於頻繁，請稍後再試。")
+
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="僅接受 PDF 格式的檔案。")
 
@@ -266,13 +328,30 @@ async def upload_order(
 
     tmp_path = None
     try:
-        # 暫存檔案來計算頁數
+        # 暫存檔案來計算頁數（含大小限制與 PDF 驗證）
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-            shutil.copyfileobj(file.file, tmp)
+            total_size = 0
+            first_chunk = True
+            while True:
+                chunk = await file.read(8192)
+                if not chunk:
+                    break
+                # 驗證 PDF magic bytes（僅檢查第一個 chunk）
+                if first_chunk:
+                    if not chunk[:5].startswith(PDF_MAGIC_BYTES):
+                        raise HTTPException(status_code=400, detail="檔案內容不是有效的 PDF 格式。")
+                    first_chunk = False
+                total_size += len(chunk)
+                if total_size > MAX_UPLOAD_SIZE:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"檔案大小超過上限 {MAX_UPLOAD_SIZE // (1024*1024)} MB。"
+                    )
+                tmp.write(chunk)
             tmp_path = tmp.name
 
         try:
-            total_pages = count_pdf_pages(tmp_path)
+            total_pages = await count_pdf_pages(tmp_path)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
             
@@ -300,7 +379,7 @@ async def upload_order(
 
         # 儲存上傳的 PDF 檔案以供後台下載/預覽
         file_path = os.path.join(UPLOAD_DIR, physical_filename)
-        shutil.copy2(tmp_path, file_path)
+        await asyncio.get_event_loop().run_in_executor(None, shutil.copy2, tmp_path, file_path)
 
         # 觸發 LINE 通知（非同步背景任務，避免阻塞前端上傳響應）
         background_tasks.add_task(
@@ -320,8 +399,12 @@ async def upload_order(
             os.remove(tmp_path)
 
 @app.get("/api/orders/history")
-async def get_user_orders(user_name: str, db: Session = Depends(get_db)):
+async def get_user_orders(request: Request, user_name: str, db: Session = Depends(get_db)):
     """取得特定使用者的訂單歷史（精簡欄位 + 短快取）"""
+    # Rate Limiting：每 IP 每分鐘最多 30 次
+    client_ip = _get_client_ip(request)
+    if not rate_limiter.is_allowed(f"api:{client_ip}", 30, 60):
+        raise HTTPException(status_code=429, detail="請求過於頻繁，請稍後再試。")
     if not user_name or not user_name.strip():
         raise HTTPException(status_code=400, detail="請提供姓名或學號以供查詢")
     rows = (
@@ -490,3 +573,37 @@ async def delete_order(order_id: int, db: Session = Depends(get_db), username: s
     db.delete(order)
     db.commit()
     return {"status": "success"}
+
+# ── 啟動時自動清理舊訂單（30 天前已完成的訂單）──────────────────
+@app.on_event("startup")
+async def cleanup_old_orders():
+    """刪除 30 天前已付款且已列印的訂單及其 PDF 檔案，釋放磁碟空間"""
+    from database import get_taipei_now
+    from datetime import timedelta as td
+    cutoff = get_taipei_now() - td(days=30)
+    db = SessionLocal()
+    try:
+        old_orders = db.query(Order).filter(
+            Order.is_paid == True,
+            Order.is_printed == True,
+            Order.created_at < cutoff
+        ).all()
+        deleted_count = 0
+        for order in old_orders:
+            physical_filename = order.physical_path if order.physical_path else f"order_{order.id}.pdf"
+            file_path = os.path.join(UPLOAD_DIR, physical_filename)
+            if os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                except Exception as exc:
+                    log.error("清理舊訂單時無法刪除檔案 %s: %s", file_path, exc)
+            db.delete(order)
+            deleted_count += 1
+        if deleted_count > 0:
+            db.commit()
+            log.info("啟動清理：已刪除 %d 筆 30 天前的已完成訂單", deleted_count)
+    except Exception as exc:
+        log.error("啟動清理失敗：%s", exc)
+        db.rollback()
+    finally:
+        db.close()

@@ -1152,7 +1152,7 @@
 
     pdfjsLib.getDocument({
       url: url,
-      cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
+      cMapUrl: '/static/pdfjs/web/cmaps/',
       cMapPacked: true,
     }).promise.then(pdf => {
       currentPdfDoc = pdf;

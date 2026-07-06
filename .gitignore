@@ -10,4 +10,6 @@ AI_CHANGELOG.md
 *.br
 *.gz
 # Zstd 日誌輪替目錄
-logs/
+logs/
+# 部署備份目錄
+backups/

@@ -47,6 +47,41 @@ _COMPRESSIBLE_PREFIXES = (
 #  策略一：靜態資源預壓縮派發
 # ═══════════════════════════════════════════════════════════════
 
+# ── 靜態檔案元資料快取（啟動時載入，避免每次請求都呼叫 os.stat）───
+_static_file_cache: dict[str, dict] = {}
+
+def _get_file_meta(file_path: str) -> dict:
+    """取得檔案元資料，快取以避免重複 os.stat 呼叫。"""
+    cached = _static_file_cache.get(file_path)
+    if cached:
+        try:
+            current_stat = os.stat(file_path)
+            # 若檔案修改時間未變，直接回傳快取
+            if current_stat.st_mtime == cached["mtime"]:
+                return cached
+        except OSError:
+            pass
+    # 重新讀取
+    stat = os.stat(file_path)
+    etag_raw = f"{stat.st_mtime}-{stat.st_size}".encode()
+    etag = f'"{hashlib.md5(etag_raw).hexdigest()}"'
+    br_path = file_path + ".br"
+    gz_path = file_path + ".gz"
+    br_exists = os.path.exists(br_path)
+    gz_exists = os.path.exists(gz_path)
+    meta = {
+        "stat": stat,
+        "mtime": stat.st_mtime,
+        "etag": etag,
+        "br_exists": br_exists,
+        "br_mtime": os.path.getmtime(br_path) if br_exists else 0,
+        "gz_exists": gz_exists,
+        "gz_mtime": os.path.getmtime(gz_path) if gz_exists else 0,
+    }
+    _static_file_cache[file_path] = meta
+    return meta
+
+
 def serve_precompressed(
     file_path: str,
     request: Request,
@@ -70,10 +105,9 @@ def serve_precompressed(
     extra_headers : dict, optional
         額外的回應標頭（例如 Service-Worker-Allowed）
     """
-    # ── ETag 條件式快取（基於原始檔案） ───────────────────────
-    stat = os.stat(file_path)
-    etag_raw = f"{stat.st_mtime}-{stat.st_size}".encode()
-    etag = f'"{hashlib.md5(etag_raw).hexdigest()}"'
+    # ── ETag 條件式快取（基於原始檔案，使用快取避免重複 stat）───
+    meta = _get_file_meta(file_path)
+    etag = meta["etag"]
 
     if_none_match = request.headers.get("if-none-match")
     if if_none_match and if_none_match == etag:
@@ -93,15 +127,14 @@ def serve_precompressed(
     # ── 優先嘗試 Brotli (.br) ────────────────────────────────
     if HAS_BROTLI and "br" in accept_encoding:
         br_path = file_path + ".br"
-        # 確保 .br 檔存在，且修改時間不早於原始檔案（避免原始檔更新了，卻還送出舊的預壓縮檔）
-        if os.path.exists(br_path) and os.path.getmtime(br_path) >= stat.st_mtime:
+        if meta["br_exists"] and meta["br_mtime"] >= meta["mtime"]:
             headers["Content-Encoding"] = "br"
             return FileResponse(br_path, media_type=media_type, headers=headers)
 
     # ── 次選 Gzip (.gz) ─────────────────────────────────────
     if "gzip" in accept_encoding:
         gz_path = file_path + ".gz"
-        if os.path.exists(gz_path) and os.path.getmtime(gz_path) >= stat.st_mtime:
+        if meta["gz_exists"] and meta["gz_mtime"] >= meta["mtime"]:
             headers["Content-Encoding"] = "gzip"
             return FileResponse(gz_path, media_type=media_type, headers=headers)
 

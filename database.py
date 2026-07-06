@@ -1,10 +1,13 @@
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Index, text
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Index, text, event
 from sqlalchemy.orm import declarative_base, sessionmaker
 from datetime import datetime, timezone, timedelta
 
+# 快取 TZ 物件，避免每次呼叫都重新建立
+_TZ_TAIPEI = timezone(timedelta(hours=8))
+
 def get_taipei_now():
     # 取得台北時間 (UTC+8) 的 Naive Datetime，確保儲存於資料庫的為台北當地時間
-    return datetime.now(timezone(timedelta(hours=8))).replace(tzinfo=None)
+    return datetime.now(_TZ_TAIPEI).replace(tzinfo=None)
 
 # ── 連線設定 ──────────────────────────────────────────────
 # SQLite 資料庫檔案會建立在同一資料夾下的 db.sqlite3
@@ -13,7 +16,21 @@ DATABASE_URL = "sqlite:///./db.sqlite3"
 engine = create_engine(
     DATABASE_URL,
     connect_args={"check_same_thread": False},  # SQLite 多執行緒需加此參數
+    pool_size=5,
+    max_overflow=10,
+    pool_pre_ping=True,
 )
+
+# ── SQLite 性能優化 PRAGMA（每個連線建立時自動套用）──────────────
+@event.listens_for(engine, "connect")
+def _set_sqlite_pragma(dbapi_conn, connection_record):
+    cursor = dbapi_conn.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")        # WAL 模式：允許讀寫併發
+    cursor.execute("PRAGMA synchronous=NORMAL")      # 平衡安全性與寫入速度
+    cursor.execute("PRAGMA cache_size=-8000")         # 8MB 頁面快取
+    cursor.execute("PRAGMA journal_size_limit=16777216")  # WAL 日誌上限 16MB
+    cursor.execute("PRAGMA busy_timeout=5000")        # 鎖定等待 5 秒
+    cursor.close()
 
 # 每次需要操作資料庫時，透過 SessionLocal() 取得一個 Session
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -85,6 +102,8 @@ def ensure_order_columns():
 
         # 確保 user_name 索引存在（加速歷史訂單查詢）
         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_orders_user_name ON orders (user_name)"))
+        # 複合索引：加速按使用者 + 建立時間排序的歷史訂單查詢
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_orders_user_created ON orders (user_name, created_at DESC)"))
 
 
 # ── 初始化：直接執行此檔案時建立資料表 ───────────────────

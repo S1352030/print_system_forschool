@@ -15,28 +15,45 @@ echo "  print_system 自動部署"
 echo "===================================="
 echo ""
 
+# ── 0. 部署前備份 SQLite 資料庫 ───────────────────────
+BACKUP_DIR="$PROJECT_DIR/backups"
+mkdir -p "$BACKUP_DIR"
+if [ -f "db.sqlite3" ]; then
+  BACKUP_NAME="db_$(date +%Y%m%d_%H%M%S).sqlite3"
+  cp db.sqlite3 "$BACKUP_DIR/$BACKUP_NAME"
+  echo "[0/5] 資料庫備份完成 → backups/$BACKUP_NAME"
+  # 只保留最近 5 份備份，刪除舊的
+  ls -t "$BACKUP_DIR"/db_*.sqlite3 2>/dev/null | tail -n +6 | xargs -r rm --
+  echo ""
+fi
+
 # ── 1. 拉取最新程式碼 ────────────────────────────────
-echo "[1/4] git pull ..."
-git pull
+echo "[1/5] git pull origin main ..."
+git pull origin main
 echo ""
 
 # ── 2. 啟用虛擬環境 + 安裝套件 ───────────────────────
-echo "[2/4] 檢查 Python 套件 ..."
+echo "[2/5] 安裝 Python 套件 ..."
 source venv/bin/activate
-pip install --quiet brotli zstandard
+pip install --quiet -r requirements.txt
 echo "     套件確認完成"
 echo ""
 
 # ── 3. 重新產生靜態資源預壓縮檔 (.br / .gz) ──────────
-echo "[3/4] 預壓縮靜態資源 ..."
+echo "[3/5] 預壓縮靜態資源 ..."
 python precompress.py
 echo ""
 
-# ── 4. 重啟服務 ──────────────────────────────────────
-echo "[4/4] pm2 reload ..."
+# ── 4. 健康檢查 (驗證 Python 匯入是否正常) ───────────
+echo "[4/5] 執行健康檢查 ..."
+python -c "from main import app; print('     ✅ 匯入檢查通過')"
+echo ""
+
+# ── 5. 重啟服務 ──────────────────────────────────────
+echo "[5/5] pm2 reload ..."
 pm2 reload print-system
 echo ""
 
 echo "===================================="
-echo "  部署完成！"
+echo "  ✅ 部署完成！"
 echo "===================================="

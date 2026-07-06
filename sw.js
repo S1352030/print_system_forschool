@@ -1,10 +1,15 @@
 // Service Worker - 影印計價與通知系統
-const CACHE_NAME = 'print-system-v2';
+const CACHE_NAME = 'print-system-v3';
+const MAX_CACHE_ENTRIES = 50; // 快取上限，防止無限增長
 
-// ── Install：預快取首頁 ──────────────────────────────────
+// ── Install：預快取核心靜態資源 ──────────────────────────────
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(['/']))
+    caches.open(CACHE_NAME).then((cache) => cache.addAll([
+      '/',
+      '/style.css',
+      '/admin.css',
+    ]))
   );
   self.skipWaiting();
 });
@@ -70,6 +75,7 @@ async function networkFirst(request) {
     if (response.ok && canCache(request)) {
       const cache = await caches.open(CACHE_NAME);
       cache.put(request, response.clone());
+      trimCache(cache); // 限制快取大小
     }
     return response;
   } catch (err) {
@@ -89,6 +95,7 @@ async function cacheFirst(request) {
     if (response.ok && canCache(request)) {
       const cache = await caches.open(CACHE_NAME);
       cache.put(request, response.clone());
+      trimCache(cache);
     }
     return response;
   } catch (err) {
@@ -100,4 +107,16 @@ async function cacheFirst(request) {
 function canCache(request) {
   const url = new URL(request.url);
   return request.method === 'GET' && url.protocol.startsWith('http');
+}
+
+// ── 輔助：限制快取項目數量（LRU 淘汰最舊的）──────────────
+async function trimCache(cache) {
+  const keys = await cache.keys();
+  if (keys.length > MAX_CACHE_ENTRIES) {
+    // 刪除最舊的快取項目
+    const deleteCount = keys.length - MAX_CACHE_ENTRIES;
+    for (let i = 0; i < deleteCount; i++) {
+      await cache.delete(keys[i]);
+    }
+  }
 }

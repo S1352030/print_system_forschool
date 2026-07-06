@@ -100,6 +100,27 @@ def send_line_notification(
         return {"error": f"未預期的錯誤：{e}"}
 
 
+async def send_line_notification_async(user_name, file_name, total_pages, total_price):
+    """
+    非同步版本的 LINE 通知發送（在線程池中執行，避免阻塞事件循環）。
+    供 FastAPI BackgroundTasks 呼叫。
+    """
+    import asyncio
+    import functools
+
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None,
+        functools.partial(
+            send_line_notification,
+            user_name=user_name,
+            file_name=file_name,
+            total_pages=total_pages,
+            total_price=total_price,
+        )
+    )
+
+
 # ── 快速測試（直接執行此檔案時觸發） ────────────────────────────────────────
 if __name__ == "__main__":
     print("正在測試傳送 LINE 訊息...")
