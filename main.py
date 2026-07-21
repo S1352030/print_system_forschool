@@ -1,4 +1,5 @@
 import os
+import ipaddress
 import shutil
 import tempfile
 import secrets
@@ -14,15 +15,16 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pypdf import PdfReader
 from sqlalchemy.orm import Session
-from dotenv import load_dotenv
+from sqlalchemy import text
 
 # 壓縮模組（Brotli 優先 + Gzip 備用）
 from compression import BrotliGzipMiddleware, serve_precompressed
 # Zstandard 日誌系統
 from log_manager import setup_logging
-
-# 載入 .env 檔案設定
-load_dotenv()
+# 集中式設定(取代散落的 os.getenv)
+from config import settings
+# Pydantic 請求模型
+from schemas import AnnouncementCreate, AnnouncementUpdate, OrderStatusUpdate
 
 # 引入資料庫模塊
 from database import Order, Announcement, get_db, engine, Base, ensure_order_columns, SessionLocal
@@ -31,14 +33,22 @@ from notify import send_line_notification
 
 # ── 輕量級 Rate Limiter（滑動視窗，適用免費層級，無需 Redis）─────
 class RateLimiter:
-    """基於 IP 的滑動視窗速率限制器（記憶體內）"""
+    """
+    基於 key 的滑動視窗速率限制器(記憶體內)。
+
+    除了 is_allowed() 的一般限流,另提供 register_failure / is_locked / reset_failure
+    三個方法,專門用於管理員暴力破解防護:連續 N 次失敗後鎖定 key 一段時間。
+    """
     def __init__(self):
+        # 限流計數:每個 key 維護一個 hit 時間戳清單
         self._hits: dict[str, list[float]] = defaultdict(list)
+        # 失敗計數:每個 key 的連續失敗次數 + 第一次失敗的時間(用於鎖定視窗)
+        self._failures: dict[str, dict] = defaultdict(dict)
         self._last_cleanup = time.monotonic()
 
     def is_allowed(self, key: str, max_hits: int, window_seconds: int) -> bool:
         now = time.monotonic()
-        # 每 60 秒清理過期記錄，防止記憶體洩漏
+        # 每 60 秒清理過期記錄,防止記憶體洩漏
         if now - self._last_cleanup > 60:
             self._cleanup(now, window_seconds)
         hits = self._hits[key]
@@ -51,24 +61,143 @@ class RateLimiter:
         hits.append(now)
         return True
 
+    # ── 暴力破解防護 API ──────────────────────────────────────
+    def register_failure(self, key: str) -> int:
+        """記錄一次失敗,回傳目前累計失敗次數。"""
+        now = time.monotonic()
+        record = self._failures[key]
+        if not record:
+            record["first_failure_at"] = now
+        record["count"] = record.get("count", 0) + 1
+        return record["count"]
+
+    def is_locked(self, key: str, max_failures: int, lock_seconds: int) -> bool:
+        """
+        判斷該 key 是否仍處於鎖定期。
+        鎖定邏輯:累計失敗 >= max_failures 時,從「第一次失敗 + lock_seconds」為鎖定截止。
+        超過鎖定期後自動重置(下次嘗試重新計算)。
+        """
+        record = self._failures.get(key)
+        if not record or record.get("count", 0) < max_failures:
+            return False
+        now = time.monotonic()
+        # 鎖定視窗從第一次失敗開始算 lock_seconds
+        locked_until = record["first_failure_at"] + lock_seconds
+        if now >= locked_until:
+            # 鎖定過期,清除此 key 讓使用者重新嘗試
+            del self._failures[key]
+            return False
+        return True
+
+    def reset_failure(self, key: str) -> None:
+        """成功時清除失敗計數(例如登入成功)。"""
+        self._failures.pop(key, None)
+
     def _cleanup(self, now: float, default_window: int):
         self._last_cleanup = now
         cutoff = now - default_window
         expired_keys = [k for k, v in self._hits.items() if not v or v[-1] < cutoff]
         for k in expired_keys:
             del self._hits[k]
+        # 同時清理過期的失敗記錄(保守地以 1 小時為界)
+        old_failure_cutoff = now - 3600
+        expired_failures = [
+            k for k, v in self._failures.items()
+            if v.get("first_failure_at", 0) < old_failure_cutoff
+        ]
+        for k in expired_failures:
+            del self._failures[k]
 
 rate_limiter = RateLimiter()
 
+
+# ── 客戶端 IP 偵測(信任反向代理清單)──────────────────────────
+def _is_ip_trusted(ip_str: str, trusted_networks: list[str]) -> bool:
+    """檢查 IP 是否落在信任的反向代理網路清單內(支援 CIDR)。"""
+    if not trusted_networks:
+        return False
+    try:
+        ip = ipaddress.ip_address(ip_str)
+    except ValueError:
+        return False
+    for cidr in trusted_networks:
+        try:
+            if ip in ipaddress.ip_network(cidr, strict=False):
+                return True
+        except ValueError:
+            continue
+    return False
+
+
 def _get_client_ip(request: Request) -> str:
-    """取得客戶端 IP（支援反向代理 X-Forwarded-For）"""
+    """
+    取得真實客戶端 IP。
+
+    安全考量:舊版無條件信任 X-Forwarded-For,直連模式下可被偽造繞過限流。
+    新版只有在 request.client.host 落在 TRUSTED_PROXIES 信任清單時,
+    才解析 X-Forwarded-For(取最左側,即最原始的客戶端 IP);
+    否則一律以 request.client.host 為準(直連模式)。
+    """
+    direct_host = request.client.host if request.client else "unknown"
+    trusted_networks = settings.trusted_proxy_networks
+
+    if not trusted_networks:
+        # 直連模式:完全不信任 forwarded header
+        return direct_host
+
+    if not _is_ip_trusted(direct_host, trusted_networks):
+        # 連線來源不是已知反代 → 不信任其 forwarded header
+        return direct_host
+
+    # 連線來自信任的反代,可解析 X-Forwarded-For 最左側(最原始客戶端)
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
+        # X-Forwarded-For: client, proxy1, proxy2 → 取 client
+        return forwarded.split(",")[0].strip() or direct_host
+    # 反代未附加 header(例如只有 TCP 代理),退而用 X-Real-IP
+    real_ip = request.headers.get("x-real-ip")
+    if real_ip:
+        return real_ip.strip()
+    return direct_host
+
+
+# ── Rate Limit FastAPI Dependency 工廠 ────────────────────────
+def rate_limit(key_prefix: str, max_hits: int | None = None, window_seconds: int = 60):
+    """
+    產生一個 FastAPI dependency,用於對路由套用限流。
+
+    用法:
+        @app.get("/api/foo", dependencies=[Depends(rate_limit("foo"))])
+        或
+        def handler(_: None = Depends(rate_limit("upload", 5))):
+            ...
+
+    max_hits 若不指定,自動從 settings 取對應 key_prefix 的預設值。
+    """
+    # key_prefix → 預設限流的對照表
+    _defaults = {
+        "api": settings.RATE_LIMIT_API_PER_MIN,
+        "upload": settings.RATE_LIMIT_UPLOAD_PER_MIN,
+        "admin": settings.RATE_LIMIT_ADMIN_PER_MIN,
+        "file": settings.RATE_LIMIT_FILE_PER_MIN,
+    }
+    if max_hits is None:
+        max_hits = _defaults.get(key_prefix, settings.RATE_LIMIT_API_PER_MIN)
+
+    def _check(request: Request) -> None:
+        client_ip = _get_client_ip(request)
+        if not rate_limiter.is_allowed(f"{key_prefix}:{client_ip}", max_hits, window_seconds):
+            raise HTTPException(
+                status_code=429,
+                detail="請求過於頻繁,請稍後再試。",
+                headers={"Retry-After": str(window_seconds)},
+            )
+
+    return _check
 
 # ── 上傳檔案限制常數 ─────────────────────────────────────────
-MAX_UPLOAD_SIZE = 20 * 1024 * 1024  # 20 MB
+# 改由 settings 動態提供,方便透過環境變數調整
+MAX_UPLOAD_SIZE = settings.max_upload_bytes
 PDF_MAGIC_BYTES = b"%PDF-"
 
 # 啟動時自動建立資料表
@@ -199,23 +328,74 @@ async def serve_service_worker(request: Request):
     )
 
 # ── 後台管理帳密與驗證設定 ──────────────────────────────────────
-# 建議於生產環境使用環境變數設定帳密。
-# 例如在 Windows PowerShell 啟動：
-#   $env:ADMIN_USERNAME="myadmin"; $env:ADMIN_PASSWORD="mypassword"; uvicorn main:app --reload
-ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")  # 預設密碼，請務必修改！
+# 帳密改由 settings 統一管理(來自 .env 或環境變數)。
+# 暴力破解防護:以 hash(IP + 帳號) 為 key,連續失敗 N 次後鎖定該組合 15 分鐘。
+ADMIN_USERNAME = settings.ADMIN_USERNAME
+ADMIN_PASSWORD = settings.ADMIN_PASSWORD
 
 security = HTTPBasic()
 
-def authenticate_admin(credentials: HTTPBasicCredentials = Depends(security)):
+
+def _admin_lock_key(ip: str, username: str) -> str:
+    """
+    產生管理員鎖定的复合 key。
+    使用 SHA256(IP + Username) 避免明文儲存,且能區分不同 IP 的同一帳號,
+    防止 NAT 環境下單一使用者被鎖定影響整個網段。
+    """
+    raw = f"{ip}:{username}".encode("utf-8")
+    return "admin_login:" + hashlib.sha256(raw).hexdigest()
+
+
+def authenticate_admin(request: Request, credentials: HTTPBasicCredentials = Depends(security)):
+    """
+    驗證後台管理員身分,內建暴力破解鎖定。
+
+    鎖定策略:
+    - 同一 (IP, 帳號) 組合連續失敗達 ADMIN_MAX_LOGIN_FAILURES 次 → 鎖定 ADMIN_LOCK_DURATION_MIN 分鐘
+    - 鎖定期間即使輸入正確密碼仍回 423 Locked
+    - 成功登入立即清除失敗計數
+    """
+    client_ip = _get_client_ip(request)
+    lock_key = _admin_lock_key(client_ip, credentials.username)
+
+    # 先檢查是否已鎖定
+    if rate_limiter.is_locked(
+        lock_key,
+        max_failures=settings.ADMIN_MAX_LOGIN_FAILURES,
+        lock_seconds=settings.ADMIN_LOCK_DURATION_MIN * 60,
+    ):
+        log.warning("管理員登入被封鎖:IP=%s, username=%s", client_ip, credentials.username)
+        raise HTTPException(
+            status_code=status.HTTP_423_LOCKED,
+            detail=f"連續登入失敗次數過多,已鎖定 {settings.ADMIN_LOCK_DURATION_MIN} 分鐘,請稍後再試。",
+            headers={"Retry-After": str(settings.ADMIN_LOCK_DURATION_MIN * 60)},
+        )
+
     correct_username = secrets.compare_digest(credentials.username, ADMIN_USERNAME)
     correct_password = secrets.compare_digest(credentials.password, ADMIN_PASSWORD)
+
     if not (correct_username and correct_password):
+        # 記錄失敗
+        failures = rate_limiter.register_failure(lock_key)
+        log.warning(
+            "管理員登入失敗:IP=%s, username=%s, 累計失敗=%d/%d",
+            client_ip, credentials.username, failures, settings.ADMIN_MAX_LOGIN_FAILURES,
+        )
+        # 若此次失敗剛觸發鎖定,回 423 讓前端知道;否則回 401
+        if failures >= settings.ADMIN_MAX_LOGIN_FAILURES:
+            raise HTTPException(
+                status_code=status.HTTP_423_LOCKED,
+                detail=f"登入失敗次數過多,已鎖定 {settings.ADMIN_LOCK_DURATION_MIN} 分鐘。",
+                headers={"Retry-After": str(settings.ADMIN_LOCK_DURATION_MIN * 60)},
+            )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="帳號或密碼錯誤",
             headers={"WWW-Authenticate": "Basic"},
         )
+
+    # 登入成功,清除失敗計數
+    rate_limiter.reset_failure(lock_key)
     return credentials.username
 
 PRICE_PER_PAGE_BY_COLOR: dict[str, int] = {
@@ -262,13 +442,9 @@ async def count_pdf_pages(file_path: str) -> int:
     return await loop.run_in_executor(None, _count_pdf_pages_sync, file_path)
 
 # ── API 路由 ──────────────────────────────────────────────
-@app.post("/api/check-pages")
-async def check_pdf_pages(request: Request, file: UploadFile = File(...)):
+@app.post("/api/check-pages", dependencies=[Depends(rate_limit("api"))])
+async def check_pdf_pages(file: UploadFile = File(...)):
     """臨時解析 PDF 檔並返回頁數"""
-    # Rate Limiting：每 IP 每分鐘最多 30 次
-    client_ip = _get_client_ip(request)
-    if not rate_limiter.is_allowed(f"api:{client_ip}", 30, 60):
-        raise HTTPException(status_code=429, detail="請求過於頻繁，請稍後再試。")
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="僅接受 PDF 格式的檔案。")
     
@@ -301,7 +477,6 @@ def _send_line_notification_bg(user_name: str, file_name: str, total_pages: int,
 
 @app.post("/api/upload")
 async def upload_order(
-    request: Request,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     user_name: str = Form(...),
@@ -309,13 +484,9 @@ async def upload_order(
     duplex: str = Form("single"),
     binding: str | None = Form(None),
     pickup_location: str | None = Form(None),
-    db: Session = Depends(get_db)  # 注入資料庫 Session
+    db: Session = Depends(get_db),  # 注入資料庫 Session
+    _rl: None = Depends(rate_limit("upload")),  # 上傳限流(較嚴格)
 ) -> JSONResponse:
-    # ── Rate Limiting：每 IP 每分鐘最多 5 次上傳 ─────────────
-    client_ip = _get_client_ip(request)
-    if not rate_limiter.is_allowed(f"upload:{client_ip}", 5, 60):
-        raise HTTPException(status_code=429, detail="上傳過於頻繁，請稍後再試。")
-
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="僅接受 PDF 格式的檔案。")
 
@@ -399,12 +570,12 @@ async def upload_order(
             os.remove(tmp_path)
 
 @app.get("/api/orders/history")
-async def get_user_orders(request: Request, user_name: str, db: Session = Depends(get_db)):
+async def get_user_orders(
+    user_name: str,
+    db: Session = Depends(get_db),
+    _rl: None = Depends(rate_limit("api")),
+):
     """取得特定使用者的訂單歷史（精簡欄位 + 短快取）"""
-    # Rate Limiting：每 IP 每分鐘最多 30 次
-    client_ip = _get_client_ip(request)
-    if not rate_limiter.is_allowed(f"api:{client_ip}", 30, 60):
-        raise HTTPException(status_code=429, detail="請求過於頻繁，請稍後再試。")
     if not user_name or not user_name.strip():
         raise HTTPException(status_code=400, detail="請提供姓名或學號以供查詢")
     rows = (
@@ -434,7 +605,10 @@ async def get_user_orders(request: Request, user_name: str, db: Session = Depend
     )
 
 @app.get("/api/announcements")
-async def get_active_announcements(db: Session = Depends(get_db)):
+async def get_active_announcements(
+    db: Session = Depends(get_db),
+    _rl: None = Depends(rate_limit("api")),
+):
     """前台 API：取得啟用中公告（5 分鐘快取，公告不需要即時性）"""
     announcements = db.query(Announcement).filter(Announcement.is_active == True).order_by(Announcement.id.desc()).all()
     return JSONResponse(
@@ -443,83 +617,116 @@ async def get_active_announcements(db: Session = Depends(get_db)):
     )
 
 @app.get("/api/admin/announcements")
-async def get_all_announcements(db: Session = Depends(get_db), username: str = Depends(authenticate_admin)):
+async def get_all_announcements(
+    db: Session = Depends(get_db),
+    username: str = Depends(authenticate_admin),
+    _rl: None = Depends(rate_limit("admin")),
+):
     """後台 API：取得所有公告列表"""
     announcements = db.query(Announcement).order_by(Announcement.id.desc()).all()
     return announcements
 
 @app.post("/api/announcements")
-async def create_announcement(payload: dict, db: Session = Depends(get_db), username: str = Depends(authenticate_admin)):
-    """後台 API：新增公告"""
-    content = payload.get("content")
-    if not content or not content.strip():
-        raise HTTPException(status_code=400, detail="公告內容不能為空")
-    new_announce = Announcement(content=content.strip())
+async def create_announcement(
+    payload: AnnouncementCreate,
+    db: Session = Depends(get_db),
+    username: str = Depends(authenticate_admin),
+    _rl: None = Depends(rate_limit("admin")),
+):
+    """後台 API：新增公告(content 由 schema 自動驗證非空)"""
+    new_announce = Announcement(content=payload.content)
     db.add(new_announce)
     db.commit()
     db.refresh(new_announce)
     return new_announce
 
 @app.put("/api/announcements/{announcement_id}")
-async def update_announcement_status(announcement_id: int, payload: dict, db: Session = Depends(get_db), username: str = Depends(authenticate_admin)):
+async def update_announcement_status(
+    announcement_id: int,
+    payload: AnnouncementUpdate,
+    db: Session = Depends(get_db),
+    username: str = Depends(authenticate_admin),
+    _rl: None = Depends(rate_limit("admin")),
+):
     """後台 API：更新公告內容或啟用狀態"""
     announcement = db.query(Announcement).filter(Announcement.id == announcement_id).first()
     if not announcement:
         raise HTTPException(status_code=404, detail="找不到該公告")
-    
-    if "is_active" in payload:
-        announcement.is_active = payload["is_active"]
-    if "content" in payload:
-        announcement.content = payload["content"].strip()
-        
+
+    if payload.is_active is not None:
+        announcement.is_active = payload.is_active
+    if payload.content is not None:
+        announcement.content = payload.content
+
     db.commit()
     return {"status": "success"}
 
 @app.delete("/api/announcements/{announcement_id}")
-async def delete_announcement(announcement_id: int, db: Session = Depends(get_db), username: str = Depends(authenticate_admin)):
+async def delete_announcement(
+    announcement_id: int,
+    db: Session = Depends(get_db),
+    username: str = Depends(authenticate_admin),
+    _rl: None = Depends(rate_limit("admin")),
+):
     """後台 API：刪除公告"""
     announcement = db.query(Announcement).filter(Announcement.id == announcement_id).first()
     if not announcement:
         raise HTTPException(status_code=404, detail="找不到該公告")
-    
+
     db.delete(announcement)
     db.commit()
     return {"status": "success"}
 
 @app.get("/api/orders")
-async def get_all_orders(db: Session = Depends(get_db), username: str = Depends(authenticate_admin)):
+async def get_all_orders(
+    db: Session = Depends(get_db),
+    username: str = Depends(authenticate_admin),
+    _rl: None = Depends(rate_limit("admin")),
+):
     """給後台用的 API：取得所有訂單"""
     orders = db.query(Order).order_by(Order.id.desc()).all()
     return orders
 
 @app.put("/api/orders/{order_id}")
-async def update_order_status(order_id: int, payload: dict, db: Session = Depends(get_db), username: str = Depends(authenticate_admin)):
+async def update_order_status(
+    order_id: int,
+    payload: OrderStatusUpdate,
+    db: Session = Depends(get_db),
+    username: str = Depends(authenticate_admin),
+    _rl: None = Depends(rate_limit("admin")),
+):
     """給後台用的 API：更新付款或列印狀態"""
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="找不到該訂單")
-    
-    if "is_paid" in payload:
-        order.is_paid = payload["is_paid"]
-    if "is_printed" in payload:
-        order.is_printed = payload["is_printed"]
-        
+
+    if payload.is_paid is not None:
+        order.is_paid = payload.is_paid
+    if payload.is_printed is not None:
+        order.is_printed = payload.is_printed
+
     db.commit()
     return {"status": "success"}
 
 @app.get("/api/orders/{order_id}/file")
 @app.get("/api/orders/{order_id}/file/{file_name}")
-async def get_order_file(order_id: int, file_name: str | None = None, db: Session = Depends(get_db), username: str = Depends(authenticate_admin)):
+async def get_order_file(
+    order_id: int,
+    file_name: str | None = None,
+    db: Session = Depends(get_db),
+    username: str = Depends(authenticate_admin),
+    _rl: None = Depends(rate_limit("file")),
+):
     """給後台用的 API：串流 PDF 檔案以供下載或預覽"""
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="找不到該訂單")
-    
+
     physical_filename = order.physical_path if order.physical_path else f"order_{order_id}.pdf"
     file_path = os.path.join(UPLOAD_DIR, physical_filename)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="找不到該訂單的 PDF 檔案")
-    
+
     return FileResponse(
         file_path,
         media_type="application/pdf",
@@ -529,23 +736,29 @@ async def get_order_file(order_id: int, file_name: str | None = None, db: Sessio
 
 @app.get("/api/orders/{order_id}/preview")
 @app.get("/api/orders/{order_id}/preview/{file_name}")
-async def preview_order_file(order_id: int, user_name: str, file_name: str | None = None, db: Session = Depends(get_db)):
+async def preview_order_file(
+    order_id: int,
+    user_name: str,
+    file_name: str | None = None,
+    db: Session = Depends(get_db),
+    _rl: None = Depends(rate_limit("file")),
+):
     """前台使用者預覽 PDF 檔案，需提供正確的 user_name"""
     if not user_name or not user_name.strip():
         raise HTTPException(status_code=400, detail="請提供姓名或學號以供驗證")
-    
+
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="找不到該訂單")
-        
+
     if order.user_name.strip() != user_name.strip():
         raise HTTPException(status_code=403, detail="無權存取此訂單的檔案")
-        
+
     physical_filename = order.physical_path if order.physical_path else f"order_{order_id}.pdf"
     file_path = os.path.join(UPLOAD_DIR, physical_filename)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="找不到該訂單的 PDF 檔案")
-        
+
     return FileResponse(
         file_path,
         media_type="application/pdf",
@@ -555,7 +768,12 @@ async def preview_order_file(order_id: int, user_name: str, file_name: str | Non
 
 
 @app.delete("/api/orders/{order_id}")
-async def delete_order(order_id: int, db: Session = Depends(get_db), username: str = Depends(authenticate_admin)):
+async def delete_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    username: str = Depends(authenticate_admin),
+    _rl: None = Depends(rate_limit("admin")),
+):
     """給後台用的 API：刪除訂單及其實體 PDF 檔案"""
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
