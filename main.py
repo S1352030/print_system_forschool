@@ -9,8 +9,9 @@ import logging
 import asyncio
 import time
 from collections import defaultdict
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Depends, status, Request, BackgroundTasks
-from fastapi.responses import JSONResponse, FileResponse, Response
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Depends, status, Request, BackgroundTasks, Query
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse, FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pypdf import PdfReader
@@ -204,7 +205,116 @@ PDF_MAGIC_BYTES = b"%PDF-"
 Base.metadata.create_all(bind=engine)
 ensure_order_columns()
 
-app = FastAPI(title="影印計價與通知系統")
+# ── 應用程式啟動時間(供 /health 計算 uptime)────────────────────
+import time as _time
+_APP_START_TIME = _time.monotonic()
+
+# ── 舊訂單清理(啟動執行一次 + APScheduler 定期執行)──────────────
+def _cleanup_old_orders_once() -> int:
+    """
+    清理超過 ORDER_RETENTION_DAYS 的「已付款且已列印」訂單及其 PDF 檔案,
+    回傳刪除筆數。可在啟動時與排程中重複呼叫。
+
+    注意:本函式為同步,由 APScheduler 的執行緒池或 asyncio.to_thread 呼叫,
+    不會阻塞事件循環。
+    """
+    from database import get_taipei_now
+    from datetime import timedelta as td
+    cutoff = get_taipei_now() - td(days=settings.ORDER_RETENTION_DAYS)
+    db = SessionLocal()
+    try:
+        old_orders = db.query(Order).filter(
+            Order.is_paid == True,
+            Order.is_printed == True,
+            Order.created_at < cutoff
+        ).all()
+        deleted_count = 0
+        for order in old_orders:
+            physical_filename = order.physical_path if order.physical_path else f"order_{order.id}.pdf"
+            file_path = os.path.join(UPLOAD_DIR, physical_filename)
+            if os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                except Exception as exc:
+                    log.error("清理舊訂單時無法刪除檔案 %s: %s", file_path, exc)
+            db.delete(order)
+            deleted_count += 1
+        if deleted_count > 0:
+            db.commit()
+            log.info(
+                "清理完成:已刪除 %d 筆超過 %d 天的已完成訂單",
+                deleted_count, settings.ORDER_RETENTION_DAYS,
+            )
+        return deleted_count
+    except Exception as exc:
+        log.error("清理舊訂單失敗:%s", exc)
+        db.rollback()
+        return 0
+    finally:
+        db.close()
+
+
+def _scheduled_cleanup() -> None:
+    """APScheduler 排程的包裝器,捕捉所有例外避免排程中斷。"""
+    try:
+        _cleanup_old_orders_once()
+    except Exception as exc:
+        log.error("排程清理任務發生未預期錯誤:%s", exc)
+
+
+# ── Lifespan:啟動/關閉事件(取代棄用的 @app.on_event)────────────
+from contextlib import asynccontextmanager
+from apscheduler.schedulers.background import BackgroundScheduler
+
+_scheduler: BackgroundScheduler | None = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    應用程式生命週期管理。
+
+    啟動時:
+    1. 立即執行一次舊訂單清理(同步於執行緒池,不阻塞)
+    2. 啟動 APScheduler,每 CLEANUP_INTERVAL_HOURS 定期清理
+
+    關閉時:
+    - scheduler.shutdown(wait=False) 立即停止,不等待執行中任務
+      (GCP 搶佔/重新部署收到 SIGTERM 時能快速回應)
+    """
+    global _scheduler
+
+    # 啟動:首次清理(放執行緒池避免阻塞 lifespan)
+    log.info("應用程式啟動,執行首次舊訂單清理...")
+    await asyncio.to_thread(_cleanup_old_orders_once)
+
+    # 啟動 APScheduler(背景執行緒,獨立於事件循環)
+    _scheduler = BackgroundScheduler(timezone="Asia/Taipei")
+    _scheduler.add_job(
+        _scheduled_cleanup,
+        trigger="interval",
+        hours=settings.CLEANUP_INTERVAL_HOURS,
+        id="cleanup_old_orders",
+        replace_existing=True,
+        max_instances=1,        # 避免重疊執行
+        coalesce=True,          # 多次錯過的觸發合併為一次
+    )
+    _scheduler.start()
+    log.info(
+        "APScheduler 已啟動:每 %d 小時清理一次超過 %d 天的舊訂單",
+        settings.CLEANUP_INTERVAL_HOURS, settings.ORDER_RETENTION_DAYS,
+    )
+
+    try:
+        yield
+    finally:
+        # 關閉:立即停止排程器,不等待執行中的任務(優雅停機)
+        if _scheduler is not None:
+            _scheduler.shutdown(wait=False)
+            log.info("APScheduler 已關閉")
+
+
+app = FastAPI(title="影印計價與通知系統", lifespan=lifespan)
 
 # 提供靜態檔案服務 (用於 PDF.js 等)
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -258,15 +368,12 @@ class SecurityAndCacheMiddleware:
                 # 4. 快取原則處理
                 cache_control = headers.get("Cache-Control", "")
                 
-                # 清除不推薦的快取指令
-                if cache_control:
-                    if "must-revalidate" in cache_control.lower() or "no-store" in cache_control.lower():
-                        directives = [d.strip() for d in cache_control.split(",") if d.strip()]
-                        cleaned = [
-                            d for d in directives 
-                            if "must-revalidate" not in d.lower() and "no-store" not in d.lower()
-                        ]
-                        cache_control = ", ".join(cleaned)
+                # 清除不推薦的快取指令(must-revalidate 與上游框架誤加的過時指令)
+                # 注意:保留 no-store — 健康檢查、動態敏感回應需要它
+                if cache_control and "must-revalidate" in cache_control.lower():
+                    directives = [d.strip() for d in cache_control.split(",") if d.strip()]
+                    cleaned = [d for d in directives if "must-revalidate" not in d.lower()]
+                    cache_control = ", ".join(cleaned)
                         
                 if path.startswith("/static/"):
                     # /static/ 底下是 PDF.js 函式庫本體、worker 與 cmaps 等版本固定的靜態資源，
@@ -315,6 +422,89 @@ class SecurityAndCacheMiddleware:
         await self.app(scope, receive, send_wrapper)
 
 app.add_middleware(SecurityAndCacheMiddleware)
+
+
+# ── Request Logging Middleware(結構化記錄每個請求)──────────────
+# 記錄 method、path、status、耗時、IP、user_agent。
+# 4xx/5xx 用 log.warning,2xx/3xx 用 log.info。
+# 排除 /health 與 /static/ 避免雜訊(這兩類是監控與函式庫,量很大)。
+
+# 不記錄 log 的路徑前綴(高頻或無意義的請求)
+_LOG_SKIP_PATHS = ("/health", "/static/", "/sw.js")
+# 哪些 IP 視為本地(避免在本機開發時被自己的請求洗版,但仍記錄)
+_LOCAL_IP_PREFIXES = ("127.", "10.", "192.168.", "172.")
+
+
+class RequestLoggingMiddleware:
+    """ASGI middleware:結構化記錄每個 HTTP 請求的方法、路徑、狀態與耗時。"""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        path = scope.get("path", "")
+        method = scope.get("method", "")
+
+        # 跳過高頻/無意義路徑
+        if any(path.startswith(p) for p in _LOG_SKIP_PATHS):
+            await self.app(scope, receive, send)
+            return
+
+        # 取 IP(信任清單感知)
+        direct_host = "unknown"
+        client = scope.get("client")
+        if client:
+            direct_host = client[0]
+        # 解析 headers(輕量版,只取需要的)
+        forwarded = user_agent = ""
+        for name, value in scope.get("headers", []):
+            if name == b"x-forwarded-for":
+                forwarded = value.decode("latin-1", errors="replace")
+            elif name == b"user-agent":
+                user_agent = value.decode("latin-1", errors="replace")
+        # 委派給 _get_client_ip 的邏輯(避免重複,但 middleware 在 Request 物件建立前執行,
+        # 此處簡化:若信任反代就用 XFF,否則用 direct_host)
+        if settings.trusted_proxy_networks and _is_ip_trusted(direct_host, settings.trusted_proxy_networks) and forwarded:
+            client_ip = forwarded.split(",")[0].strip()
+        else:
+            client_ip = direct_host
+
+        start_time = time.monotonic()
+        status_code_holder = {"code": 0}
+
+        async def send_wrapper(message):
+            if message["type"] == "http.response.start":
+                status_code_holder["code"] = message.get("status", 0)
+            await send(message)
+
+        try:
+            await self.app(scope, receive, send_wrapper)
+        except Exception:
+            # 例外會由全域 exception handler 接手;此處只記錄耗時與 500
+            duration_ms = (time.monotonic() - start_time) * 1000
+            log.error(
+                "%s %s 500 %.0fms ip=%s ua=%r(未攔截例外)",
+                method, path, duration_ms, client_ip, user_agent[:80],
+            )
+            raise
+
+        status_code = status_code_holder["code"]
+        duration_ms = (time.monotonic() - start_time) * 1000
+
+        # 依狀態碼選日誌等級
+        if status_code >= 500:
+            log.error("%s %s %d %.0fms ip=%s ua=%r", method, path, status_code, duration_ms, client_ip, user_agent[:80])
+        elif status_code >= 400:
+            log.warning("%s %s %d %.0fms ip=%s ua=%r", method, path, status_code, duration_ms, client_ip, user_agent[:80])
+        else:
+            log.info("%s %s %d %.0fms ip=%s", method, path, status_code, duration_ms, client_ip)
+
+
+app.add_middleware(RequestLoggingMiddleware)
 
 # ── Service Worker 路由（必須在最前面，從根目錄提供）────────────
 @app.get("/sw.js")
@@ -436,10 +626,141 @@ def _count_pdf_pages_sync(file_path: str) -> int:
     except Exception as exc:
         raise ValueError(f"無法讀取 PDF 頁數：{exc}") from exc
 
+
+# ── PDF Range Request 串流(避免一次讀進 RAM)─────────────────────
+# GCP 免費層(e2-micro,1GB RAM)上,舊版 FileResponse 不支援 Range,
+# 瀏覽器 PDF 預覽無法跳頁串流,且大檔案會浪費頻寬。此函式實作 HTTP 206
+# Partial Content,使用 aiofiles 分塊非同步讀取,即使中斷也能正確釋放 fd。
+
+# 每次讀取的分塊大小(64KB,平衡 syscall 次數與記憶體佔用)
+_PDF_CHUNK_SIZE = 64 * 1024
+
+
+def _parse_range_header(range_header: str, file_size: int) -> tuple[int, int] | None:
+    """
+    解析 HTTP Range header,回傳 (start, end) 含頭尾的位元組區間(閉區間)。
+
+    支援格式:
+      bytes=0-1023      → (0, 1023)
+      bytes=500-        → (500, file_size-1)
+      bytes=-500        → (file_size-500, file_size-1)
+
+    不合法或多重範圍(bytes=a-b,c-d)回傳 None(呼叫端應回 416)。
+    """
+    if not range_header.startswith("bytes="):
+        return None
+    range_spec = range_header[6:].strip()
+    # 不支援多重範圍
+    if "," in range_spec:
+        return None
+    if "-" not in range_spec:
+        return None
+    start_str, end_str = range_spec.split("-", 1)
+    try:
+        if start_str == "":
+            # suffix range:bytes=-500 → 最後 500 bytes
+            length = int(end_str)
+            if length <= 0:
+                return None
+            start = max(0, file_size - length)
+            end = file_size - 1
+        elif end_str == "":
+            # open range:bytes=500- → 從 500 到檔尾
+            start = int(start_str)
+            end = file_size - 1
+        else:
+            start = int(start_str)
+            end = int(end_str)
+            if end >= file_size:
+                end = file_size - 1
+        if start < 0 or start >= file_size or start > end:
+            return None
+        return (start, end)
+    except ValueError:
+        return None
+
+
+async def serve_pdf_with_range(
+    file_path: str,
+    request: Request,
+    download_filename: str,
+) -> Response:
+    """
+    以 HTTP 206 Partial Content 串流 PDF 檔案。
+
+    - 無 Range header → 回 200 + 完整檔案(仍用串流,不一次讀進 RAM)
+    - 有合法 Range → 回 206 + Content-Range
+    - Range 不合法 → 回 416 Range Not Satisfiable
+
+    使用 aiofiles 非同步分塊讀取,連線中斷時自動釋放 file descriptor。
+    """
+    import aiofiles
+    import os as _os
+
+    if not _os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="找不到該訂單的 PDF 檔案")
+
+    file_size = _os.path.getsize(file_path)
+    range_header = request.headers.get("range")
+
+    # ── 處理 Range header ─────────────────────────────────
+    if range_header:
+        parsed = _parse_range_header(range_header, file_size)
+        if parsed is None:
+            # 不合法範圍 → 416
+            return Response(
+                status_code=416,
+                headers={
+                    "Content-Range": f"bytes */{file_size}",
+                },
+            )
+        start, end = parsed
+        status_code = 206
+        content_length = end - start + 1
+        content_range = f"bytes {start}-{end}/{file_size}"
+    else:
+        # 無 Range → 完整檔案
+        start, end = 0, file_size - 1
+        status_code = 200
+        content_length = file_size
+        content_range = None
+
+    # ── 非同步分塊讀取 generator ──────────────────────────
+    async def _stream():
+        # 使用 async with 確保連線中斷時 fd 也會正確釋放
+        async with aiofiles.open(file_path, "rb") as f:
+            await f.seek(start)
+            remaining = content_length
+            while remaining > 0:
+                chunk_size = min(_PDF_CHUNK_SIZE, remaining)
+                chunk = await f.read(chunk_size)
+                if not chunk:
+                    break
+                remaining -= len(chunk)
+                yield chunk
+
+    headers = {
+        "Content-Type": "application/pdf",
+        "Content-Length": str(content_length),
+        "Content-Disposition": f'inline; filename="{download_filename}"',
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "private, no-cache",
+    }
+    if content_range is not None:
+        headers["Content-Range"] = content_range
+
+    return StreamingResponse(
+        content=_stream(),
+        status_code=status_code,
+        headers=headers,
+        media_type="application/pdf",
+    )
+
 async def count_pdf_pages(file_path: str) -> int:
-    """非同步版本：在線程池中執行 PDF 解析，避免阻塞事件循環"""
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, _count_pdf_pages_sync, file_path)
+    """非同步版本:在線程池中執行 PDF 解析,避免阻塞事件循環。
+    使用 asyncio.to_thread(Python 3.9+)取代棄用的 get_event_loop()。
+    """
+    return await asyncio.to_thread(_count_pdf_pages_sync, file_path)
 
 # ── API 路由 ──────────────────────────────────────────────
 @app.post("/api/check-pages", dependencies=[Depends(rate_limit("api"))])
@@ -572,13 +893,27 @@ async def upload_order(
 @app.get("/api/orders/history")
 async def get_user_orders(
     user_name: str,
+    page: int | None = Query(default=None, ge=1, description="頁碼(從 1 開始);不帶則回傳舊版全量格式"),
+    page_size: int | None = Query(default=None, ge=1, description="每頁筆數"),
     db: Session = Depends(get_db),
     _rl: None = Depends(rate_limit("api")),
 ):
-    """取得特定使用者的訂單歷史（精簡欄位 + 短快取）"""
+    """
+    取得特定使用者的訂單歷史(精簡欄位 + 短快取)。
+
+    向後相容設計:
+    - 不帶 page 參數 → 舊版純陣列(但加 ORDERS_MAX_PAGE_SIZE 安全上限)。
+    - 帶 page 參數 → {items, total, page, page_size, total_pages}。
+    """
     if not user_name or not user_name.strip():
         raise HTTPException(status_code=400, detail="請提供姓名或學號以供查詢")
-    rows = (
+
+    effective_page_size = (
+        min(page_size or settings.ORDERS_DEFAULT_PAGE_SIZE,
+            settings.ORDERS_MAX_PAGE_SIZE)
+    )
+
+    base_query = (
         db.query(
             Order.id, Order.file_name, Order.total_pages, Order.total_price,
             Order.color_mode, Order.duplex, Order.binding, Order.pickup_location,
@@ -586,10 +921,10 @@ async def get_user_orders(
         )
         .filter(Order.user_name == user_name.strip())
         .order_by(Order.id.desc())
-        .all()
     )
-    result = [
-        {
+
+    def _row_to_dict(r) -> dict:
+        return {
             "id": r.id, "file_name": r.file_name,
             "total_pages": r.total_pages, "total_price": r.total_price,
             "color_mode": r.color_mode, "duplex": r.duplex,
@@ -597,10 +932,32 @@ async def get_user_orders(
             "is_paid": r.is_paid, "is_printed": r.is_printed,
             "created_at": str(r.created_at) if r.created_at else None,
         }
-        for r in rows
-    ]
+
+    if page is None:
+        rows = base_query.limit(settings.ORDERS_MAX_PAGE_SIZE).all()
+        result = [_row_to_dict(r) for r in rows]
+        return JSONResponse(
+            content=result,
+            headers={
+                "Cache-Control": "private, no-cache",
+                "X-Deprecation-Warning": (
+                    f"Unpaginated calls are deprecated and capped at "
+                    f"{settings.ORDERS_MAX_PAGE_SIZE} results. Use ?page=1&page_size={settings.ORDERS_DEFAULT_PAGE_SIZE}"
+                ),
+            },
+        )
+
+    total = base_query.count()
+    total_pages = (total + effective_page_size - 1) // effective_page_size if total > 0 else 0
+    rows = base_query.offset((page - 1) * effective_page_size).limit(effective_page_size).all()
     return JSONResponse(
-        content=result,
+        content={
+            "items": [_row_to_dict(r) for r in rows],
+            "total": total,
+            "page": page,
+            "page_size": effective_page_size,
+            "total_pages": total_pages,
+        },
         headers={"Cache-Control": "private, no-cache"},
     )
 
@@ -679,13 +1036,55 @@ async def delete_announcement(
 
 @app.get("/api/orders")
 async def get_all_orders(
+    request: Request,
+    page: int | None = Query(default=None, ge=1, description="頁碼(從 1 開始);不帶則回傳舊版全量格式"),
+    page_size: int | None = Query(default=None, ge=1, description="每頁筆數(上限由 ORDERS_MAX_PAGE_SIZE 控制)"),
     db: Session = Depends(get_db),
     username: str = Depends(authenticate_admin),
     _rl: None = Depends(rate_limit("admin")),
 ):
-    """給後台用的 API：取得所有訂單"""
-    orders = db.query(Order).order_by(Order.id.desc()).all()
-    return orders
+    """
+    給後台用的 API:取得所有訂單。
+
+    向後相容設計:
+    - 不帶 page 參數 → 回傳舊版純陣列(但加安全上限 ORDERS_MAX_PAGE_SIZE,
+      並附 X-Deprecation-Warning header 提示未來將淘汰)。
+    - 帶 page 參數 → 回傳分頁結構 {items, total, page, page_size, total_pages}。
+    """
+    # 釐清有效 page_size(不論哪種模式都套用上限保護)
+    effective_page_size = (
+        min(page_size or settings.ORDERS_DEFAULT_PAGE_SIZE,
+            settings.ORDERS_MAX_PAGE_SIZE)
+    )
+
+    base_query = db.query(Order).order_by(Order.id.desc())
+
+    if page is None:
+        # 舊版相容模式:回純陣列,但限制最大筆數保護伺服器
+        orders = base_query.limit(settings.ORDERS_MAX_PAGE_SIZE).all()
+        # HTTP header 只能 latin-1,用英文訊息避免 UnicodeEncodeError
+        response = JSONResponse(
+            content=jsonable_encoder(orders),
+            headers={
+                "X-Deprecation-Warning": (
+                    f"Unpaginated calls are deprecated and capped at "
+                    f"{settings.ORDERS_MAX_PAGE_SIZE} results. Use ?page=1&page_size={settings.ORDERS_DEFAULT_PAGE_SIZE}"
+                ),
+            },
+        )
+        return response
+
+    # 分頁模式
+    total = base_query.count()
+    total_pages = (total + effective_page_size - 1) // effective_page_size if total > 0 else 0
+    items = base_query.offset((page - 1) * effective_page_size).limit(effective_page_size).all()
+    return {
+        "items": jsonable_encoder(items),
+        "total": total,
+        "page": page,
+        "page_size": effective_page_size,
+        "total_pages": total_pages,
+    }
 
 @app.put("/api/orders/{order_id}")
 async def update_order_status(
@@ -712,38 +1111,33 @@ async def update_order_status(
 @app.get("/api/orders/{order_id}/file/{file_name}")
 async def get_order_file(
     order_id: int,
+    request: Request,
     file_name: str | None = None,
     db: Session = Depends(get_db),
     username: str = Depends(authenticate_admin),
     _rl: None = Depends(rate_limit("file")),
 ):
-    """給後台用的 API：串流 PDF 檔案以供下載或預覽"""
+    """給後台用的 API:串流 PDF 檔案以供下載或預覽(支援 HTTP Range)"""
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="找不到該訂單")
 
     physical_filename = order.physical_path if order.physical_path else f"order_{order_id}.pdf"
     file_path = os.path.join(UPLOAD_DIR, physical_filename)
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="找不到該訂單的 PDF 檔案")
-
-    return FileResponse(
-        file_path,
-        media_type="application/pdf",
-        filename=order.display_name if order.display_name else order.file_name,
-        content_disposition_type="inline"
-    )
+    download_name = order.display_name if order.display_name else order.file_name
+    return await serve_pdf_with_range(file_path, request, download_name)
 
 @app.get("/api/orders/{order_id}/preview")
 @app.get("/api/orders/{order_id}/preview/{file_name}")
 async def preview_order_file(
     order_id: int,
+    request: Request,
     user_name: str,
     file_name: str | None = None,
     db: Session = Depends(get_db),
     _rl: None = Depends(rate_limit("file")),
 ):
-    """前台使用者預覽 PDF 檔案，需提供正確的 user_name"""
+    """前台使用者預覽 PDF 檔案,需提供正確的 user_name(支援 HTTP Range)"""
     if not user_name or not user_name.strip():
         raise HTTPException(status_code=400, detail="請提供姓名或學號以供驗證")
 
@@ -756,15 +1150,8 @@ async def preview_order_file(
 
     physical_filename = order.physical_path if order.physical_path else f"order_{order_id}.pdf"
     file_path = os.path.join(UPLOAD_DIR, physical_filename)
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="找不到該訂單的 PDF 檔案")
-
-    return FileResponse(
-        file_path,
-        media_type="application/pdf",
-        filename=order.display_name if order.display_name else order.file_name,
-        content_disposition_type="inline"
-    )
+    download_name = order.display_name if order.display_name else order.file_name
+    return await serve_pdf_with_range(file_path, request, download_name)
 
 
 @app.delete("/api/orders/{order_id}")
@@ -792,36 +1179,40 @@ async def delete_order(
     db.commit()
     return {"status": "success"}
 
-# ── 啟動時自動清理舊訂單（30 天前已完成的訂單）──────────────────
-@app.on_event("startup")
-async def cleanup_old_orders():
-    """刪除 30 天前已付款且已列印的訂單及其 PDF 檔案，釋放磁碟空間"""
-    from database import get_taipei_now
-    from datetime import timedelta as td
-    cutoff = get_taipei_now() - td(days=30)
-    db = SessionLocal()
+
+# ── 健康檢查端點(必須在 app 定義後,放檔尾方便維護)──────────────
+# 不要求認證、不限流(讓監控程式/GCP LB 可定期打)
+@app.get("/health")
+async def health_check(db: Session = Depends(get_db)):
+    """健康檢查:回傳服務狀態、DB 連通性、uptime、版本。"""
+    db_ok = True
     try:
-        old_orders = db.query(Order).filter(
-            Order.is_paid == True,
-            Order.is_printed == True,
-            Order.created_at < cutoff
-        ).all()
-        deleted_count = 0
-        for order in old_orders:
-            physical_filename = order.physical_path if order.physical_path else f"order_{order.id}.pdf"
-            file_path = os.path.join(UPLOAD_DIR, physical_filename)
-            if os.path.exists(file_path):
-                try:
-                    os.remove(file_path)
-                except Exception as exc:
-                    log.error("清理舊訂單時無法刪除檔案 %s: %s", file_path, exc)
-            db.delete(order)
-            deleted_count += 1
-        if deleted_count > 0:
-            db.commit()
-            log.info("啟動清理：已刪除 %d 筆 30 天前的已完成訂單", deleted_count)
+        db.execute(text("SELECT 1"))
     except Exception as exc:
-        log.error("啟動清理失敗：%s", exc)
-        db.rollback()
-    finally:
-        db.close()
+        db_ok = False
+        log.error("/health 資料庫檢查失敗:%s", exc)
+
+    uptime_seconds = int(_time.monotonic() - _APP_START_TIME)
+    status_code = 200 if db_ok else 503
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "status": "ok" if db_ok else "degraded",
+            "db": db_ok,
+            "uptime_seconds": uptime_seconds,
+            "version": settings.APP_VERSION,
+        },
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+# ── 全域 exception handler(攔截未預期錯誤,避免暴露堆疊給前端)────
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """攔截所有未處理的例外,回 500 + 制式錯誤格式,並記錄完整堆疊。"""
+    log.exception("未預期的例外:path=%s, exception=%r", request.url.path, exc)
+    return JSONResponse(
+        status_code=500,
+        content={"error": "internal_server_error", "detail": "伺服器發生內部錯誤,請稍後再試。"},
+        headers={"Cache-Control": "no-store"},
+    )
