@@ -1,4 +1,5 @@
 :root {
+  color-scheme: dark;
   /* MD3 Design Token Aliases */
   --md-sys-color-primary: var(--accent2, #0f3460);
   --md-sys-color-surface: var(--surface);
