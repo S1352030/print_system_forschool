@@ -384,3 +384,21 @@ td.price { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: va
   background-color: rgba(233, 69, 96, 0.16);
 }
 
+
+/* ── 載入更多按鈕 (M3.2 後台) ────────────────────────────── */
+.admin-load-more-btn {
+  display: block;
+  width: 100%;
+  margin: 16px 0;
+  padding: 12px;
+  background: transparent;
+  border: 1px dashed var(--accent, #1976d2);
+  border-radius: 100px;
+  color: var(--accent, #1976d2);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.admin-load-more-btn:hover {
+  background: var(--bg-hover, rgba(25, 118, 210, 0.08));
+}

@@ -15,6 +15,7 @@
 
 import os
 import gzip
+import glob
 
 try:
     import brotli
@@ -23,13 +24,29 @@ except ImportError:
     raise SystemExit(1)
 
 # ── 需要預壓縮的靜態檔案清單 ──────────────────────────────────
-STATIC_FILES = [
-    "index.html",
-    "admin.html",
+# M3 起改用 glob 自動掃描,新增 JS 模組不必手動加入清單
+_GLOB_PATTERNS = [
+    "*.html",
+    "*.css",
     "sw.js",
-    "style.css",
-    "admin.css",
+    "static/js/**/*.js",    # ES module 模組(M3 新增)
+    "static/dialog.js",     # 非模組共用腳本
 ]
+
+
+def _collect_files():
+    """從 glob patterns 收集所有需預壓縮的檔案(自動去重、排序)。"""
+    seen = set()
+    files = []
+    for pattern in _GLOB_PATTERNS:
+        for path in glob.glob(pattern, recursive=True):
+            if path not in seen and os.path.isfile(path):
+                seen.add(path)
+                files.append(path)
+    return sorted(files)
+
+
+STATIC_FILES = _collect_files()
 
 BROTLI_QUALITY = 11  # 最高壓縮率（僅部署時執行一次，不影響即時效能）
 GZIP_LEVEL = 9       # 最高壓縮率

@@ -1460,3 +1460,51 @@ html.dark .theme-icon-moon {
   from { opacity: 0; transform: scale(0.97) translateY(8px); }
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
+
+/* ── 上傳進度條 (M3.4) ────────────────────────────────────── */
+.upload-progress-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 8px 4px;
+}
+.upload-progress-track {
+  flex: 1;
+  height: 8px;
+  background: var(--md-sys-color-surface-container-highest, #e0e0e0);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.upload-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--md-sys-color-primary, #6750a4);
+  border-radius: 4px;
+  transition: width 0.2s ease;
+}
+.upload-progress-text {
+  font-size: 13px;
+  color: var(--md-sys-color-on-surface-variant, #49454f);
+  min-width: 80px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* ── 載入更多按鈕 (M3.2) ──────────────────────────────────── */
+.load-more-btn {
+  display: block;
+  width: 100%;
+  margin-top: 16px;
+  padding: 12px;
+  background: transparent;
+  border: 1px dashed var(--md-sys-color-outline-variant, #cac4d0);
+  border-radius: 100px;
+  color: var(--md-sys-color-primary, #6750a4);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.load-more-btn:hover {
+  background: var(--md-sys-color-primary-container, #eaddff);
+}

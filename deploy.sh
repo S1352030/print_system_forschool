@@ -44,9 +44,18 @@ echo "[3/5] 預壓縮靜態資源 ..."
 python precompress.py
 echo ""
 
-# ── 4. 健康檢查 (驗證 Python 匯入是否正常) ───────────
+# ── 4. 健康檢查 (驗證 Python 匯入 + /health 端點) ───────
 echo "[4/5] 執行健康檢查 ..."
 python -c "from main import app; print('     ✅ 匯入檢查通過')"
+# 部署後可用 curl 驗證服務狀態(若伺服器有 curl)
+if command -v curl >/dev/null 2>&1; then
+  HEALTH=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/health 2>/dev/null || echo "000")
+  if [ "$HEALTH" = "200" ]; then
+    echo "     ✅ /health 回應 200"
+  else
+    echo "     ⚠️  /health 回應 $HEALTH(服務可能尚未啟動或不在 8000 埠)"
+  fi
+fi
 echo ""
 
 # ── 5. 重啟服務 ──────────────────────────────────────
