@@ -10,7 +10,9 @@ git_commit_guidelines_v1.pdf
 AI_CHANGELOG.md
 .agents
 .zcode/
-# 預壓縮產生的靜態資源（由 precompress.py 在伺服器上生成）
+# 預壓縮產生的靜態資源(由 precompress.py 在伺服器上生成)
+# 涵蓋 HTML/CSS/JS 與 PDF.js 函式庫(pdf.worker.js 等),
+# 由 PrecompressedStaticFiles 依 Accept-Encoding 派發。
 *.br
 *.gz
 # Zstd 日誌輪替目錄

@@ -18,7 +18,8 @@ engine = create_engine(
     connect_args={"check_same_thread": False},  # SQLite 多執行緒需加此參數
     pool_size=5,
     max_overflow=10,
-    pool_pre_ping=True,
+    # 不設 pool_pre_ping:SQLite 為本地檔案,不像 PG/MySQL 會斷線,
+    # 每次借出連線都先跑 SELECT 1 探活是純 overhead,在高頻請求下累積成無謂的 DB 往返。
 )
 
 # ── SQLite 性能優化 PRAGMA（每個連線建立時自動套用）──────────────
@@ -104,6 +105,12 @@ def ensure_order_columns():
         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_orders_user_name ON orders (user_name)"))
         # 複合索引：加速按使用者 + 建立時間排序的歷史訂單查詢
         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_orders_user_created ON orders (user_name, created_at DESC)"))
+        # 複合索引：加速清理任務的「已付款 + 已列印 + 超過保留天數」查詢,
+        # 避免訂單累積後每次清理都要全表掃描。
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_orders_cleanup "
+            "ON orders (is_paid, is_printed, created_at)"
+        ))
 
 
 # ── 初始化：直接執行此檔案時建立資料表 ───────────────────

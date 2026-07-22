@@ -8,10 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
   <link rel="stylesheet" href="/admin.css?v=20260721a">
-  <script src="/static/pdfjs/build/pdf.js"></script>
-  <script>
-    pdfjsLib.GlobalWorkerOptions.workerSrc = '/static/pdfjs/build/pdf.worker.js';
-  </script>
+  <!-- PDF.js 改為延遲載入:僅在實際預覽 PDF 時才由 pdf-modal.js 動態注入。 -->
   <script src="/static/dialog.js"></script>
 </head>
 <body>

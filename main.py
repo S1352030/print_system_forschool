@@ -20,6 +20,8 @@ from sqlalchemy import text
 
 # 壓縮模組（Brotli 優先 + Gzip 備用）
 from compression import BrotliGzipMiddleware, serve_precompressed
+# 預壓縮感知的 StaticFiles(派發 .br/.gz,免除 PDF.js 等大檔即時壓縮)
+from compressed_static import PrecompressedStaticFiles
 # Zstandard 日誌系統
 from log_manager import setup_logging
 # 集中式設定(取代散落的 os.getenv)
@@ -317,7 +319,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="影印計價與通知系統", lifespan=lifespan)
 
 # 提供靜態檔案服務 (用於 PDF.js 等)
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# 使用 PrecompressedStaticFiles:優先派發 precompress.py 產生的 .br/.gz 預壓縮檔,
+# 避免 PDF.js 等 1.9MB 級大檔落入即時壓縮 middleware 消耗 CPU/記憶體。
+app.mount("/static", PrecompressedStaticFiles(directory="static"), name="static")
 
 # ── 初始化結構化日誌系統（Zstd 壓縮輪替）────────────────────────
 setup_logging()
@@ -771,10 +775,16 @@ async def check_pdf_pages(file: UploadFile = File(...)):
     
     tmp_path = None
     try:
+        # 以 async 串流寫入暫存檔(與 /api/upload 一致),
+        # 避免 shutil.copyfileobj 同步阻塞整個事件循環。
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-            shutil.copyfileobj(file.file, tmp)
+            while True:
+                chunk = await file.read(8192)
+                if not chunk:
+                    break
+                tmp.write(chunk)
             tmp_path = tmp.name
-        
+
         try:
             total_pages = await count_pdf_pages(tmp_path)
             return {"status": "success", "pages": total_pages}
@@ -871,7 +881,7 @@ async def upload_order(
 
         # 儲存上傳的 PDF 檔案以供後台下載/預覽
         file_path = os.path.join(UPLOAD_DIR, physical_filename)
-        await asyncio.get_event_loop().run_in_executor(None, shutil.copy2, tmp_path, file_path)
+        await asyncio.to_thread(shutil.copy2, tmp_path, file_path)
 
         # 觸發 LINE 通知（非同步背景任務，避免阻塞前端上傳響應）
         background_tasks.add_task(

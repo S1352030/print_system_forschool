@@ -7,6 +7,7 @@
  */
 
 import { showAlert } from './app.js';
+import { ensurePdfjs } from './pdfjs-loader.js';
 
 let currentPdfDoc = null;
 let currentPdfPage = 1;
@@ -82,6 +83,7 @@ export async function showPreview(fileObj) {
       const arrayBuffer = await file.arrayBuffer();
       if (myToken !== previewToken) return; // 已切換到其他檔案
 
+      await ensurePdfjs();
       const loadingTask = pdfjsLib.getDocument({
         data: arrayBuffer,
         cMapUrl: '/static/pdfjs/web/cmaps/',
@@ -137,6 +139,7 @@ export async function previewPastOrder(orderId, fileName, searchName) {
 
   const myToken = ++previewToken;
   try {
+    await ensurePdfjs();
     const pdf = await pdfjsLib.getDocument({
       url,
       cMapUrl: '/static/pdfjs/web/cmaps/',

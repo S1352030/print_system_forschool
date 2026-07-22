@@ -31,6 +31,7 @@ _GLOB_PATTERNS = [
     "sw.js",
     "static/js/**/*.js",    # ES module 模組(M3 新增)
     "static/dialog.js",     # 非模組共用腳本
+    "static/pdfjs/**/*.js", # PDF.js 函式庫(pdf.worker.js 1.9MB 等,避免即時壓縮吃 CPU)
 ]
 
 

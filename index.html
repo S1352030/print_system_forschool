@@ -10,11 +10,8 @@
   <noscript>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet" />
   </noscript>
-  <!-- PDF.js 載入 -->
-  <script src="/static/pdfjs/build/pdf.js"></script>
-  <script>
-    pdfjsLib.GlobalWorkerOptions.workerSrc = '/static/pdfjs/build/pdf.worker.js';
-  </script>
+  <!-- PDF.js 改為延遲載入:僅在實際預覽 PDF 時才透過 pdfjs-loader.js 動態注入,
+       避免首屏被 515KB 的 pdf.js 同步阻塞。 -->
   <script>
     (function() {
       // 1. Dark/Light mode theme

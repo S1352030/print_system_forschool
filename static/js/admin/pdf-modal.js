@@ -4,6 +4,7 @@
  */
 
 import { findOrder } from './orders.js';
+import { ensurePdfjs } from '../pdfjs-loader.js';
 
 const API_BASE = '';
 const ADMIN_PDF_CACHE_LIMIT = 8;
@@ -100,6 +101,7 @@ export async function openPdfModal(orderId) {
   try {
     showToastAdmin('正在載入 PDF 檔案...');
     const url = API_BASE + '/api/orders/' + orderId + '/file/' + encodeURIComponent(order.file_name);
+    await ensurePdfjs();
     const pdf = await pdfjsLib.getDocument({
       url,
       cMapUrl: '/static/pdfjs/web/cmaps/',
