@@ -2,12 +2,17 @@
  * PDF 預覽模組(使用者端 index.html 用)
  * 負責本地檔案與歷史訂單的 PDF 預覽。
  *
+ * 預覽框固定為 A4 比例(直向 210×297 / 橫向 297×210),PDF 內容以
+ * 「符合頁面(fit-to-page)」等比縮放、置中、留白,精確反映 A4 列印結果。
+ * 非 A4 檔案顯示尺寸標籤與警告。逐頁重新偵測(支援多尺寸混合 PDF)。
+ *
  * 含有「預覽 token」防競態機制:使用者快速切換檔案時,
  * 舊的非同步載入完成後不會覆蓋目前正在看的預覽。
  */
 
 import { showAlert } from './app.js';
 import { ensurePdfjs } from './pdfjs-loader.js';
+import { detectPaper, computeA4Fit, safeDpr } from './pdf-paper.js';
 
 let currentPdfDoc = null;
 let currentPdfPage = 1;
@@ -17,46 +22,113 @@ let pdfRenderTask = null;
 function _els() {
   return {
     canvas: document.getElementById('pdf-canvas'),
+    a4Frame: document.getElementById('pdf-a4-frame'),
     container: document.getElementById('pdf-preview-container'),
     placeholder: document.getElementById('pdf-placeholder'),
     meta: document.getElementById('preview-meta'),
+    paperBadge: document.getElementById('meta-paper'),
   };
 }
 
 /**
+ * 更新紙張尺寸標籤。
+ * A4 → 綠色 badge;非 A4 → 橘紅警告 badge +「將以 A4 縮放列印」提示。
+ * 每頁渲染後呼叫,支援同一份檔案內多種尺寸混合的及時切換。
+ *
+ * @param {import('pdfjs-dist').PDFPageProxy} page
+ */
+async function updatePaperBadge(page) {
+  const { paperBadge, a4Frame } = _els();
+  if (!paperBadge || !page) return;
+  try {
+    const vp = page.getViewport({ scale: 1.0 });
+    const info = detectPaper(vp.width, vp.height);
+    const orient = info.isLandscape ? '橫向' : '直向';
+    paperBadge.classList.toggle('paper-warn', !info.isA4);
+    paperBadge.classList.toggle('paper-ok', info.isA4);
+    if (info.isA4) {
+      paperBadge.textContent = 'A4 ' + orient;
+    } else {
+      paperBadge.textContent = `${info.name} ${info.wMm}×${info.hMm}mm · ⚠ 將以 A4 縮放列印`;
+    }
+    // A4 框方向逐頁同步(橫向頁 → 框轉橫向)
+    if (a4Frame) a4Frame.classList.toggle('landscape', info.isLandscape);
+  } catch (e) {
+    // 偵測失敗不阻斷預覽
+    console.warn('paper detect failed', e);
+  }
+}
+
+/**
  * 渲染指定頁碼到 canvas。
+ * 內容以 fit-to-page 等比縮放進 A4 框,置中留白;含 DPR 上限防護。
  */
 async function renderPdfPage(num) {
   if (!currentPdfDoc) return;
-  if (pdfRenderTask) return; // 避免重複渲染
-  const { canvas, container } = _els();
-  if (!canvas || !container) return;
+  const { canvas, a4Frame } = _els();
+  if (!canvas || !a4Frame) return;
+
+  // 若有進行中的渲染,先取消再重來(resize / 快速翻頁可重渲染)
+  if (pdfRenderTask) {
+    try { await pdfRenderTask.cancel(); } catch (_) { /* RenderingCancelledException 靜默 */ }
+    pdfRenderTask = null;
+  }
+
   const ctx = canvas.getContext('2d');
   try {
     const page = await currentPdfDoc.getPage(num);
-    // 動態計算縮放比例,最高限制在 1.0 以大幅提升預覽載入速度
-    const containerWidth = container.clientWidth || 400;
-    const unscaledViewport = page.getViewport({ scale: 1.0 });
-    const scale = Math.min(containerWidth / unscaledViewport.width, 1.0);
-    const viewport = page.getViewport({ scale });
-    canvas.height = viewport.height;
-    canvas.width = viewport.width;
-    canvas.style.width = '100%';
-    canvas.style.maxWidth = `${unscaledViewport.width}px`;
+
+    // 先依當頁方向更新 A4 框(橫向頁 → aspect-ratio 切橫向),再讀框尺寸
+    await updatePaperBadge(page);
+    const frameW = a4Frame.clientWidth || 380;
+    const frameH = a4Frame.clientHeight || (frameW * 297 / 210);
+
+    const unscaled = page.getViewport({ scale: 1.0 });
+    const { contentCssW, contentCssH, renderScale } = computeA4Fit(
+      unscaled.width, unscaled.height, frameW, frameH
+    );
+    const dpr = safeDpr();
+    const viewport = page.getViewport({ scale: renderScale * dpr });
+
+    // canvas 實體像素 = 內容 CSS 尺寸 × DPR;CSS 顯示尺寸 = 內容尺寸
+    canvas.width = Math.round(contentCssW * dpr);
+    canvas.height = Math.round(contentCssH * dpr);
+    canvas.style.width = `${contentCssW}px`;
+    canvas.style.height = `${contentCssH}px`;
+
     pdfRenderTask = page.render({ canvasContext: ctx, viewport });
     await pdfRenderTask.promise;
     pdfRenderTask = null;
     const pageNumEl = document.getElementById('pdf-page-num');
     if (pageNumEl) pageNumEl.textContent = num;
   } catch (e) {
-    console.error('PDF rendering error', e);
     pdfRenderTask = null;
+    // 取消造成的例外靜默;真正錯誤才記錄
+    if (e && e.name !== 'RenderingCancelledException') {
+      console.error('PDF rendering error', e);
+    }
   }
 }
 
 // 遞增版本號,用來判斷「使用者是否已經切到別的檔案」,
 // 避免上一份還沒解析完的 PDF 在解析完成後蓋掉目前預覽(競態問題)。
 let previewToken = 0;
+
+// resize 監聽:debounce 200ms,期間靠 CSS 拉伸 canvas(不重渲染避免閃爍),
+// 倒數結束後才悄悄重渲染高解析畫面覆蓋。
+let resizeTimer = null;
+let resizeBound = false;
+function bindResizeIfNeeded() {
+  if (resizeBound) return;
+  resizeBound = true;
+  window.addEventListener('resize', () => {
+    if (!currentPdfDoc) return;
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      renderPdfPage(currentPdfPage);
+    }, 200);
+  });
+}
 
 /**
  * 預覽本地選取的檔案。
@@ -101,6 +173,7 @@ export async function showPreview(fileObj) {
 
     document.getElementById('pdf-page-count').textContent = currentPdfDoc.numPages;
     currentPdfPage = 1;
+    bindResizeIfNeeded();
     await renderPdfPage(currentPdfPage);
   } catch (e) {
     if (myToken !== previewToken) return;
@@ -115,10 +188,15 @@ export async function showPreview(fileObj) {
 export function resetPreview() {
   previewToken++; // 讓所有還在進行中的載入工作失效
   currentPdfDoc = null;
-  const { canvas, container, placeholder, meta } = _els();
-  if (!canvas || !container || !placeholder || !meta) return;
+  const { canvas, a4Frame, container, placeholder, meta, paperBadge } = _els();
+  if (!canvas || !a4Frame || !container || !placeholder || !meta) return;
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  a4Frame.classList.remove('landscape');
+  if (paperBadge) {
+    paperBadge.classList.remove('paper-warn', 'paper-ok');
+    paperBadge.textContent = '—';
+  }
   placeholder.classList.remove('hidden');
   container.classList.add('hidden');
   meta.classList.add('hidden');
@@ -152,6 +230,7 @@ export async function previewPastOrder(orderId, fileName, searchName) {
     currentPdfDoc = pdf;
     document.getElementById('pdf-page-count').textContent = currentPdfDoc.numPages;
     currentPdfPage = 1;
+    bindResizeIfNeeded();
     await renderPdfPage(currentPdfPage);
   } catch (e) {
     if (myToken !== previewToken) return;

@@ -495,8 +495,29 @@ input[type="file"] { display: none; }
   min-height: 320px; color: var(--on-surface-variant); font-size: 13px; gap: 10px;
 }
 .pdf-placeholder .material-symbols-outlined { font-size: 48px; opacity: .35; display: block; line-height: 1; }
-#pdf-preview-iframe {
-  width: 100%; flex: 1; min-height: 420px; border: none; border-radius: 12px;
+
+/* A4 預覽框:模擬實際 A4 紙張比例與外觀。
+   預設直向(210×297),.landscape 切橫向(297×210)。
+   canvas 內容以 fit-to-page 等比縮放置中,留白處露出框白底 = 白紙留白。 */
+.pdf-a4-frame {
+  width: 100%;
+  max-width: 460px;
+  aspect-ratio: 210 / 297;
+  background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.pdf-a4-frame.landscape { aspect-ratio: 297 / 210; max-width: 620px; }
+.pdf-a4-frame > canvas {
+  background: transparent;
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
 }
 .preview-meta {
   margin-top: 12px; font-size: 12px; color: var(--on-surface-variant);
@@ -504,6 +525,19 @@ input[type="file"] { display: none; }
 }
 .preview-meta span { display: flex; align-items: center; gap: 4px; }
 .preview-meta .material-symbols-outlined { font-size: 14px; line-height: 1; }
+
+/* 紙張尺寸標籤:A4 → 綠(安全);非 A4 → 橘紅(警告,將以 A4 縮放列印) */
+.paper-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 10px; border-radius: var(--md-sys-shape-corner-full, 9999px);
+  font-size: 12px; font-weight: 600; line-height: 1.5;
+}
+.paper-badge.paper-ok {
+  background: var(--status-paid-bg); color: var(--status-paid-text);
+}
+.paper-badge.paper-warn {
+  background: var(--status-unpaid-bg); color: var(--status-unpaid-text);
+}
 
 /* Tabs & History Styles */
 .md3-tabs {

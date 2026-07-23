@@ -1,10 +1,15 @@
 /**
  * 後台 PDF 預覽 Modal 模組(admin.html 用)
  * 含 LRU 快取(限 8 個)與防競態 token。
+ *
+ * 預覽框固定為 A4 比例(直向 210×297 / 橫向 297×210),PDF 內容以
+ * 「符合頁面(fit-to-page)」等比縮放、置中、留白,精確反映 A4 列印結果。
+ * 非 A4 檔案顯示尺寸標籤與警告。逐頁重新偵測(支援多尺寸混合 PDF)。
  */
 
 import { findOrder } from './orders.js';
 import { ensurePdfjs } from '../pdfjs-loader.js';
+import { detectPaper, computeA4Fit, safeDpr } from '../pdf-paper.js';
 
 const API_BASE = '';
 const ADMIN_PDF_CACHE_LIMIT = 8;
@@ -16,8 +21,16 @@ let currentPreviewOrderId = null;
 const adminPdfCache = new Map();
 let adminPdfLoadToken = 0;
 
-const adminPdfCanvas = document.getElementById('admin-pdf-canvas');
-const adminPdfCtx = adminPdfCanvas ? adminPdfCanvas.getContext('2d') : null;
+// DOM 引用改為 lazy 取得,避免模組載入時 DOM 尚未就緒
+function _els() {
+  const canvas = document.getElementById('admin-pdf-canvas');
+  return {
+    canvas,
+    ctx: canvas ? canvas.getContext('2d') : null,
+    a4Frame: document.getElementById('admin-pdf-a4-frame'),
+    paperBadge: document.getElementById('admin-pdf-paper'),
+  };
+}
 
 export function bindAdminPdfNavButtons() {
   const prev = document.getElementById('admin-pdf-prev');
@@ -34,26 +47,68 @@ export function bindAdminPdfNavButtons() {
   });
 }
 
+/**
+ * 更新紙張尺寸標籤(後台 modal)。
+ * A4 → 綠色 badge;非 A4 → 橘紅警告 badge +「將以 A4 縮放列印」。
+ * 每頁渲染後呼叫,支援多尺寸混合 PDF。
+ */
+async function updateAdminPaperBadge(page) {
+  const { paperBadge, a4Frame } = _els();
+  if (!page) return;
+  try {
+    const vp = page.getViewport({ scale: 1.0 });
+    const info = detectPaper(vp.width, vp.height);
+    if (a4Frame) a4Frame.classList.toggle('landscape', info.isLandscape);
+    if (!paperBadge) return;
+    const orient = info.isLandscape ? '橫向' : '直向';
+    paperBadge.classList.toggle('paper-warn', !info.isA4);
+    paperBadge.classList.toggle('paper-ok', info.isA4);
+    paperBadge.textContent = info.isA4
+      ? 'A4 ' + orient
+      : `${info.name} ${info.wMm}×${info.hMm}mm · ⚠ 將以 A4 縮放列印`;
+  } catch (e) {
+    console.warn('paper detect failed', e);
+  }
+}
+
 async function renderAdminPdfPage(num) {
   if (!adminPdfDoc) return;
-  if (adminPdfRenderTask) return;
+  const { canvas, ctx, a4Frame } = _els();
+  if (!canvas || !ctx || !a4Frame) return;
+
+  // 先取消進行中的渲染,讓 resize / 快速翻頁可重來
+  if (adminPdfRenderTask) {
+    try { await adminPdfRenderTask.cancel(); } catch (_) { /* 靜默 */ }
+    adminPdfRenderTask = null;
+  }
+
   try {
     const page = await adminPdfDoc.getPage(num);
-    const containerWidth = document.querySelector('.modal-pdf-wrap')?.clientWidth || 600;
-    const unscaledViewport = page.getViewport({ scale: 1.0 });
-    const scale = Math.min(containerWidth / unscaledViewport.width, 1.0);
-    const viewport = page.getViewport({ scale });
-    adminPdfCanvas.height = viewport.height;
-    adminPdfCanvas.width = viewport.width;
-    adminPdfCanvas.style.width = '100%';
-    adminPdfCanvas.style.maxWidth = `${unscaledViewport.width}px`;
-    adminPdfRenderTask = page.render({ canvasContext: adminPdfCtx, viewport });
+    await updateAdminPaperBadge(page);
+    const frameW = a4Frame.clientWidth || 560;
+    const frameH = a4Frame.clientHeight || (frameW * 297 / 210);
+
+    const unscaled = page.getViewport({ scale: 1.0 });
+    const { contentCssW, contentCssH, renderScale } = computeA4Fit(
+      unscaled.width, unscaled.height, frameW, frameH
+    );
+    const dpr = safeDpr();
+    const viewport = page.getViewport({ scale: renderScale * dpr });
+
+    canvas.width = Math.round(contentCssW * dpr);
+    canvas.height = Math.round(contentCssH * dpr);
+    canvas.style.width = `${contentCssW}px`;
+    canvas.style.height = `${contentCssH}px`;
+
+    adminPdfRenderTask = page.render({ canvasContext: ctx, viewport });
     await adminPdfRenderTask.promise;
     adminPdfRenderTask = null;
     document.getElementById('admin-pdf-num').textContent = num;
   } catch (e) {
-    console.error('PDF render error:', e);
     adminPdfRenderTask = null;
+    if (e && e.name !== 'RenderingCancelledException') {
+      console.error('PDF render error:', e);
+    }
   }
 }
 
@@ -65,6 +120,21 @@ function cacheAdminPdf(orderId, pdf) {
     adminPdfCache.delete(oldestKey);
   }
   adminPdfCache.set(orderId, pdf);
+}
+
+// resize 監聯:僅 modal 開啟時生效;期間靠 CSS 拉伸 canvas 避免閃爍。
+let resizeTimer = null;
+let resizeBound = false;
+function bindResizeIfNeeded() {
+  if (resizeBound) return;
+  resizeBound = true;
+  window.addEventListener('resize', () => {
+    if (!adminPdfDoc || !currentPreviewOrderId) return;
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      renderAdminPdfPage(adminPdfPage);
+    }, 200);
+  });
 }
 
 export async function openPdfModal(orderId) {
@@ -85,7 +155,9 @@ export async function openPdfModal(orderId) {
   const { buildSettingBadges } = await import('./orders.js');
   document.getElementById('modal-settings').innerHTML = buildSettingBadges(order);
 
-  if (adminPdfCtx) adminPdfCtx.clearRect(0, 0, adminPdfCanvas.width, adminPdfCanvas.height);
+  const { canvas, ctx, a4Frame } = _els();
+  if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (a4Frame) a4Frame.classList.remove('landscape');
   adminPdfDoc = null;
 
   const cached = adminPdfCache.get(orderId);
@@ -93,6 +165,7 @@ export async function openPdfModal(orderId) {
     adminPdfDoc = cached;
     document.getElementById('admin-pdf-count').textContent = cached.numPages;
     adminPdfPage = 1;
+    bindResizeIfNeeded();
     renderAdminPdfPage(adminPdfPage);
     document.getElementById('pdf-modal').classList.add('open');
     return;
@@ -115,6 +188,7 @@ export async function openPdfModal(orderId) {
     adminPdfDoc = pdf;
     document.getElementById('admin-pdf-count').textContent = pdf.numPages;
     adminPdfPage = 1;
+    bindResizeIfNeeded();
     renderAdminPdfPage(adminPdfPage);
     document.getElementById('pdf-modal').classList.add('open');
   } catch (err) {
@@ -125,7 +199,9 @@ export async function openPdfModal(orderId) {
 
 export function closePdfModal() {
   document.getElementById('pdf-modal').classList.remove('open');
-  if (adminPdfCtx) adminPdfCtx.clearRect(0, 0, adminPdfCanvas.width, adminPdfCanvas.height);
+  const { canvas, ctx, a4Frame } = _els();
+  if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (a4Frame) a4Frame.classList.remove('landscape');
   adminPdfDoc = null;
   currentPreviewOrderId = null;
   const dlBtn = document.getElementById('btn-download-pdf');
