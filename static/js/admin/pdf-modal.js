@@ -9,7 +9,7 @@
 
 import { findOrder } from './orders.js';
 import { ensurePdfjs } from '../pdfjs-loader.js';
-import { detectPaper, computeA4Fit, computeA4Cover, safeDpr } from '../pdf-paper.js';
+import { detectPaper, computeA4Fit, computeA4Cover, safeDpr, a4LabelMm } from '../pdf-paper.js';
 
 const API_BASE = '';
 const ADMIN_PDF_CACHE_LIMIT = 8;
@@ -30,6 +30,9 @@ function _els() {
     canvas,
     ctx: canvas ? canvas.getContext('2d') : null,
     a4Frame: document.getElementById('admin-pdf-a4-frame'),
+    docOutline: document.getElementById('admin-pdf-doc-outline'),
+    docLabel: document.getElementById('admin-pdf-doc-label'),
+    a4Label: document.getElementById('admin-pdf-a4-label'),
     paperBadge: document.getElementById('admin-pdf-paper'),
   };
 }
@@ -46,6 +49,15 @@ export function bindAdminPdfNavButtons() {
     if (!adminPdfDoc || adminPdfPage >= adminPdfDoc.numPages) return;
     adminPdfPage++;
     renderAdminPdfPage(adminPdfPage);
+  });
+
+  // 邊界標註切換(與前台同邏輯;顏色語意用 MD3 Tooltip 純 CSS hover)
+  const annoBtn = document.getElementById('admin-pdf-annotate-toggle');
+  if (annoBtn) annoBtn.addEventListener('click', () => {
+    const { a4Frame } = _els();
+    if (!a4Frame) return;
+    const on = a4Frame.classList.toggle('annotated');
+    annoBtn.classList.toggle('active', on);
   });
 }
 
@@ -88,6 +100,9 @@ async function updateAdminPaperBadge(page) {
     const vp = page.getViewport({ scale: 1.0 });
     const info = detectPaper(vp.width, vp.height);
     if (a4Frame) a4Frame.classList.toggle('landscape', info.isLandscape);
+    // A4 尺寸標籤依方向更新
+    const { a4Label } = _els();
+    if (a4Label) a4Label.textContent = a4LabelMm(info.isLandscape);
     if (!paperBadge) return;
     const orient = info.isLandscape ? '橫向' : '直向';
     paperBadge.classList.toggle('paper-warn', !info.isA4);
@@ -135,6 +150,18 @@ async function renderAdminPdfPage(num) {
     await adminPdfRenderTask.promise;
     adminPdfRenderTask = null;
     document.getElementById('admin-pdf-num').textContent = num;
+
+    // 原文件邊界框 + 尺寸標籤
+    const { docOutline, docLabel } = _els();
+    if (docOutline) {
+      docOutline.style.width = `${contentCssW}px`;
+      docOutline.style.height = `${contentCssH}px`;
+    }
+    if (docLabel) {
+      const wMm = Math.round(unscaled.width * 25.4 / 72);
+      const hMm = Math.round(unscaled.height * 25.4 / 72);
+      docLabel.textContent = `原文件 ${wMm}×${hMm}mm`;
+    }
   } catch (e) {
     adminPdfRenderTask = null;
     if (e && e.name !== 'RenderingCancelledException') {
@@ -234,7 +261,9 @@ export function closePdfModal() {
   document.getElementById('pdf-modal').classList.remove('open');
   const { canvas, ctx, a4Frame } = _els();
   if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
-  if (a4Frame) a4Frame.classList.remove('landscape', 'cover');
+  if (a4Frame) a4Frame.classList.remove('landscape', 'cover', 'annotated');
+  const annoBtn = document.getElementById('admin-pdf-annotate-toggle');
+  if (annoBtn) annoBtn.classList.remove('active');
   adminPdfDoc = null;
   adminFitMode = 'fit';
   currentPreviewOrderId = null;

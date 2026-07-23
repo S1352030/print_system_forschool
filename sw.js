@@ -1,5 +1,5 @@
 // Service Worker - 影印計價與通知系統
-const CACHE_NAME = 'print-system-v4';
+const CACHE_NAME = 'print-system-v7';
 const MAX_CACHE_ENTRIES = 50; // 快取上限,防止無限增長
 
 // ── Install：預快取核心靜態資源 ──────────────────────────────

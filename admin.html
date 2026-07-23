@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
-  <link rel="stylesheet" href="/admin.css?v=20260721a">
+  <link rel="stylesheet" href="/admin.css?v=20260723c">
   <!-- PDF.js 改為延遲載入:僅在實際預覽 PDF 時才由 pdf-modal.js 動態注入。 -->
   <script src="/static/dialog.js"></script>
 </head>
@@ -124,12 +124,21 @@
       <div style="flex: 1; overflow: auto; width: 100%; display: flex; justify-content: center; align-items: flex-start; padding: 10px;">
         <div id="admin-pdf-a4-frame" class="pdf-a4-frame">
           <canvas id="admin-pdf-canvas"></canvas>
+          <div class="pdf-doc-outline" id="admin-pdf-doc-outline">
+            <span class="pdf-doc-label" id="admin-pdf-doc-label"></span>
+          </div>
+          <div class="pdf-a4-label" id="admin-pdf-a4-label">A4 · 210×297mm</div>
         </div>
       </div>
       <div style="display: flex; gap: 15px; align-items: center; padding: 8px 16px; background: rgba(0,0,0,0.6); color: white; border-radius: 20px; position: absolute; bottom: 10px; z-index: 10;">
         <button type="button" id="admin-pdf-prev" style="background: none; border: none; color: white; cursor: pointer; font-size: 16px;">◀</button>
         <span style="font-size: 14px;"><span id="admin-pdf-num">1</span> / <span id="admin-pdf-count">1</span></span>
         <button type="button" id="admin-pdf-next" style="background: none; border: none; color: white; cursor: pointer; font-size: 16px;">▶</button>
+        <span style="width: 1px; height: 18px; background: rgba(255,255,255,0.3);"></span>
+        <span class="md3-tooltip-wrap">
+          <button type="button" id="admin-pdf-annotate-toggle" style="background: none; border: 1px solid rgba(255,255,255,0.3); color: white; cursor: pointer; padding: 4px 10px; font-size: 12px; border-radius: 12px;">📐 邊界</button>
+          <span class="md3-tooltip" role="tooltip">紅框＝原文件邊界<br>灰色區＝A4 上的留白</span>
+        </span>
       </div>
     </div>
   </div>
@@ -137,7 +146,7 @@
 
 <div id="toast-container"></div>
 
-<script type="module" src="/static/js/admin/app.js?v=20260721a"></script>
+<script type="module" src="/static/js/admin/app.js?v=20260723c"></script>
 
 </body>
 </html>

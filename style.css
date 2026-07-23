@@ -502,6 +502,7 @@ input[type="file"] { display: none; }
    elevation-2 雙層陰影 + outline-variant 細邊框,白紙清楚浮起。
    cover 模式:canvas 解除 max 限制,靠 flexbox 置中 + overflow:hidden 四邊均等裁切。 */
 .pdf-a4-frame {
+  position: relative;
   width: 100%;
   max-width: 460px;
   aspect-ratio: 210 / 297;
@@ -526,6 +527,114 @@ input[type="file"] { display: none; }
 .pdf-a4-frame.cover > canvas {
   max-width: none;
   max-height: none;
+}
+
+/* 原文件邊界框 + 留白區填色:預設隱藏,按「邊界」按鈕(.annotated)才顯示。
+   box-shadow 向外延伸淺色塊 = 留白區;框內透明露出 PDF。 */
+.pdf-doc-outline {
+  display: none;
+}
+.pdf-a4-frame.annotated .pdf-doc-outline {
+  display: block;
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  border: 2px solid #d32f2f;
+  border-radius: 2px;
+  box-shadow: 0 0 0 9999px rgba(0, 100, 148, 0.13);
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+/* 原文件尺寸標籤(標在邊界框上方) */
+.pdf-doc-label {
+  display: none;
+}
+.pdf-a4-frame.annotated .pdf-doc-label {
+  display: block;
+  position: absolute;
+  top: -10px; left: 8px;
+  transform: translateY(-100%);
+  background: #d32f2f;
+  color: #fff;
+  padding: 1px 7px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* A4 尺寸標籤:同樣只在 annotated 時顯示 */
+.pdf-a4-label { display: none; }
+.pdf-a4-frame.annotated .pdf-a4-label {
+  display: block;
+  position: absolute;
+  bottom: 6px; right: 8px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: var(--md-sys-shape-corner-extra-small, 4px);
+  font-size: var(--md-sys-typescale-label-small-size, 0.6875rem);
+  font-weight: var(--md-sys-typescale-label-small-weight, 500);
+  line-height: 1.4;
+  letter-spacing: var(--md-sys-typescale-label-small-tracking, 0.03125rem);
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* 邊界標註切換按鈕 active 態 */
+#pdf-annotate-toggle.active {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+/* MD3 Plain Tooltip:hover/focus 時顯示,說明顏色語意。
+   inverse-surface 底 + inverse-on-surface 字 (MD3 規範),
+   label-small typography,向上彈出避免擋控制列。 */
+.md3-tooltip-wrap { position: relative; display: inline-flex; }
+.md3-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: #313033;
+  color: #f4eff4;
+  padding: 6px 10px;
+  border-radius: var(--md-sys-shape-corner-extra-small, 4px);
+  font-size: var(--md-sys-typescale-label-small-size, 0.6875rem);
+  font-weight: var(--md-sys-typescale-label-small-weight, 500);
+  line-height: 1.45;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease, transform 150ms ease;
+  z-index: 20;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+}
+.md3-tooltip-wrap:hover .md3-tooltip,
+.md3-tooltip-wrap:focus-within .md3-tooltip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* A4 尺寸標籤:固定於 A4 框右下角,MD3 label-small typography */
+.pdf-a4-label {
+  position: absolute;
+  bottom: 6px; right: 8px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: var(--md-sys-shape-corner-extra-small, 4px);
+  font-size: var(--md-sys-typescale-label-small-size, 0.6875rem);
+  font-weight: var(--md-sys-typescale-label-small-weight, 500);
+  line-height: 1.4;
+  letter-spacing: var(--md-sys-typescale-label-small-tracking, 0.03125rem);
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
 /* 行動裝置:壓縮 scroll 區 padding 把空間還給 A4 預覽框 */

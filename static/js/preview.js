@@ -12,7 +12,7 @@
 
 import { showAlert } from './app.js';
 import { ensurePdfjs } from './pdfjs-loader.js';
-import { detectPaper, computeA4Fit, computeA4Cover, safeDpr } from './pdf-paper.js';
+import { detectPaper, computeA4Fit, computeA4Cover, safeDpr, a4LabelMm } from './pdf-paper.js';
 
 let currentPdfDoc = null;
 let currentPdfPage = 1;
@@ -27,6 +27,9 @@ function _els() {
   return {
     canvas: document.getElementById('pdf-canvas'),
     a4Frame: document.getElementById('pdf-a4-frame'),
+    docOutline: document.getElementById('pdf-doc-outline'),
+    docLabel: document.getElementById('pdf-doc-label'),
+    a4Label: document.getElementById('pdf-a4-label'),
     container: document.getElementById('pdf-preview-container'),
     placeholder: document.getElementById('pdf-placeholder'),
     meta: document.getElementById('preview-meta'),
@@ -57,6 +60,9 @@ async function updatePaperBadge(page) {
     }
     // A4 框方向逐頁同步(橫向頁 → 框轉橫向)
     if (a4Frame) a4Frame.classList.toggle('landscape', info.isLandscape);
+    // A4 尺寸標籤依方向更新
+    const { a4Label } = _els();
+    if (a4Label) a4Label.textContent = a4LabelMm(info.isLandscape);
   } catch (e) {
     // 偵測失敗不阻斷預覽
     console.warn('paper detect failed', e);
@@ -131,6 +137,21 @@ async function renderPdfPage(num) {
     pdfRenderTask = null;
     const pageNumEl = document.getElementById('pdf-page-num');
     if (pageNumEl) pageNumEl.textContent = num;
+
+    // 原文件邊界框:尺寸 = canvas CSS 尺寸(即原文件 fit/cover 後的邊界)。
+    // fit 時小於 A4 框(框內留白區被 box-shadow 色塊標示);
+    // cover 時 ≥ A4 框(box-shadow 色塊被 overflow:hidden 裁掉,無留白顯示)。
+    const { docOutline, docLabel } = _els();
+    if (docOutline) {
+      docOutline.style.width = `${contentCssW}px`;
+      docOutline.style.height = `${contentCssH}px`;
+    }
+    // 原文件尺寸標籤(pt → mm)
+    if (docLabel) {
+      const wMm = Math.round(unscaled.width * 25.4 / 72);
+      const hMm = Math.round(unscaled.height * 25.4 / 72);
+      docLabel.textContent = `原文件 ${wMm}×${hMm}mm`;
+    }
   } catch (e) {
     pdfRenderTask = null;
     // 取消造成的例外靜默;真正錯誤才記錄
@@ -225,7 +246,9 @@ export function resetPreview() {
   if (!canvas || !a4Frame || !container || !placeholder || !meta) return;
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  a4Frame.classList.remove('landscape', 'cover');
+  a4Frame.classList.remove('landscape', 'cover', 'annotated');
+  const annoBtn = document.getElementById('pdf-annotate-toggle');
+  if (annoBtn) annoBtn.classList.remove('active');
   if (paperBadge) {
     paperBadge.classList.remove('paper-warn', 'paper-ok');
     paperBadge.textContent = '—';
@@ -294,4 +317,14 @@ export function bindPdfNavButtons() {
   const next = document.getElementById('pdf-next');
   if (prev) prev.addEventListener('click', () => pdfNavigate(-1));
   if (next) next.addEventListener('click', () => pdfNavigate(1));
+
+  // 邊界標註切換:點擊切換 .annotated,只動 CSS class 不重渲染 PDF(瞬間反應)。
+  // 顏色語意說明改用 MD3 Tooltip(純 CSS hover,不需 JS)。
+  const annoBtn = document.getElementById('pdf-annotate-toggle');
+  if (annoBtn) annoBtn.addEventListener('click', () => {
+    const { a4Frame } = _els();
+    if (!a4Frame) return;
+    const on = a4Frame.classList.toggle('annotated');
+    annoBtn.classList.toggle('active', on);
+  });
 }

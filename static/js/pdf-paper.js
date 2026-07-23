@@ -118,3 +118,12 @@ export function computeA4Cover(pageWPt, pageHPt, frameCssW, frameCssH) {
 export function safeDpr() {
   return Math.min(window.devicePixelRatio || 1, 2);
 }
+
+/**
+ * A4 尺寸標籤文字(依方向)。
+ * @param {boolean} isLandscape - 是否橫向
+ * @returns {string} 'A4 · 210×297mm' 或 'A4 · 297×210mm'
+ */
+export function a4LabelMm(isLandscape) {
+  return isLandscape ? 'A4 · 297×210mm' : 'A4 · 210×297mm';
+}

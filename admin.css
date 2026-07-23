@@ -173,6 +173,7 @@ td.price { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: va
    預設直向(210×297),.landscape 切橫向(297×210)。
    cover 模式:canvas 解除 max 限制,靠 flexbox 置中 + overflow:hidden 裁切。 */
 .pdf-a4-frame {
+  position: relative;
   width: 100%;
   max-width: 560px;
   aspect-ratio: 210 / 297;
@@ -196,6 +197,82 @@ td.price { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: va
 .pdf-a4-frame.cover > canvas {
   max-width: none;
   max-height: none;
+}
+
+/* 原文件邊界框 + 留白區填色:預設隱藏,.annotated 才顯示(後台深色背景) */
+.pdf-doc-outline { display: none; }
+.pdf-a4-frame.annotated .pdf-doc-outline {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  border: 2px solid #ff5252;
+  border-radius: 2px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+  box-sizing: border-box;
+}
+.pdf-doc-label { display: none; }
+.pdf-a4-frame.annotated .pdf-doc-label {
+  position: absolute;
+  top: -10px; left: 8px;
+  transform: translateY(-100%);
+  background: #ff5252;
+  color: #fff;
+  padding: 1px 7px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.pdf-a4-label { display: none; }
+.pdf-a4-frame.annotated .pdf-a4-label {
+  position: absolute;
+  bottom: 6px; right: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.4;
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* 邊界標註切換按鈕 active 態 */
+#admin-pdf-annotate-toggle.active {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+/* MD3 Plain Tooltip(後台):hover/focus 顯示顏色語意說明 */
+.md3-tooltip-wrap { position: relative; display: inline-flex; }
+.md3-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: #e0e8ff;
+  color: #1a1a2e;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.45;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease, transform 150ms ease;
+  z-index: 20;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+.md3-tooltip-wrap:hover .md3-tooltip,
+.md3-tooltip-wrap:focus-within .md3-tooltip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
 
 /* 紙張標籤列 + fit/cover 切換(獨立於 setting badges) */

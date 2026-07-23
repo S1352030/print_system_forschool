@@ -34,7 +34,7 @@
     })();
   </script>
   <script src="/static/dialog.js"></script>
-  <link rel="stylesheet" href="/style.css?v=20260721a">
+  <link rel="stylesheet" href="/style.css?v=20260723c">
 </head>
 <body>
 <!-- Offline status banner -->
@@ -222,12 +222,21 @@
         <div style="flex: 1; overflow: auto; width: 100%; display: flex; justify-content: center; align-items: flex-start; padding: 16px; background: var(--md-sys-color-surface-container-high, #eceff3);">
           <div id="pdf-a4-frame" class="pdf-a4-frame">
             <canvas id="pdf-canvas"></canvas>
+            <div class="pdf-doc-outline" id="pdf-doc-outline">
+              <span class="pdf-doc-label" id="pdf-doc-label"></span>
+            </div>
+            <div class="pdf-a4-label" id="pdf-a4-label">A4 · 210×297mm</div>
           </div>
         </div>
         <div id="pdf-controls" style="display: flex; gap: 15px; align-items: center; padding: 8px 16px; background: rgba(0,0,0,0.6); color: white; border-radius: 20px; margin-bottom: 10px; z-index: 10; position: absolute; bottom: 10px;">
           <button type="button" id="pdf-prev" style="background: none; border: none; color: white; cursor: pointer; padding: 5px; font-size: 16px; display: flex; align-items: center;">◀</button>
           <span style="font-size: 14px;"><span id="pdf-page-num">1</span> / <span id="pdf-page-count">1</span></span>
           <button type="button" id="pdf-next" style="background: none; border: none; color: white; cursor: pointer; padding: 5px; font-size: 16px; display: flex; align-items: center;">▶</button>
+          <span style="width: 1px; height: 18px; background: rgba(255,255,255,0.3);"></span>
+          <span class="md3-tooltip-wrap">
+            <button type="button" id="pdf-annotate-toggle" style="background: none; border: 1px solid rgba(255,255,255,0.3); color: white; cursor: pointer; padding: 4px 10px; font-size: 12px; border-radius: 12px; display: flex; align-items: center; gap: 4px;">📐 邊界</button>
+            <span class="md3-tooltip" role="tooltip">紅框＝原文件邊界<br>藍色區＝A4 上的留白</span>
+          </span>
         </div>
       </div>
       <div class="preview-meta hidden" id="preview-meta">
@@ -257,9 +266,9 @@
 
 </div>
 
-<script type="module" src="/static/js/app.js?v=20260721a"></script>
+<script type="module" src="/static/js/app.js?v=20260723c"></script>
 <script type="module">
-  import { initApp } from '/static/js/app.js?v=20260721a';
+  import { initApp } from '/static/js/app.js?v=20260723c';
   // dialog.js 是非模組,掛在 window;等它就緒後初始化
   function _bootstrap() {
     if (typeof window.showAlert === 'function') {
