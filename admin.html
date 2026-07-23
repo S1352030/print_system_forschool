@@ -113,7 +113,13 @@
       </div>
     </div>
     <div class="modal-settings" id="modal-settings"></div>
-    <div class="modal-paper-bar"><span id="admin-pdf-paper" class="paper-badge">—</span></div>
+    <div class="modal-paper-bar">
+      <span id="admin-pdf-paper" class="paper-badge">—</span>
+      <span class="modal-fit-toggle" title="切換預覽模式(僅供預覽,不影響訂單設定)">
+        <button type="button" id="admin-fit-btn">留白</button>
+        <button type="button" id="admin-cover-btn">裁切</button>
+      </span>
+    </div>
     <div class="modal-pdf-wrap" style="position: relative; display: flex; flex-direction: column; align-items: center; overflow: hidden;">
       <div style="flex: 1; overflow: auto; width: 100%; display: flex; justify-content: center; align-items: flex-start; padding: 10px;">
         <div id="admin-pdf-a4-frame" class="pdf-a4-frame">

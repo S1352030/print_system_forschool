@@ -51,6 +51,7 @@ class Order(Base):
     total_price = Column(Integer, nullable=False)               # 總金額（元）
     color_mode  = Column(String,  default="bw", nullable=False) # 色彩模式: bw/color
     duplex      = Column(String,  default="single", nullable=False) # 列印方式: single/double
+    fit_mode    = Column(String,  default="fit", nullable=False)   # 文件處理方式: fit(留白)/cover(裁切)
     binding     = Column(String,  nullable=True)                # 裝訂位置
     pickup_location = Column(String, nullable=True)             # 取件地點
     is_paid     = Column(Boolean, default=False, nullable=False)    # 是否已付款
@@ -86,6 +87,7 @@ def ensure_order_columns():
     required_columns = {
         "color_mode": "ALTER TABLE orders ADD COLUMN color_mode VARCHAR NOT NULL DEFAULT 'bw'",
         "duplex": "ALTER TABLE orders ADD COLUMN duplex VARCHAR NOT NULL DEFAULT 'single'",
+        "fit_mode": "ALTER TABLE orders ADD COLUMN fit_mode VARCHAR NOT NULL DEFAULT 'fit'",
         "binding": "ALTER TABLE orders ADD COLUMN binding VARCHAR",
         "pickup_location": "ALTER TABLE orders ADD COLUMN pickup_location VARCHAR",
         "display_name": "ALTER TABLE orders ADD COLUMN display_name VARCHAR",

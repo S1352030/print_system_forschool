@@ -9,7 +9,7 @@
  */
 
 import { showAlert, showConfirm, invalidateHistoryCache, refreshHistory } from './app.js';
-import { showPreview, resetPreview } from './preview.js';
+import { showPreview, resetPreview, setFitMode } from './preview.js';
 import { apiPost, apiPostWithProgress, ApiError } from './api.js';
 import { escHtml } from './utils.js';
 
@@ -142,6 +142,7 @@ export async function addFiles(files) {
         file: fileToUpload,
         colorMode: 'bw',
         duplex: 'single',
+        fitMode: 'fit',
         binding: 'top_left',
         bindingOtherText: '',
         pages: null,
@@ -212,6 +213,19 @@ export function updateFileOtherText(idx, value) {
   if (selectedFiles[idx]) {
     selectedFiles[idx].bindingOtherText = value;
     checkFormValidity();
+  }
+}
+
+/**
+ * 切換文件處理方式(fit 留白 / cover 裁切)。
+ * 不呼叫 renderFileList()(預覽由 setFitMode 內部即時重繪,避免卡片重渲染打斷)。
+ */
+export function updateFitMode(idx, value) {
+  if (isCooldown) return;
+  if (selectedFiles[idx]) {
+    selectedFiles[idx].fitMode = value;
+    // 即時切換預覽模式(重繪當前頁)
+    setFitMode(value, false);
   }
 }
 
@@ -336,6 +350,25 @@ function renderFileList() {
             </div>
   ` : '';
 
+  // 文件處理方式:fit(留白)/cover(裁切),即時反映於右側預覽
+  const fitModeHtml = `
+            <div class="setting-col-flex">
+              <span class="setting-label">文件處理</span>
+              <div class="chip-group">
+                <label>
+                  <input type="radio" name="fit_mode_${idx}" value="fit" ${fileObj.fitMode === 'fit' ? 'checked' : ''} onchange="updateFitMode(${idx}, 'fit')">
+                  <span class="material-symbols-outlined chip-icon"><svg><use href="#i-fit_page"/></svg></span>
+                  <span>留白</span>
+                </label>
+                <label>
+                  <input type="radio" name="fit_mode_${idx}" value="cover" ${fileObj.fitMode === 'cover' ? 'checked' : ''} onchange="updateFitMode(${idx}, 'cover')">
+                  <span class="material-symbols-outlined chip-icon"><svg><use href="#i-crop"/></svg></span>
+                  <span>裁切</span>
+                </label>
+              </div>
+            </div>
+  `;
+
   filesList.innerHTML = `
     <div class="file-item-card">
       <div class="file-item-header">
@@ -365,6 +398,7 @@ function renderFileList() {
             </div>
           </div>
           ${duplexHtml}
+          ${fitModeHtml}
         </div>
         ${bindingHtml}
       </div>
@@ -491,6 +525,7 @@ async function handleSubmit(e) {
     formData.append('file', fileObj.file);
     formData.append('color_mode', fileObj.colorMode);
     formData.append('duplex', fileObj.duplex);
+    formData.append('fit_mode', fileObj.fitMode);
 
     let bindingVal = fileObj.binding;
     if (bindingVal === 'other') bindingVal = fileObj.bindingOtherText.trim();

@@ -12,11 +12,15 @@
 
 import { showAlert } from './app.js';
 import { ensurePdfjs } from './pdfjs-loader.js';
-import { detectPaper, computeA4Fit, safeDpr } from './pdf-paper.js';
+import { detectPaper, computeA4Fit, computeA4Cover, safeDpr } from './pdf-paper.js';
 
 let currentPdfDoc = null;
 let currentPdfPage = 1;
 let pdfRenderTask = null;
+// 文件處理模式:'fit'(留白,預設) / 'cover'(裁切)。
+// 由 setFitMode() 統一管理;切換預覽檔案時由呼叫端靜默同步,
+// 確保預覽模式永遠吻合當前檔案的 fitMode 設定(多檔案狀態同步)。
+let currentFitMode = 'fit';
 
 // DOM 引用(lazy 取得,避免模組載入時 DOM 尚未就緒)
 function _els() {
@@ -60,8 +64,32 @@ async function updatePaperBadge(page) {
 }
 
 /**
+ * 設定文件處理模式(fit 留白 / cover 裁切)。
+ *
+ * @param {string} mode - 'fit' 或 'cover'
+ * @param {boolean} [silent=false] - true 時只更新狀態與 A4 框 class,
+ *   不立即重繪。用於「切換到另一個檔案」時先把模式同步成該檔案的設定,
+ *   後續的 render 自然就會用對的模式(silent=true 時 currentPdfDoc 尚未換好)。
+ */
+export function setFitMode(mode, silent = false) {
+  currentFitMode = mode === 'cover' ? 'cover' : 'fit';
+  const { a4Frame } = _els();
+  if (a4Frame) a4Frame.classList.toggle('cover', currentFitMode === 'cover');
+  if (!silent && currentPdfDoc) {
+    renderPdfPage(currentPdfPage);
+  }
+}
+
+/**
+ * 以當前 PDF 文件與頁碼重新渲染(供 resize / 外部觸發用)。
+ */
+export function rerenderCurrent() {
+  if (currentPdfDoc) renderPdfPage(currentPdfPage);
+}
+
+/**
  * 渲染指定頁碼到 canvas。
- * 內容以 fit-to-page 等比縮放進 A4 框,置中留白;含 DPR 上限防護。
+ * 內容依 currentFitMode 以 fit(留白)或 cover(裁切)縮放進 A4 框;含 DPR 上限防護。
  */
 async function renderPdfPage(num) {
   if (!currentPdfDoc) return;
@@ -84,7 +112,9 @@ async function renderPdfPage(num) {
     const frameH = a4Frame.clientHeight || (frameW * 297 / 210);
 
     const unscaled = page.getViewport({ scale: 1.0 });
-    const { contentCssW, contentCssH, renderScale } = computeA4Fit(
+    // 依當前模式分派:fit=留白(放進框),cover=裁切(填滿框,超出由 overflow:hidden 裁)
+    const compute = currentFitMode === 'cover' ? computeA4Cover : computeA4Fit;
+    const { contentCssW, contentCssH, renderScale } = compute(
       unscaled.width, unscaled.height, frameW, frameH
     );
     const dpr = safeDpr();
@@ -173,6 +203,8 @@ export async function showPreview(fileObj) {
 
     document.getElementById('pdf-page-count').textContent = currentPdfDoc.numPages;
     currentPdfPage = 1;
+    // 切換檔案時同步該檔案的處理模式(silent:不立即重繪,下一行 render 會用新模式)
+    setFitMode(fileObj.fitMode || 'fit', true);
     bindResizeIfNeeded();
     await renderPdfPage(currentPdfPage);
   } catch (e) {
@@ -188,11 +220,12 @@ export async function showPreview(fileObj) {
 export function resetPreview() {
   previewToken++; // 讓所有還在進行中的載入工作失效
   currentPdfDoc = null;
+  currentFitMode = 'fit'; // 重設為預設模式
   const { canvas, a4Frame, container, placeholder, meta, paperBadge } = _els();
   if (!canvas || !a4Frame || !container || !placeholder || !meta) return;
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  a4Frame.classList.remove('landscape');
+  a4Frame.classList.remove('landscape', 'cover');
   if (paperBadge) {
     paperBadge.classList.remove('paper-warn', 'paper-ok');
     paperBadge.textContent = '—';
@@ -204,8 +237,10 @@ export function resetPreview() {
 
 /**
  * 預覽歷史訂單的 PDF(透過 API 下載)。
+ *
+ * @param {string} fitMode - 該訂單的文件處理模式('fit'/'cover'),用於同步預覽。
  */
-export async function previewPastOrder(orderId, fileName, searchName) {
+export async function previewPastOrder(orderId, fileName, searchName, fitMode) {
   const { container, placeholder, meta } = _els();
   placeholder.classList.add('hidden');
   container.classList.remove('hidden');
@@ -230,6 +265,7 @@ export async function previewPastOrder(orderId, fileName, searchName) {
     currentPdfDoc = pdf;
     document.getElementById('pdf-page-count').textContent = currentPdfDoc.numPages;
     currentPdfPage = 1;
+    setFitMode(fitMode || 'fit', true);
     bindResizeIfNeeded();
     await renderPdfPage(currentPdfPage);
   } catch (e) {

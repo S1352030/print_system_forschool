@@ -170,12 +170,14 @@ td.price { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: va
 .modal-pdf-wrap { flex: 1; overflow: hidden; background: #525659; }
 
 /* A4 預覽框:深色背景上以白底框凸顯紙張,模擬 A4 實體比例。
-   預設直向(210×297),.landscape 切橫向(297×210)。 */
+   預設直向(210×297),.landscape 切橫向(297×210)。
+   cover 模式:canvas 解除 max 限制,靠 flexbox 置中 + overflow:hidden 裁切。 */
 .pdf-a4-frame {
   width: 100%;
   max-width: 560px;
   aspect-ratio: 210 / 297;
   background: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 4px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
   display: flex;
@@ -191,11 +193,16 @@ td.price { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: va
   max-height: 100%;
   display: block;
 }
+.pdf-a4-frame.cover > canvas {
+  max-width: none;
+  max-height: none;
+}
 
-/* 紙張標籤列(獨立於 setting badges) */
+/* 紙張標籤列 + fit/cover 切換(獨立於 setting badges) */
 .modal-paper-bar {
   padding: 8px 20px;
   border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
   flex-shrink: 0;
 }
 .paper-badge {
@@ -205,6 +212,20 @@ td.price { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: va
 }
 .paper-badge.paper-ok { background: rgba(46, 204, 113, .2); color: var(--success); }
 .paper-badge.paper-warn { background: rgba(243, 156, 18, .2); color: var(--warning); }
+
+/* fit/cover 預覽切換按鈕(讓管理員預覽兩種效果,不改訂單設定) */
+.modal-fit-toggle { display: inline-flex; gap: 4px; background: rgba(255,255,255,.06); border-radius: 9999px; padding: 2px; }
+.modal-fit-toggle button {
+  background: transparent; border: none; color: var(--muted);
+  padding: 4px 12px; border-radius: 9999px; cursor: pointer;
+  font-size: .75rem; font-weight: 600; transition: all .15s;
+}
+.modal-fit-toggle button.active { background: var(--accent); color: #fff; }
+.modal-fit-toggle button:hover:not(.active) { color: var(--text); }
+
+/* 文件處理方式 badge(留白/裁切)+ 列印防呆 tooltip */
+.badge-chip.badge-fit-fit { background: rgba(46, 204, 113, .18); color: var(--success); }
+.badge-chip.badge-fit-cover { background: rgba(243, 156, 18, .18); color: var(--warning); }
 
 /* Toast */
 #toast-container { position: fixed; bottom: 1.5rem; right: 1.5rem; display: flex; flex-direction: column; gap: .5rem; z-index: 9999; }

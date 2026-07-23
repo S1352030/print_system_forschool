@@ -12,7 +12,7 @@
 
 import { bindUploadEvents, checkFormValidity, updatePriceSummary,
          updateFileSetting, updateFileOtherText, removeFile,
-         changeActiveFile, previewFile } from './upload.js';
+         changeActiveFile, previewFile, updateFitMode } from './upload.js';
 import { bindPdfNavButtons, previewPastOrder } from './preview.js';
 import { bindHistoryEvents, fetchHistory, invalidateHistoryCache } from './history.js';
 import { apiGet, ApiError } from './api.js';
@@ -172,17 +172,18 @@ window.addEventListener('offline', updateOnlineStatus);
 // ES module 預設是閉包,必須外掛到 window 才能被 inline 呼叫。
 window.updateFileSetting = updateFileSetting;
 window.updateFileOtherText = updateFileOtherText;
+window.updateFitMode = updateFitMode;
 window.removeFile = removeFile;
 window.changeActiveFile = changeActiveFile;
 window.previewFile = previewFile;
-window.previewPastOrder = (orderId, fileName) => {
+window.previewPastOrder = (orderId, fileName, fitMode) => {
   const searchName = (document.getElementById('history_search_name')?.value || '').trim()
     || sessionStorage.getItem('print_user_name');
   if (!searchName) {
     showAlert('請先輸入您的姓名或學號!', 'warning');
     return;
   }
-  previewPastOrder(orderId, fileName, searchName);
+  previewPastOrder(orderId, fileName, searchName, fitMode);
 };
 
 // ── 初始化 ────────────────────────────────────────────────────

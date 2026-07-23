@@ -4,7 +4,7 @@
  */
 
 import { loadOrders, updateOrder, deleteOrder } from './orders.js';
-import { openPdfModal, closePdfModal, closeModal, downloadCurrentPdf, bindAdminPdfNavButtons } from './pdf-modal.js';
+import { openPdfModal, closePdfModal, closeModal, downloadCurrentPdf, bindAdminPdfNavButtons, bindAdminFitToggle } from './pdf-modal.js';
 import { loadAnnouncements, publishAnnouncement, updateAnnouncementStatus, deleteAnnouncement } from './announcements.js';
 
 // 把 inline onclick 的函式掛到 window
@@ -21,5 +21,6 @@ window.deleteAnnouncement = deleteAnnouncement;
 
 // 初始化
 bindAdminPdfNavButtons();
+bindAdminFitToggle();
 loadOrders();
 loadAnnouncements();

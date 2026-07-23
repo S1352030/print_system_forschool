@@ -103,6 +103,12 @@ export function buildSettingBadges(order) {
       ? '<span class="badge-chip badge-double">雙面</span>'
       : '<span class="badge-chip badge-single">單面</span>'
   );
+  // 文件處理方式 + 列印防呆 tooltip(提示對應的印表機設定)
+  badges.push(
+    order.fit_mode === 'cover'
+      ? '<span class="badge-chip badge-fit-cover" title="建議印表機設定:實際大小 Actual Size 或無邊界 Borderless">裁切</span>'
+      : '<span class="badge-chip badge-fit-fit" title="建議印表機設定:縮放至可列印區域 / Fit to Printable Area">留白</span>'
+  );
 
   if (binding === 'top_left') badges.push('<span class="badge-chip badge-binding">左上裝訂</span>');
   else if (binding === 'top_right') badges.push('<span class="badge-chip badge-binding">右上裝訂</span>');

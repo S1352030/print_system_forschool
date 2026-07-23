@@ -88,6 +88,29 @@ export function computeA4Fit(pageWPt, pageHPt, frameCssW, frameCssH) {
 }
 
 /**
+ * 「填滿頁面(cover)」策略:PDF 內容縮放到完全覆蓋 A4 框,超出邊緣被裁切。
+ *
+ * 與 fit 相反,這裡用 Math.max:取「能填滿較短邊」的縮放比,
+ * 使內容覆蓋整個框,另一軸必然超出。canvas CSS 尺寸因此大於框,
+ * 靠 A4 框的 flexbox 置中 + overflow:hidden 從中心向外四邊均等裁切。
+ *
+ * @param {number} pageWPt - PDF 原始頁寬(pt)
+ * @param {number} pageHPt - PDF 原始頁高(pt)
+ * @param {number} frameCssW - A4 框 CSS 寬度(px)
+ * @param {number} frameCssH - A4 框 CSS 高度(px)
+ * @returns {{contentCssW:number, contentCssH:number, renderScale:number}}
+ *   contentCssW/H 通常會有一軸大於框(被裁切),另一軸等於框。
+ */
+export function computeA4Cover(pageWPt, pageHPt, frameCssW, frameCssH) {
+  const coverScale = Math.max(frameCssW / pageWPt, frameCssH / pageHPt);
+  return {
+    contentCssW: pageWPt * coverScale,
+    contentCssH: pageHPt * coverScale,
+    renderScale: coverScale,
+  };
+}
+
+/**
  * DPR(裝置像素比),含記憶體防護。
  * 上限設 2:視網膜螢幕清晰度已足夠,同時避免高 DPR(3~4)行動裝置
  * canvas 實體像素爆量導致卡頓或崩潰。

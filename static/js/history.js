@@ -201,6 +201,11 @@ function renderHistoryList(orders) {
           ? '<span class="hist-badge hist-badge-double">雙面</span>'
           : '<span class="hist-badge hist-badge-single">單面</span>'
       );
+      settingsBadges.push(
+        order.fit_mode === 'cover'
+          ? '<span class="hist-badge hist-badge-binding">裁切</span>'
+          : '<span class="hist-badge hist-badge-binding">留白</span>'
+      );
       if (order.binding === 'top_left') {
         settingsBadges.push('<span class="hist-badge hist-badge-binding">左上裝訂</span>');
       } else if (order.binding === 'top_right') {
@@ -217,7 +222,7 @@ function renderHistoryList(orders) {
             <span class="history-item-id">訂單編號 #${order.id}</span>
             <span class="history-item-date">${formatDate(order.created_at)}</span>
           </div>
-          <div class="history-item-filename" onclick="previewPastOrder(${order.id}, '${escJsString(order.file_name)}')" title="點擊預覽此檔案">
+          <div class="history-item-filename" onclick="previewPastOrder(${order.id}, '${escJsString(order.file_name)}', '${order.fit_mode || 'fit'}')" title="點擊預覽此檔案">
             <span class="material-symbols-outlined"><svg><use href="#i-picture_as_pdf"/></svg></span>
             <span>${escHtml(order.file_name)}</span>
           </div>

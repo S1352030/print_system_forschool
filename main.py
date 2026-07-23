@@ -813,6 +813,7 @@ async def upload_order(
     user_name: str = Form(...),
     color_mode: str = Form("bw"),
     duplex: str = Form("single"),
+    fit_mode: str = Form("fit"),
     binding: str | None = Form(None),
     pickup_location: str | None = Form(None),
     db: Session = Depends(get_db),  # 注入資料庫 Session
@@ -825,6 +826,8 @@ async def upload_order(
         raise HTTPException(status_code=400, detail="Invalid color mode")
     if duplex not in {"single", "double"}:
         raise HTTPException(status_code=400, detail="Invalid duplex mode")
+    if fit_mode not in {"fit", "cover"}:
+        raise HTTPException(status_code=400, detail="Invalid fit mode")
     if pickup_location and len(pickup_location) > 20:
         raise HTTPException(status_code=400, detail="取件時間長度不能超過 20 個字元。")
 
@@ -872,6 +875,7 @@ async def upload_order(
             total_price=total_price,
             color_mode=color_mode,
             duplex=duplex,
+            fit_mode=fit_mode,
             binding=binding,
             pickup_location=pickup_location
         )
@@ -926,7 +930,7 @@ async def get_user_orders(
     base_query = (
         db.query(
             Order.id, Order.file_name, Order.total_pages, Order.total_price,
-            Order.color_mode, Order.duplex, Order.binding, Order.pickup_location,
+            Order.color_mode, Order.duplex, Order.fit_mode, Order.binding, Order.pickup_location,
             Order.is_paid, Order.is_printed, Order.created_at,
         )
         .filter(Order.user_name == user_name.strip())
@@ -938,7 +942,7 @@ async def get_user_orders(
             "id": r.id, "file_name": r.file_name,
             "total_pages": r.total_pages, "total_price": r.total_price,
             "color_mode": r.color_mode, "duplex": r.duplex,
-            "binding": r.binding, "pickup_location": r.pickup_location,
+            "fit_mode": r.fit_mode, "binding": r.binding, "pickup_location": r.pickup_location,
             "is_paid": r.is_paid, "is_printed": r.is_printed,
             "created_at": str(r.created_at) if r.created_at else None,
         }
