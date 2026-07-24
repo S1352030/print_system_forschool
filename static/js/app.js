@@ -146,11 +146,28 @@ function renderAnnouncements(items, container, card) {
 }
 
 // ── Service Worker 註冊 ──────────────────────────────────────
+// 新版 SW（如 v8→v9）下載完成後，sw.js 的 skipWaiting() 會立即接管；
+// 這裡監聽 controllerchange，在新 SW 接管的「那一刻」自動重載頁面，
+// 讓既有訪客不必手動按 Ctrl+Shift+R 或清快取，就能吃到新版 JS。
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch((err) => {
-      console.log('[SW] 註冊失敗:', err);
+    // 防止新 SW 觸發多個 client 控制權變更時，導致無限 Reload 迴圈
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (refreshing) return;
+      refreshing = true;
+      console.log('[SW] Controller changed, reloading page for update...');
+      window.location.reload();
     });
+
+    // 註冊 SW 並維持原有的錯誤處理
+    navigator.serviceWorker.register('/sw.js')
+      .then((registration) => {
+        console.log('[SW] Registered correctly:', registration.scope);
+      })
+      .catch((error) => {
+        console.error('[SW] Registration failed:', error);
+      });
   }
 }
 

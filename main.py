@@ -356,7 +356,7 @@ class SecurityAndCacheMiddleware:
                 
                 # 2. Content-Security-Policy (強化防護，攔截外部腳本注入如卡巴斯基)
                 content_type = headers.get("content-type", "")
-                csp = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://cdnjs.cloudflare.com blob:; worker-src 'self' blob:; frame-src 'self' blob: data:; object-src 'self' blob: data:"
+                csp = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://cdnjs.cloudflare.com https://fonts.googleapis.com blob:; worker-src 'self' blob:; frame-src 'self' blob: data:; object-src 'self' blob: data:"
                 if "application/pdf" not in content_type.lower():
                     csp += "; frame-ancestors 'self'"
                 headers["Content-Security-Policy"] = csp
@@ -380,10 +380,13 @@ class SecurityAndCacheMiddleware:
                     cache_control = ", ".join(cleaned)
                         
                 if path.startswith("/static/"):
-                    # /static/ 底下是 PDF.js 函式庫本體、worker 與 cmaps 等版本固定的靜態資源，
-                    # 內容不會變動，設定長效快取（1 年 + immutable）讓瀏覽器直接使用本地快取，
-                    # 不必每次開啟 PDF 預覽都重新走一次 304 驗證流程，可明顯縮短 PDF.js 的載入時間。
-                    cache_control = "public, max-age=31536000, immutable"
+                    # /static/ 底下同時包含 PDF.js 函式庫與前端 ES module（app.js、upload.js 等）。
+                    # 前端模組由 app.js 以相對路徑靜態 import，import 的 URL 沒有版本號，
+                    # 若設 immutable（1 年快取），部署新版後瀏覽器/CDN 會持續派發舊版模組，
+                    # 導致「新版 app.js 配舊版 upload.js」的 ES module 版本錯位（import 失敗 → 全站無反應）。
+                    # 改用 no-cache + ETag：檔案沒變回 304（零成本），檔案變了就拿新版，
+                    # 從根本消除無版本號模組被永久快取的問題。與 compression.py 的設計意圖一致。
+                    cache_control = "public, no-cache"
                 elif path.startswith("/api/"):
                     if not cache_control:
                         cache_control = "private, no-cache"

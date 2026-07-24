@@ -41,6 +41,9 @@ echo ""
 
 # ── 3. 重新產生靜態資源預壓縮檔 (.br / .gz) ──────────
 echo "[3/5] 預壓縮靜態資源 ..."
+# 先清除舊的預壓縮檔,避免檔案重命名/刪除後舊的 .br/.gz 殘留被誤派發。
+# -type f 確保只刪檔案;括號分組 -o (OR) 避免邏輯錯誤。
+find ./static -type f \( -name '*.br' -o -name '*.gz' \) -delete
 python precompress.py
 echo ""
 
