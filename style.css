@@ -1475,6 +1475,83 @@ html.dark .theme-icon-moon {
   animation-duration: var(--md-sys-motion-duration-long, 500ms);
 }
 
+/* ── 主題切換輻射揭示(MD3 Expressive 圓形擴張)────────────────── */
+/* 防破窗 + 效能:輻射期間禁用所有子元素獨立 view-transition-name,
+   確保圓形 clip-path 不被獨立快照穿透,同時降低低階機 GPU 負擔。
+   因限定在 html.theme-transition,不影響 tab 切換的交叉淡入。 */
+html.theme-transition * {
+  view-transition-name: none !important;
+}
+html.theme-transition::view-transition-old(root) {
+  animation: none;
+  z-index: 1;  /* 舊層靜止於下層,不淡出(MD3 圓形揭示標準) */
+}
+html.theme-transition::view-transition-new(root) {
+  /* 進場表面用 MD3 emphasized decelerate */
+  animation: theme-radial-reveal
+    var(--md-sys-motion-duration-long, 500ms)
+    var(--md-sys-motion-easing-emphasized-decel, cubic-bezier(0.05, 0.7, 0.1, 1))
+    both;
+  z-index: 2;
+}
+@keyframes theme-radial-reveal {
+  from { clip-path: circle(0 at var(--theme-transition-x, 50%) var(--theme-transition-y, 50%)); }
+  to   { clip-path: circle(var(--theme-transition-r, 150%) at var(--theme-transition-x, 50%) var(--theme-transition-y, 50%)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.theme-transition::view-transition-old(root),
+  html.theme-transition::view-transition-new(root) {
+    animation: none;
+  }
+}
+
+/* ── Tab 切換(MD3 Fade Through,兩階段錯開)────────────────── */
+/* 單一容器作為 transition target:標題+panel 一體縮放過場。
+   Fade Through 規範:舊內容放大淡出後,新內容才縮小淡入,
+   任一時刻只一個清晰可見 → 從設計上杜絕重疊。
+   兩階段各 200ms,以 animation-delay 錯開,總時長 400ms。 */
+html.tab-transition .md3-content {
+  view-transition-name: panel;
+}
+html.tab-transition::view-transition-group(panel) {
+  animation-duration: 400ms;   /* 兩階段總時長 */
+}
+/* tab 切換時,整頁 root 退回瞬切(避免疊影) */
+html.tab-transition::view-transition-old(root),
+html.tab-transition::view-transition-new(root) {
+  animation: none;
+}
+/* 舊內容:放大 + 淡出(出場:emphasized accelerate,前 200ms) */
+html.tab-transition::view-transition-old(panel) {
+  animation: tab-fade-through-out
+    200ms
+    var(--md-sys-motion-easing-emphasized-accel, cubic-bezier(0.3, 0, 0.8, 0.15))
+    both;
+  z-index: 1;
+}
+/* 新內容:縮小 + 淡入(進場:emphasized decelerate,延遲 200ms 後 200ms) */
+html.tab-transition::view-transition-new(panel) {
+  animation: tab-fade-through-in
+    200ms
+    var(--md-sys-motion-easing-emphasized-decel, cubic-bezier(0.05, 0.7, 0.1, 1))
+    200ms both;   /* delay 200ms:等舊內容完全淡出後才進場 */
+  z-index: 2;
+}
+@keyframes tab-fade-through-out {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(1.05); }  /* 放大淡出 */
+}
+@keyframes tab-fade-through-in {
+  from { opacity: 0; transform: scale(0.92); }  /* 縮小淡入 */
+  to   { opacity: 1; transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.tab-transition::view-transition-old(panel),
+  html.tab-transition::view-transition-new(panel) {
+    animation: none;
+  }
+}
+
 @keyframes fade-out {
   from { opacity: 1; }
   to { opacity: 0; }

@@ -30,7 +30,7 @@ export function refreshHistory() {
   fetchHistory(false);
 }
 
-// ── Tab 切換 ──────────────────────────────────────────────────
+// ── Tab 切換(MD3 Fade Through)──────────────────────────────
 function switchTab(tab) {
   const currentTab = document.querySelector('.md3-tab.active');
   if (!currentTab) return;
@@ -38,11 +38,12 @@ function switchTab(tab) {
   if ((tab === 'upload' && currentTabId === 'tab-upload') ||
       (tab === 'history' && currentTabId === 'tab-history')) return;
 
-  if (!document.startViewTransition) {
-    updateTabDOM(tab);
-    return;
-  }
-  document.startViewTransition(() => updateTabDOM(tab));
+  const apply = () => updateTabDOM(tab);
+
+  if (!document.startViewTransition) { apply(); return; }
+  document.documentElement.classList.add('tab-transition');   // 限定 Fade Through 動畫
+  const transition = document.startViewTransition(apply);
+  transition.finished.finally(() => document.documentElement.classList.remove('tab-transition'));
 }
 window.switchTab = switchTab;
 
@@ -77,20 +78,38 @@ function updateTabDOM(tab) {
   }
 }
 
-// ── 主題切換 ──────────────────────────────────────────────────
+// ── 主題切換(MD3 Expressive 輻射揭示)──────────────────────────
 function bindThemeToggle() {
   const btn = document.getElementById('theme-toggle');
   if (!btn) return;
-  btn.addEventListener('click', () => {
-    if (!document.startViewTransition) {
-      const isDark = document.documentElement.classList.toggle('dark');
-      sessionStorage.setItem('theme', isDark ? 'dark' : 'light');
-      return;
+  btn.addEventListener('click', (event) => {
+    // 輻射原點:游標座標;event.detail === 0 為鍵盤 Enter/Space 合成 click,退回按鈕中心
+    let x = event.clientX, y = event.clientY;
+    if (event.detail === 0 || (!x && !y)) {
+      const r = btn.getBoundingClientRect();
+      x = r.left + r.width / 2;
+      y = r.top + r.height / 2;
     }
-    document.startViewTransition(() => {
-      const isDark = document.documentElement.classList.toggle('dark');
+    // 到畫面最遠角的距離 = 圓形擴張終止半徑(已涵蓋行動版網址列伸縮的微小視口變化)
+    const endRadius = Math.hypot(
+      Math.max(x, window.innerWidth - x),
+      Math.max(y, window.innerHeight - y)
+    );
+    const root = document.documentElement;
+    root.style.setProperty('--theme-transition-x', `${x}px`);
+    root.style.setProperty('--theme-transition-y', `${y}px`);
+    root.style.setProperty('--theme-transition-r', `${endRadius}px`);
+
+    const apply = () => {
+      const isDark = root.classList.toggle('dark');
       sessionStorage.setItem('theme', isDark ? 'dark' : 'light');
-    });
+    };
+
+    if (!document.startViewTransition) { apply(); return; }
+
+    root.classList.add('theme-transition');           // 限定輻射動畫 + 防破窗
+    const transition = document.startViewTransition(apply);
+    transition.finished.finally(() => root.classList.remove('theme-transition'));
   });
 }
 
