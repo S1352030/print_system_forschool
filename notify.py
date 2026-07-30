@@ -27,6 +27,32 @@ LINE_RECEIVER_ID = os.getenv("LINE_RECEIVER_ID", "在此貼上你的 LINE User I
 LINE_API_URL = "https://api.line.me/v2/bot/message/push"
 
 
+def send_line_text_notification(message: str) -> dict:
+    """發送一般系統通知；未設定 LINE 時安全略過。"""
+    if (
+        not LINE_CHANNEL_ACCESS_TOKEN
+        or not LINE_RECEIVER_ID
+        or "在此貼上" in LINE_CHANNEL_ACCESS_TOKEN
+        or "在此貼上" in LINE_RECEIVER_ID
+    ):
+        return {"error": "LINE 金鑰或接收者 ID 尚未設定。"}
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}",
+    }
+    payload = {
+        "to": LINE_RECEIVER_ID,
+        "messages": [{"type": "text", "text": message[:5000]}],
+    }
+    try:
+        response = requests.post(LINE_API_URL, headers=headers, json=payload, timeout=10)
+        response.raise_for_status()
+        return {"status": "success"}
+    except Exception as exc:
+        return {"error": str(exc)}
+
+
 def send_line_notification(
     user_name: str,
     file_name: str,

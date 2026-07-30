@@ -12,9 +12,14 @@
   --md-sys-color-outline: var(--outline);
   --md-sys-color-outline-variant: rgba(var(--on-surface-rgb), 0.16);
   --md-sys-color-error: var(--error);
+  --md-sys-color-error-container: color-mix(in srgb, var(--error) 16%, var(--surface));
+  --md-sys-color-on-error-container: var(--error);
+  --md-sys-color-inverse-surface: var(--on-surface);
+  --md-sys-color-inverse-on-surface: var(--surface);
   --md-sys-color-surface-container-low: color-mix(in srgb, var(--surface) 80%, var(--surface-container));
   --md-sys-color-surface-container-high: color-mix(in srgb, var(--surface-container) 80%, var(--on-surface) 2%);
   --md-sys-color-surface-container-highest: color-mix(in srgb, var(--surface-container) 60%, var(--on-surface) 4%);
+  --pdf-preview-paper: #ffffff;
   
   /* MD3 Shape Tokens */
   --md-sys-shape-corner-none: 0px;
@@ -670,7 +675,11 @@ input[type="file"] { display: none; }
 }
 .md3-tab {
   flex: 1;
+  min-height: 48px;
   padding: 10px 4px;
+  appearance: none;
+  background: transparent;
+  border: 0;
   text-align: center;
   cursor: pointer;
   font-size: var(--md-sys-typescale-title-small-size);
@@ -686,6 +695,7 @@ input[type="file"] { display: none; }
   transition: all var(--md-sys-motion-duration-short) var(--md-sys-motion-easing-standard);
   border-radius: var(--md-sys-shape-corner-medium) var(--md-sys-shape-corner-medium) 0 0;
   user-select: none;
+  font-family: inherit;
 }
 .md3-tab::before {
   content: ""; position: absolute; inset: 0; border-radius: inherit;
@@ -1549,6 +1559,34 @@ html.tab-transition::view-transition-new(panel) {
   html.tab-transition::view-transition-old(panel),
   html.tab-transition::view-transition-new(panel) {
     animation: none;
+  }
+}
+
+/* ── 手機 tab 切換:右欄(PDF 預覽/公告)平滑滑動 ──────────────── */
+/* 手機單欄時,右欄排在 panel 正下方。upload panel 遠比 history panel 高,
+   切換瞬間右欄的位置會大幅改變;若任由 root 瞬切,右欄會「瞬跳」到新位置,
+   與 panel 的 Fade Through 不同步 → 觀感突兀。
+   解法:給右欄一個專屬 view-transition-name,瀏覽器會自動對其舊→新位置做
+   平滑插補(不淡入淡出,因預覽內容不變,淡入淡出反而讓 PDF 閃爍)。
+   桌面雙欄右欄位置不變,故僅在手機版啟用。 */
+@media (max-width: 680px) {
+  html.tab-transition .right-column {
+    view-transition-name: right-col;
+  }
+  /* 群組:只做位置/尺寸滑動,時長與緩動對齊 panel 的 Fade Through(400ms) */
+  html.tab-transition::view-transition-group(right-col) {
+    animation-duration: 400ms;
+    animation-timing-function: var(--md-sys-motion-easing-emphasized-decel, cubic-bezier(0.05, 0.7, 0.1, 1));
+  }
+  /* 新舊快照都不淡入淡出 → 純位置滑動,預覽不閃爍 */
+  html.tab-transition::view-transition-old(right-col),
+  html.tab-transition::view-transition-new(right-col) {
+    animation: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html.tab-transition::view-transition-group(right-col) {
+      animation: none;
+    }
   }
 }
 

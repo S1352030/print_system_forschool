@@ -10,31 +10,10 @@
   <noscript>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet" />
   </noscript>
-  <!-- PDF.js 改為延遲載入:僅在實際預覽 PDF 時才透過 pdfjs-loader.js 動態注入,
-       避免首屏被 515KB 的 pdf.js 同步阻塞。 -->
-  <script>
-    (function() {
-      // 1. Dark/Light mode theme
-      const savedTheme = sessionStorage.getItem('theme');
-      const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      if (savedTheme === 'dark' || (!savedTheme && systemPrefersDark)) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
-
-      // 2. Random color palette theme
-      const palettes = ['theme-blue', 'theme-green', 'theme-purple', 'theme-teal', 'theme-rose', 'theme-orange'];
-      let selectedPalette = sessionStorage.getItem('selected-palette');
-      if (!selectedPalette || !palettes.includes(selectedPalette)) {
-        selectedPalette = palettes[Math.floor(Math.random() * palettes.length)];
-        sessionStorage.setItem('selected-palette', selectedPalette);
-      }
-      document.documentElement.classList.add(selectedPalette);
-    })();
-  </script>
+  <script src="/static/js/theme-bootstrap.js?v=20260730a"></script>
   <script src="/static/dialog.js"></script>
-  <link rel="stylesheet" href="/style.css?v=20260723c">
+  <link rel="stylesheet" href="/style.css?v=20260730a">
+  <link rel="stylesheet" href="/static/pdf-preview.css?v=20260730a">
 </head>
 <body>
 <!-- Offline status banner -->
@@ -71,7 +50,7 @@
   <symbol id="i-fit_page" viewBox="0 -960 960 960"><path d="M200-200h560v-560H200v560Zm-80 80v-720h720v720H120Zm160-240v-80h400v80H280Zm0-160v-80h400v80H280Z"/></symbol>
   <symbol id="i-crop" viewBox="0 -960 960 960"><path d="M240-80v-120H120v-80h120v-480H120v-80h120v-120h80v120h320v-120h80v120h120v80H680v480h120v80H680v120h-80v-120H320v120h-80Zm80-200h320v-480H320v480Z"/></symbol>
 </svg>
-<button id="theme-toggle" class="theme-toggle-btn" title="切換深淺模式">
+<button id="theme-toggle" class="theme-toggle-btn" title="切換深淺模式" aria-label="切換深淺模式">
   <span class="material-symbols-outlined theme-icon-sun"><svg><use href="#i-light_mode"/></svg></span>
   <span class="material-symbols-outlined theme-icon-moon"><svg><use href="#i-dark_mode"/></svg></span>
 </button>
@@ -88,21 +67,23 @@
     </div>
 
     <!-- M3 Tabs -->
-    <div class="md3-tabs">
-      <div class="md3-tab active" id="tab-upload" onclick="switchTab('upload')">
-        <span class="material-symbols-outlined"><svg><use href="#i-upload_file"/></svg></span>
+    <div class="md3-tabs" role="tablist" aria-label="主要功能">
+      <button type="button" class="md3-tab active" id="tab-upload" role="tab"
+              aria-selected="true" aria-controls="upload-panel" tabindex="0" data-tab="upload">
+        <span class="material-symbols-outlined" aria-hidden="true"><svg><use href="#i-upload_file"/></svg></span>
         <span>檔案上傳</span>
-        <div class="md3-tab-indicator"></div>
-      </div>
-      <div class="md3-tab" id="tab-history" onclick="switchTab('history')">
-        <span class="material-symbols-outlined"><svg><use href="#i-history"/></svg></span>
+        <span class="md3-tab-indicator" aria-hidden="true"></span>
+      </button>
+      <button type="button" class="md3-tab" id="tab-history" role="tab"
+              aria-selected="false" aria-controls="history-panel" tabindex="-1" data-tab="history">
+        <span class="material-symbols-outlined" aria-hidden="true"><svg><use href="#i-history"/></svg></span>
         <span>歷史訂單</span>
-        <div class="md3-tab-indicator"></div>
-      </div>
+        <span class="md3-tab-indicator" aria-hidden="true"></span>
+      </button>
     </div>
 
     <!-- Panel 1: Upload Form -->
-    <div id="upload-panel">
+    <div id="upload-panel" role="tabpanel" aria-labelledby="tab-upload">
       <form id="uploadForm">
         <!-- 上傳冷卻提示橫幅 -->
         <div id="cooldown-banner" class="cooldown-banner hidden">
@@ -125,11 +106,13 @@
           <div class="file-pager-header">
             <div class="section-label">已選擇的檔案 (最多 5 個)</div>
             <div class="file-pager-bar">
-              <button type="button" class="pager-arrow-btn" id="file-pager-prev" onclick="changeActiveFile(-1)">
+              <button type="button" class="pager-arrow-btn" id="file-pager-prev"
+                      onclick="changeActiveFile(-1)" aria-label="上一份檔案">
                 <span class="material-symbols-outlined"><svg><use href="#i-chevron_left"/></svg></span>
               </button>
               <span class="file-pager-indicator" id="file-pager-info">1 / 1</span>
-              <button type="button" class="pager-arrow-btn" id="file-pager-next" onclick="changeActiveFile(1)">
+              <button type="button" class="pager-arrow-btn" id="file-pager-next"
+                      onclick="changeActiveFile(1)" aria-label="下一份檔案">
                 <span class="material-symbols-outlined"><svg><use href="#i-chevron_right"/></svg></span>
               </button>
             </div>
@@ -181,7 +164,7 @@
     </div>
 
     <!-- Panel 2: History Query -->
-    <div id="history-panel" class="hidden">
+    <div id="history-panel" class="hidden" role="tabpanel" aria-labelledby="tab-history">
       <div class="md3-text-field">
         <input type="text" id="history_search_name" placeholder=" ">
         <label for="history_search_name">請輸入您的姓名或學號</label>
@@ -220,25 +203,51 @@
         <span class="material-symbols-outlined"><svg><use href="#i-picture_as_pdf"/></svg></span>
         <span>選擇 PDF 後顯示預覽</span>
       </div>
-      <div id="pdf-preview-container" class="hidden" style="position: relative; display: flex; flex-direction: column; align-items: center; width: 100%; height: 100%; min-height: 400px; background: var(--bg-card); border-radius: 8px; overflow: hidden;">
-        <div style="flex: 1; overflow: auto; width: 100%; display: flex; justify-content: center; align-items: flex-start; padding: 16px; background: var(--md-sys-color-surface-container-high, #eceff3);">
-          <div id="pdf-a4-frame" class="pdf-a4-frame">
-            <canvas id="pdf-canvas"></canvas>
-            <div class="pdf-doc-outline" id="pdf-doc-outline">
-              <span class="pdf-doc-label" id="pdf-doc-label"></span>
+      <div id="pdf-preview-container" class="pdf-preview hidden" data-pdf-preview>
+        <div class="pdf-preview__topline">
+          <span class="paper-badge" data-pdf-paper>—</span>
+          <span class="pdf-preview__status" data-pdf-status role="status" aria-live="polite"></span>
+        </div>
+        <progress class="pdf-preview__progress" data-pdf-progress aria-label="PDF 載入進度" hidden></progress>
+        <div class="pdf-preview__viewport" data-pdf-viewport tabindex="0"
+             aria-label="PDF 預覽區，可用左右方向鍵或滑動翻頁">
+          <div class="pdf-a4-frame" data-pdf-frame>
+            <canvas data-pdf-canvas aria-label="PDF 預覽"></canvas>
+            <div class="pdf-doc-outline" data-pdf-doc-outline aria-hidden="true">
+              <span class="pdf-doc-label" data-pdf-doc-label></span>
             </div>
-            <div class="pdf-a4-label" id="pdf-a4-label">A4 · 210×297mm</div>
+            <div class="pdf-a4-label" data-pdf-a4-label aria-hidden="true">A4 · 210×297mm</div>
           </div>
         </div>
-        <div id="pdf-controls" style="display: flex; gap: 15px; align-items: center; padding: 8px 16px; background: rgba(0,0,0,0.6); color: white; border-radius: 20px; margin-bottom: 10px; z-index: 10; position: absolute; bottom: 10px;">
-          <button type="button" id="pdf-prev" style="background: none; border: none; color: white; cursor: pointer; padding: 5px; font-size: 16px; display: flex; align-items: center;">◀</button>
-          <span style="font-size: 14px;"><span id="pdf-page-num">1</span> / <span id="pdf-page-count">1</span></span>
-          <button type="button" id="pdf-next" style="background: none; border: none; color: white; cursor: pointer; padding: 5px; font-size: 16px; display: flex; align-items: center;">▶</button>
-          <span style="width: 1px; height: 18px; background: rgba(255,255,255,0.3);"></span>
-          <span class="md3-tooltip-wrap">
-            <button type="button" id="pdf-annotate-toggle" style="background: none; border: 1px solid rgba(255,255,255,0.3); color: white; cursor: pointer; padding: 4px 10px; font-size: 12px; border-radius: 12px; display: flex; align-items: center; gap: 4px;">📐 邊界</button>
-            <span class="md3-tooltip" role="tooltip">紅框＝原文件邊界<br>藍色區＝A4 上的留白</span>
-          </span>
+        <div class="pdf-preview__controls" aria-label="PDF 預覽控制">
+          <button type="button" class="pdf-preview__icon-button" data-pdf-prev aria-label="上一頁">◀</button>
+          <label class="pdf-preview__page-field">
+            <span class="visually-hidden">目前頁碼</span>
+            <input data-pdf-page type="number" min="1" value="1" inputmode="numeric">
+            <span aria-hidden="true">/</span>
+            <span data-pdf-count aria-label="總頁數">1</span>
+          </label>
+          <button type="button" class="pdf-preview__icon-button" data-pdf-next aria-label="下一頁">▶</button>
+          <label class="pdf-preview__select">
+            <span class="visually-hidden">縮放比例</span>
+            <select data-pdf-zoom aria-label="縮放比例">
+              <option value="fit">符合畫面</option>
+              <option value="1.25">125%</option>
+              <option value="1.5">150%</option>
+              <option value="2">200%</option>
+            </select>
+          </label>
+          <button type="button" class="pdf-preview__text-button" data-pdf-boundary
+                  aria-label="顯示列印邊界" aria-pressed="false">邊界</button>
+          <button type="button" class="pdf-preview__text-button" data-pdf-fullscreen
+                  aria-label="開啟全螢幕預覽">全螢幕</button>
+        </div>
+        <div class="pdf-preview__error" data-pdf-error role="alert" hidden>
+          <span data-pdf-error-message></span>
+          <div class="pdf-preview__error-actions">
+            <button type="button" class="pdf-preview__text-button" data-pdf-retry>重新載入</button>
+            <a class="pdf-preview__text-button" data-pdf-download hidden>下載原始 PDF</a>
+          </div>
         </div>
       </div>
       <div class="preview-meta hidden" id="preview-meta">
@@ -250,7 +259,6 @@
           <span class="material-symbols-outlined"><svg><use href="#i-straighten"/></svg></span>
           <span id="meta-size">—</span>
         </span>
-        <span id="meta-paper" class="paper-badge">—</span>
       </div>
     </div>
 
@@ -268,19 +276,16 @@
 
 </div>
 
-<script type="module" src="/static/js/app.js?v=20260723c"></script>
-<script type="module">
-  import { initApp } from '/static/js/app.js?v=20260723c';
-  // dialog.js 是非模組,掛在 window;等它就緒後初始化
-  function _bootstrap() {
-    if (typeof window.showAlert === 'function') {
-      initApp();
-    } else {
-      // dialog.js 尚未載入完成,稍候重試
-      setTimeout(_bootstrap, 30);
-    }
-  }
-  _bootstrap();
-</script>
+<dialog id="pdf-fullscreen-dialog" class="pdf-fullscreen-dialog" aria-labelledby="pdf-fullscreen-title">
+  <header class="pdf-fullscreen-dialog__header">
+    <h2 id="pdf-fullscreen-title">PDF 全螢幕預覽</h2>
+    <form method="dialog">
+      <button type="submit" class="pdf-preview__icon-button" aria-label="關閉全螢幕預覽">✕</button>
+    </form>
+  </header>
+  <div class="pdf-fullscreen-dialog__mount" data-pdf-fullscreen-mount></div>
+</dialog>
+
+<script type="module" src="/static/js/app.js?v=20260730a"></script>
 </body>
 </html>

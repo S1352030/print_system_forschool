@@ -8,6 +8,8 @@ import uuid
 import logging
 import asyncio
 import time
+from pathlib import Path
+from urllib.parse import quote
 from collections import defaultdict
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Depends, status, Request, BackgroundTasks, Query
 from fastapi.encoders import jsonable_encoder
@@ -32,7 +34,7 @@ from schemas import AnnouncementCreate, AnnouncementUpdate, OrderStatusUpdate
 # 引入資料庫模塊
 from database import Order, Announcement, get_db, engine, Base, ensure_order_columns, SessionLocal
 # 引入通知模塊
-from notify import send_line_notification
+from notify import send_line_notification, send_line_text_notification
 
 # ── 輕量級 Rate Limiter（滑動視窗，適用免費層級，無需 Redis）─────
 class RateLimiter:
@@ -264,6 +266,71 @@ def _scheduled_cleanup() -> None:
         log.error("排程清理任務發生未預期錯誤:%s", exc)
 
 
+_STORAGE_NOTIFICATION_COOLDOWN_SECONDS = 24 * 60 * 60
+_last_storage_notification_at = 0.0
+
+
+def _cleanup_stale_parts_once(max_age_hours: int = 24) -> int:
+    """只清除上傳目錄中逾時的 .part，不觸碰有效 PDF。"""
+    upload_root = Path(UPLOAD_DIR)
+    if not upload_root.exists():
+        return 0
+    cutoff = time.time() - max_age_hours * 60 * 60
+    removed = 0
+    for part_path in upload_root.glob("*.part"):
+        try:
+            if part_path.is_file() and part_path.stat().st_mtime < cutoff:
+                part_path.unlink()
+                removed += 1
+        except OSError as exc:
+            log.warning("無法清理暫存檔 %s: %s", part_path, exc)
+    return removed
+
+
+def _check_storage_once() -> float:
+    """記錄磁碟用量，超過門檻時以 24 小時冷卻發送 LINE。"""
+    global _last_storage_notification_at
+    usage = shutil.disk_usage(Path(UPLOAD_DIR).resolve())
+    percent = usage.used / usage.total * 100 if usage.total else 0.0
+    free_gib = usage.free / (1024 ** 3)
+    level = None
+    if percent >= settings.STORAGE_CRITICAL_PERCENT:
+        level = "嚴重"
+        log.error("磁碟用量 %.1f%%（剩餘 %.2f GiB）", percent, free_gib)
+    elif percent >= settings.STORAGE_WARN_PERCENT:
+        level = "警告"
+        log.warning("磁碟用量 %.1f%%（剩餘 %.2f GiB）", percent, free_gib)
+    else:
+        log.info("磁碟用量 %.1f%%（剩餘 %.2f GiB）", percent, free_gib)
+
+    now = time.monotonic()
+    line_configured = bool(settings.LINE_CHANNEL_ACCESS_TOKEN and settings.LINE_RECEIVER_ID)
+    if (
+        level
+        and line_configured
+        and now - _last_storage_notification_at >= _STORAGE_NOTIFICATION_COOLDOWN_SECONDS
+    ):
+        result = send_line_text_notification(
+            f"⚠️ 影印系統磁碟{level}\n使用率：{percent:.1f}%\n剩餘：{free_gib:.2f} GiB"
+        )
+        if "error" in result:
+            log.error("磁碟警告 LINE 通知失敗：%s", result["error"])
+        else:
+            _last_storage_notification_at = now
+    return percent
+
+
+def _scheduled_maintenance() -> None:
+    try:
+        _scheduled_cleanup()
+        removed = _cleanup_stale_parts_once()
+        if removed:
+            log.info("已清理 %d 個逾時 .part 暫存檔", removed)
+        _check_storage_once()
+    except Exception as exc:
+        log.error("定期維護發生未預期錯誤：%s", exc)
+
+
 # ── Lifespan:啟動/關閉事件(取代棄用的 @app.on_event)────────────
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -289,14 +356,16 @@ async def lifespan(app: FastAPI):
     # 啟動:首次清理(放執行緒池避免阻塞 lifespan)
     log.info("應用程式啟動,執行首次舊訂單清理...")
     await asyncio.to_thread(_cleanup_old_orders_once)
+    await asyncio.to_thread(_cleanup_stale_parts_once)
+    await asyncio.to_thread(_check_storage_once)
 
     # 啟動 APScheduler(背景執行緒,獨立於事件循環)
     _scheduler = BackgroundScheduler(timezone="Asia/Taipei")
     _scheduler.add_job(
-        _scheduled_cleanup,
+        _scheduled_maintenance,
         trigger="interval",
         hours=settings.CLEANUP_INTERVAL_HOURS,
-        id="cleanup_old_orders",
+        id="storage_and_order_maintenance",
         replace_existing=True,
         max_instances=1,        # 避免重疊執行
         coalesce=True,          # 多次錯過的觸發合併為一次
@@ -356,7 +425,7 @@ class SecurityAndCacheMiddleware:
                 
                 # 2. Content-Security-Policy (強化防護，攔截外部腳本注入如卡巴斯基)
                 content_type = headers.get("content-type", "")
-                csp = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://cdnjs.cloudflare.com https://fonts.googleapis.com blob:; worker-src 'self' blob:; frame-src 'self' blob: data:; object-src 'self' blob: data:"
+                csp = "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdnjs.cloudflare.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://cdnjs.cloudflare.com https://fonts.googleapis.com blob:; worker-src 'self' blob:; frame-src 'self' blob: data:; object-src 'self' blob: data:"
                 if "application/pdf" not in content_type.lower():
                     csp += "; frame-ancestors 'self'"
                 headers["Content-Security-Policy"] = csp
@@ -379,7 +448,11 @@ class SecurityAndCacheMiddleware:
                     cleaned = [d for d in directives if "must-revalidate" not in d.lower()]
                     cache_control = ", ".join(cleaned)
                         
-                if path.startswith("/static/"):
+                if path.startswith("/static/pdfjs/5.7.284/"):
+                    cache_control = "public, max-age=31536000, immutable"
+                elif path.startswith("/static/pdfjs/"):
+                    cache_control = "public, no-cache"
+                elif path.startswith("/static/"):
                     # /static/ 底下同時包含 PDF.js 函式庫與前端 ES module（app.js、upload.js 等）。
                     # 前端模組由 app.js 以相對路徑靜態 import，import 的 URL 沒有版本號，
                     # 若設 immutable（1 年快取），部署新版後瀏覽器/CDN 會持續派發舊版模組，
@@ -387,7 +460,7 @@ class SecurityAndCacheMiddleware:
                     # 改用 no-cache + ETag：檔案沒變回 304（零成本），檔案變了就拿新版，
                     # 從根本消除無版本號模組被永久快取的問題。與 compression.py 的設計意圖一致。
                     cache_control = "public, no-cache"
-                elif path.startswith("/api/"):
+                elif path.startswith("/api/") or path.startswith("/admin"):
                     if not cache_control:
                         cache_control = "private, no-cache"
                     else:
@@ -414,6 +487,10 @@ class SecurityAndCacheMiddleware:
                         cache_control = "no-cache"
                         
                 headers["Cache-Control"] = cache_control
+                if path == "/":
+                    headers["CDN-Cache-Control"] = "public, max-age=300"
+                elif path.startswith("/api/") or path.startswith("/admin"):
+                    headers["CDN-Cache-Control"] = "no-store"
                 
                 # 5. 強制 charset=utf-8 (文字、JSON、JS、CSS 等)
                 content_type = headers.get("content-type", "")
@@ -600,14 +677,17 @@ PRICE_PER_PAGE_BY_COLOR: dict[str, int] = {
     "color": 2,
 }
 
-UPLOAD_DIR = "uploads"
+UPLOAD_DIR = settings.UPLOAD_DIR
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # ── 網頁畫面路由（預壓縮靜態派發 + ETag 條件式快取）──────────────
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 async def serve_frontend(request: Request):
     """提供使用者上傳頁面（優先派發 .br → .gz → 原始檔）"""
-    return serve_precompressed("index.html", request, media_type="text/html; charset=utf-8")
+    response = serve_precompressed("index.html", request, media_type="text/html; charset=utf-8")
+    response.headers["Cache-Control"] = "public, no-cache"
+    response.headers["CDN-Cache-Control"] = "public, max-age=300"
+    return response
 
 @app.get("/admin")
 async def serve_admin(request: Request, username: str = Depends(authenticate_admin)):
@@ -629,7 +709,12 @@ def _count_pdf_pages_sync(file_path: str) -> int:
     """同步版本的 PDF 頁數計算（CPU 密集型，應在線程池中執行）"""
     try:
         reader = PdfReader(file_path)
-        return len(reader.pages)
+        if reader.is_encrypted:
+            raise ValueError("不支援加密或需要密碼的 PDF。")
+        page_count = len(reader.pages)
+        if page_count < 1:
+            raise ValueError("PDF 沒有可列印的頁面。")
+        return page_count
     except Exception as exc:
         raise ValueError(f"無法讀取 PDF 頁數：{exc}") from exc
 
@@ -749,7 +834,10 @@ async def serve_pdf_with_range(
     headers = {
         "Content-Type": "application/pdf",
         "Content-Length": str(content_length),
-        "Content-Disposition": f'inline; filename="{download_filename}"',
+        "Content-Disposition": (
+            'inline; filename="document.pdf"; '
+            f"filename*=UTF-8''{quote(download_filename)}"
+        ),
         "Accept-Ranges": "bytes",
         "Cache-Control": "private, no-cache",
     }
@@ -763,39 +851,70 @@ async def serve_pdf_with_range(
         media_type="application/pdf",
     )
 
+_PDF_PARSE_SEMAPHORE = asyncio.Semaphore(settings.PDF_PARSE_CONCURRENCY)
+
+
 async def count_pdf_pages(file_path: str) -> int:
     """非同步版本:在線程池中執行 PDF 解析,避免阻塞事件循環。
     使用 asyncio.to_thread(Python 3.9+)取代棄用的 get_event_loop()。
     """
-    return await asyncio.to_thread(_count_pdf_pages_sync, file_path)
+    async with _PDF_PARSE_SEMAPHORE:
+        return await asyncio.to_thread(_count_pdf_pages_sync, file_path)
+
+
+async def _write_validated_pdf(upload: UploadFile, destination: str) -> int:
+    """串流寫入 PDF，並統一驗證副檔名、大小、空檔與 magic bytes。"""
+    import aiofiles
+
+    filename = upload.filename or ""
+    if not filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="僅接受 PDF 格式的檔案。")
+
+    total_size = 0
+    header = bytearray()
+    try:
+        async with aiofiles.open(destination, "wb") as output:
+            while True:
+                chunk = await upload.read(_PDF_CHUNK_SIZE)
+                if not chunk:
+                    break
+                total_size += len(chunk)
+                if total_size > MAX_UPLOAD_SIZE:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"檔案大小超過上限 {MAX_UPLOAD_SIZE // (1024 * 1024)} MB。",
+                    )
+                if len(header) < len(PDF_MAGIC_BYTES):
+                    header.extend(chunk[:len(PDF_MAGIC_BYTES) - len(header)])
+                await output.write(chunk)
+
+        if total_size == 0:
+            raise HTTPException(status_code=400, detail="PDF 檔案不可為空。")
+        if bytes(header) != PDF_MAGIC_BYTES:
+            raise HTTPException(status_code=400, detail="檔案內容不是有效的 PDF 格式。")
+        return total_size
+    except BaseException:
+        try:
+            await asyncio.to_thread(os.remove, destination)
+        except FileNotFoundError:
+            pass
+        raise
 
 # ── API 路由 ──────────────────────────────────────────────
 @app.post("/api/check-pages", dependencies=[Depends(rate_limit("api"))])
 async def check_pdf_pages(file: UploadFile = File(...)):
     """臨時解析 PDF 檔並返回頁數"""
-    if not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="僅接受 PDF 格式的檔案。")
-    
-    tmp_path = None
+    tmp_path = os.path.join(tempfile.gettempdir(), f"print-check-{uuid.uuid4()}.part")
     try:
-        # 以 async 串流寫入暫存檔(與 /api/upload 一致),
-        # 避免 shutil.copyfileobj 同步阻塞整個事件循環。
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-            while True:
-                chunk = await file.read(8192)
-                if not chunk:
-                    break
-                tmp.write(chunk)
-            tmp_path = tmp.name
-
+        await _write_validated_pdf(file, tmp_path)
         try:
             total_pages = await count_pdf_pages(tmp_path)
             return {"status": "success", "pages": total_pages}
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
     finally:
-        if tmp_path and os.path.exists(tmp_path):
-            os.remove(tmp_path)
+        if os.path.exists(tmp_path):
+            await asyncio.to_thread(os.remove, tmp_path)
 
 def _send_line_notification_bg(user_name: str, file_name: str, total_pages: int, total_price: float):
     notify_result = send_line_notification(
@@ -822,9 +941,6 @@ async def upload_order(
     db: Session = Depends(get_db),  # 注入資料庫 Session
     _rl: None = Depends(rate_limit("upload")),  # 上傳限流(較嚴格)
 ) -> JSONResponse:
-    if not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="僅接受 PDF 格式的檔案。")
-
     if color_mode not in PRICE_PER_PAGE_BY_COLOR:
         raise HTTPException(status_code=400, detail="Invalid color mode")
     if duplex not in {"single", "double"}:
@@ -834,41 +950,24 @@ async def upload_order(
     if pickup_location and len(pickup_location) > 20:
         raise HTTPException(status_code=400, detail="取件時間長度不能超過 20 個字元。")
 
-    tmp_path = None
+    physical_filename = f"{uuid.uuid4()}.pdf"
+    final_path = os.path.join(UPLOAD_DIR, physical_filename)
+    part_path = f"{final_path}.part"
+    file_ready = False
+    committed = False
     try:
-        # 暫存檔案來計算頁數（含大小限制與 PDF 驗證）
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-            total_size = 0
-            first_chunk = True
-            while True:
-                chunk = await file.read(8192)
-                if not chunk:
-                    break
-                # 驗證 PDF magic bytes（僅檢查第一個 chunk）
-                if first_chunk:
-                    if not chunk[:5].startswith(PDF_MAGIC_BYTES):
-                        raise HTTPException(status_code=400, detail="檔案內容不是有效的 PDF 格式。")
-                    first_chunk = False
-                total_size += len(chunk)
-                if total_size > MAX_UPLOAD_SIZE:
-                    raise HTTPException(
-                        status_code=413,
-                        detail=f"檔案大小超過上限 {MAX_UPLOAD_SIZE // (1024*1024)} MB。"
-                    )
-                tmp.write(chunk)
-            tmp_path = tmp.name
-
+        await _write_validated_pdf(file, part_path)
         try:
-            total_pages = await count_pdf_pages(tmp_path)
+            total_pages = await count_pdf_pages(part_path)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
             
         total_price = total_pages * PRICE_PER_PAGE_BY_COLOR[color_mode]
 
-        # 生成 UUID 實體檔名
-        physical_filename = f"{uuid.uuid4()}.pdf"
+        # 檔案完整且可解析後，於同一目錄原子改名；資料庫最後提交。
+        await asyncio.to_thread(os.replace, part_path, final_path)
+        file_ready = True
 
-        # 寫入資料庫
         new_order = Order(
             user_name=user_name,
             file_name=file.filename,
@@ -883,12 +982,14 @@ async def upload_order(
             pickup_location=pickup_location
         )
         db.add(new_order)
-        db.commit()
-        db.refresh(new_order) # 取得產生的 id
-
-        # 儲存上傳的 PDF 檔案以供後台下載/預覽
-        file_path = os.path.join(UPLOAD_DIR, physical_filename)
-        await asyncio.to_thread(shutil.copy2, tmp_path, file_path)
+        try:
+            db.flush()
+            new_order_id = new_order.id
+            db.commit()
+            committed = True
+        except Exception:
+            db.rollback()
+            raise
 
         # 觸發 LINE 通知（非同步背景任務，避免阻塞前端上傳響應）
         background_tasks.add_task(
@@ -900,12 +1001,14 @@ async def upload_order(
         )
 
         return JSONResponse(
-            content={"status": "success", "order_id": new_order.id, "total_price": total_price},
+            content={"status": "success", "order_id": new_order_id, "total_price": total_price},
             status_code=201,
         )
     finally:
-        if tmp_path and os.path.exists(tmp_path):
-            os.remove(tmp_path)
+        if os.path.exists(part_path):
+            await asyncio.to_thread(os.remove, part_path)
+        if file_ready and not committed and os.path.exists(final_path):
+            await asyncio.to_thread(os.remove, final_path)
 
 @app.get("/api/orders/history")
 async def get_user_orders(
@@ -1218,6 +1321,7 @@ async def health_check(db: Session = Depends(get_db)):
             "db": db_ok,
             "uptime_seconds": uptime_seconds,
             "version": settings.APP_VERSION,
+            "build_id": settings.APP_BUILD_ID or settings.APP_VERSION,
         },
         headers={"Cache-Control": "no-store"},
     )

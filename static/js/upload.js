@@ -3,17 +3,25 @@
  * 負責檔案選擇、頁數解析、設定檔、上傳與防呆。
  *
  * 狀態說明:
- *   selectedFiles:使用者選擇的檔案陣列,每個物件含 file/colorMode/duplex/binding/pages/pdfDoc
+ *   selectedFiles:使用者選擇的檔案陣列,每個物件含 file/colorMode/duplex/binding/pages
  *   activeFileIndex:目前編輯/預覽的檔案索引
  *   isCooldown:上傳後 7 秒冷卻中,禁止重複提交
  */
 
-import { showAlert, showConfirm, invalidateHistoryCache, refreshHistory } from './app.js';
-import { showPreview, resetPreview, setFitMode } from './preview.js';
+import { showAlert, showConfirm } from './dialog-api.js';
+import { invalidateHistoryCache, fetchHistory as refreshHistory } from './history.js';
+import {
+  showPreview,
+  resetPreview,
+  setFitMode,
+  inspectPdfFile,
+  releasePdfFile,
+} from './preview.js';
 import { apiPost, apiPostWithProgress, ApiError } from './api.js';
 import { escHtml } from './utils.js';
 
 const MAX_FILES = 5;
+const MAX_PDF_BYTES = 20 * 1024 * 1024;
 const COOLDOWN_SECONDS = 7;
 const PRICE_MAP = { bw: 1, color: 2 };
 
@@ -116,12 +124,22 @@ export async function addFiles(files) {
   let nonPdfFound = false;
   let duplicateFound = false;
   let overLimit = false;
+  let emptyFound = false;
+  let oversizedFound = false;
   const newlyAdded = [];
 
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
       nonPdfFound = true;
+      continue;
+    }
+    if (file.size === 0) {
+      emptyFound = true;
+      continue;
+    }
+    if (file.size > MAX_PDF_BYTES) {
+      oversizedFound = true;
       continue;
     }
 
@@ -146,7 +164,7 @@ export async function addFiles(files) {
         binding: 'top_left',
         bindingOtherText: '',
         pages: null,
-        pdfDoc: null,
+        parseError: null,
       };
       selectedFiles.push(fileObj);
       newlyAdded.push(fileObj);
@@ -157,6 +175,8 @@ export async function addFiles(files) {
   }
 
   if (nonPdfFound) await showAlert('僅接受 PDF 格式的檔案!', 'warning');
+  if (emptyFound) await showAlert('空白 PDF 無法上傳。', 'warning');
+  if (oversizedFound) await showAlert('PDF 單檔不可超過 20 MB。', 'warning');
   if (duplicateFound) await showAlert('已忽略重複選擇的檔案。', 'warning');
   if (overLimit) await showAlert(`最多只能選擇 ${MAX_FILES} 個檔案!`, 'warning');
 
@@ -169,22 +189,29 @@ export async function addFiles(files) {
   updatePriceSummary();
 
   if (selectedFiles.length > 0) {
-    showPreview(selectedFiles[activeFileIndex]);
+    await showPreview(selectedFiles[activeFileIndex]);
   }
 
   // 非同步解析每一份文件的頁數(優先本地解析,失敗才呼叫 API)
-  newlyAdded.forEach(async (fileObj) => {
+  for (const fileObj of newlyAdded) {
     const localPages = await getLocalPdfPageCount(fileObj.file);
     if (localPages !== null && localPages > 0) {
       fileObj.pages = localPages;
+      fileObj.parseError = null;
     } else {
       try {
         const formData = new FormData();
         formData.append('file', fileObj.file);
         const result = await apiPost('/api/check-pages', formData, { isForm: true });
         fileObj.pages = result.pages;
+        fileObj.parseError = null;
       } catch (e) {
-        fileObj.pages = 2;
+        fileObj.pages = null;
+        fileObj.parseError = e instanceof ApiError ? e.message : '無法解析 PDF';
+        await showAlert(
+          `檔案「${fileObj.file.name}」無法取得頁數：${fileObj.parseError}`,
+          'error',
+        );
       }
     }
     if (fileObj.pages === 1) {
@@ -194,7 +221,7 @@ export async function addFiles(files) {
     renderFileList();
     checkFormValidity();
     updatePriceSummary();
-  });
+  }
 }
 
 // ── 檔案設定變更(供 onclick 呼叫)──────────────────────────────
@@ -232,10 +259,7 @@ export function updateFitMode(idx, value) {
 export function removeFile(idx) {
   if (isCooldown) return;
   const removed = selectedFiles[idx];
-  if (removed && removed.pdfDoc) {
-    removed.pdfDoc.destroy();
-    removed.pdfDoc = null;
-  }
+  if (removed?.file) void releasePdfFile(removed.file);
   selectedFiles.splice(idx, 1);
   if (activeFileIndex >= selectedFiles.length) {
     activeFileIndex = Math.max(0, selectedFiles.length - 1);
@@ -302,8 +326,10 @@ function renderFileList() {
   const fileObj = selectedFiles[activeFileIndex];
   const idx = activeFileIndex;
   const file = fileObj.file;
-  const pagesText = fileObj.pages === null
-    ? `<span class="file-item-pages">(計算頁數中...)</span>`
+  const pagesText = fileObj.parseError
+    ? `<span class="file-item-pages file-item-pages--error">(PDF 無法解析)</span>`
+    : fileObj.pages === null
+    ? `<span class="file-item-pages">(計算頁數中…)</span>`
     : `<span class="file-item-pages">(${fileObj.pages} 頁)</span>`;
   const showBinding = fileObj.pages === null || fileObj.pages > 1;
   const showDuplex = fileObj.pages === null || fileObj.pages > 1;
@@ -376,7 +402,8 @@ function renderFileList() {
           <span class="material-symbols-outlined file-item-icon"><svg><use href="#i-description"/></svg></span>
           <span class="file-item-name" title="${escHtml(file.name)}">${escHtml(file.name)} (${(file.size / 1024).toFixed(0)} KB) ${pagesText}</span>
         </div>
-        <button type="button" onclick="removeFile(${idx})" class="file-item-remove-btn">
+        <button type="button" onclick="removeFile(${idx})" class="file-item-remove-btn"
+                aria-label="移除 ${escHtml(file.name)}">
           <span class="material-symbols-outlined remove-icon"><svg><use href="#i-close"/></svg></span>
         </button>
       </div>
@@ -413,7 +440,9 @@ export function checkFormValidity() {
     submitBtn.disabled = true;
     return;
   }
-  let allSettingsOk = true;
+  let allSettingsOk = selectedFiles.every(
+    (fileObj) => Number.isInteger(fileObj.pages) && fileObj.pages > 0 && !fileObj.parseError,
+  );
   for (const fileObj of selectedFiles) {
     if (fileObj.binding === 'other' && !fileObj.bindingOtherText.trim()) {
       allSettingsOk = false;
@@ -560,6 +589,7 @@ async function handleSubmit(e) {
 
     if (uploadForm) uploadForm.reset();
     if (userNameInput) userNameInput.value = nameVal;
+    await Promise.allSettled(selectedFiles.map((item) => releasePdfFile(item.file)));
     selectedFiles = [];
     renderFileList();
     updatePriceSummary();
@@ -579,26 +609,7 @@ async function handleSubmit(e) {
 // ── 本地 PDF 頁數解析(避免重複上傳至 /api/check-pages)─────────
 async function getLocalPdfPageCount(file) {
   try {
-    const buffer = await file.arrayBuffer();
-    const bytes = new Uint8Array(buffer);
-    const text = new TextDecoder('latin1').decode(bytes);
-
-    // 策略 1:搜尋所有 /Count N,取最大值(根 Pages 節點持有總頁數)
-    const countRegex = /\/Count\s+(\d+)/g;
-    let maxCount = 0;
-    let match;
-    while ((match = countRegex.exec(text)) !== null) {
-      const count = parseInt(match[1]);
-      if (count > maxCount) maxCount = count;
-    }
-    if (maxCount > 0) return maxCount;
-
-    // 策略 2:計算獨立 /Type /Page(非 /Pages)物件數
-    const pageRegex = /\/Type\s*\/Page\b(?!s)/g;
-    const pages = text.match(pageRegex);
-    if (pages && pages.length > 0) return pages.length;
-
-    return null; // 無法判斷,交由 API fallback
+    return await inspectPdfFile(file);
   } catch (e) {
     return null;
   }

@@ -1,21 +1,9 @@
 #!/usr/bin/env python3
-"""
-靜態資源預先壓縮腳本（Pre-compression）
+"""增量產生 Brotli/Gzip 靜態資源，並清除沒有來源檔的舊 sidecar。"""
 
-在部署前執行此腳本，為 HTML / CSS / JS 等靜態檔案產生：
-  - .br  檔（Brotli Quality 11，最高壓縮率）
-  - .gz  檔（Gzip Level 9，最高壓縮率）
-
-伺服器只需根據 Accept-Encoding 標頭回傳預壓縮檔，
-完全免除即時壓縮的 CPU 負擔。
-
-用法：
-    python precompress.py
-"""
-
-import os
-import gzip
 import glob
+import gzip
+import os
 
 try:
     import brotli
@@ -23,87 +11,89 @@ except ImportError:
     print("錯誤：請先安裝 brotli 套件 → pip install brotli")
     raise SystemExit(1)
 
-# ── 需要預壓縮的靜態檔案清單 ──────────────────────────────────
-# M3 起改用 glob 自動掃描,新增 JS 模組不必手動加入清單
 _GLOB_PATTERNS = [
     "*.html",
     "*.css",
     "sw.js",
-    "static/js/**/*.js",    # ES module 模組(M3 新增)
-    "static/dialog.js",     # 非模組共用腳本
-    "static/pdfjs/**/*.js", # PDF.js 函式庫(pdf.worker.js 1.9MB 等,避免即時壓縮吃 CPU)
+    "static/**/*.css",
+    "static/**/*.js",
+    "static/pdfjs/**/*.mjs",
 ]
 
+BROTLI_QUALITY = 11
+GZIP_LEVEL = 9
 
-def _collect_files():
-    """從 glob patterns 收集所有需預壓縮的檔案(自動去重、排序)。"""
-    seen = set()
-    files = []
+
+def _collect_files() -> list[str]:
+    files: set[str] = set()
     for pattern in _GLOB_PATTERNS:
-        for path in glob.glob(pattern, recursive=True):
-            if path not in seen and os.path.isfile(path):
-                seen.add(path)
-                files.append(path)
+        files.update(
+            path
+            for path in glob.glob(pattern, recursive=True)
+            if os.path.isfile(path) and not path.endswith((".br", ".gz"))
+        )
     return sorted(files)
 
 
-STATIC_FILES = _collect_files()
+def _is_current(source: str, sidecar: str) -> bool:
+    return (
+        os.path.isfile(sidecar)
+        and os.path.getsize(sidecar) > 0
+        and os.path.getmtime(sidecar) >= os.path.getmtime(source)
+    )
 
-BROTLI_QUALITY = 11  # 最高壓縮率（僅部署時執行一次，不影響即時效能）
-GZIP_LEVEL = 9       # 最高壓縮率
+
+def _atomic_write(path: str, data: bytes) -> None:
+    temp_path = f"{path}.tmp"
+    with open(temp_path, "wb") as output:
+        output.write(data)
+    os.replace(temp_path, path)
 
 
-def precompress(file_path: str) -> None:
-    """為單一檔案產生 .br 與 .gz 壓縮版本，並印出壓縮率報告。"""
-    with open(file_path, "rb") as f:
-        original_data = f.read()
+def precompress(file_path: str) -> bool:
+    br_path = f"{file_path}.br"
+    gz_path = f"{file_path}.gz"
+    needs_br = not _is_current(file_path, br_path)
+    needs_gz = not _is_current(file_path, gz_path)
+    if not needs_br and not needs_gz:
+        print(f"  [SKIP] {file_path}")
+        return False
 
-    original_size = len(original_data)
-    if original_size == 0:
+    with open(file_path, "rb") as source:
+        original_data = source.read()
+    if not original_data:
         print(f"  [WARN] {file_path} 為空檔案，跳過")
-        return
+        return False
 
-    # ── Brotli 壓縮 ──────────────────────────────────────────
-    br_data = brotli.compress(original_data, quality=BROTLI_QUALITY)
-    br_path = file_path + ".br"
-    with open(br_path, "wb") as f:
-        f.write(br_data)
-    br_ratio = (1 - len(br_data) / original_size) * 100
+    if needs_br:
+        _atomic_write(br_path, brotli.compress(original_data, quality=BROTLI_QUALITY))
+    if needs_gz:
+        _atomic_write(gz_path, gzip.compress(original_data, compresslevel=GZIP_LEVEL, mtime=0))
+    print(f"  [UPDATE] {file_path}")
+    return True
 
-    # ── Gzip 壓縮 ───────────────────────────────────────────
-    gz_path = file_path + ".gz"
-    with gzip.open(gz_path, "wb", compresslevel=GZIP_LEVEL) as f:
-        f.write(original_data)
-    gz_size = os.path.getsize(gz_path)
-    gz_ratio = (1 - gz_size / original_size) * 100
 
-    # ── 輸出壓縮報告 ─────────────────────────────────────────
-    print(f"  [FILE] {file_path}")
-    print(f"     原始大小:         {original_size:>10,} bytes")
-    print(f"     Brotli (Lv{BROTLI_QUALITY:>2}):   {len(br_data):>10,} bytes  (down {br_ratio:.1f}%)")
-    print(f"     Gzip   (Lv{GZIP_LEVEL}):    {gz_size:>10,} bytes  (down {gz_ratio:.1f}%)")
-    print()
+def remove_orphan_sidecars() -> int:
+    sidecars = (
+        glob.glob("*.br")
+        + glob.glob("*.gz")
+        + glob.glob("static/**/*.br", recursive=True)
+        + glob.glob("static/**/*.gz", recursive=True)
+    )
+    removed = 0
+    for sidecar in sidecars:
+        source = sidecar[:-3]
+        if not os.path.isfile(source):
+            os.remove(sidecar)
+            print(f"  [REMOVE] {sidecar}")
+            removed += 1
+    return removed
 
 
 def main() -> None:
-    print("=" * 52)
-    print("  靜態資源預先壓縮  (Brotli + Gzip)")
-    print("=" * 52)
-    print()
-
-    compressed_count = 0
-    for file_path in STATIC_FILES:
-        if os.path.exists(file_path):
-            precompress(file_path)
-            compressed_count += 1
-        else:
-            print(f"  [WARN] {file_path} 不存在，跳過\n")
-
-    if compressed_count > 0:
-        print(f"[OK] 完成！已為 {compressed_count} 個檔案產生預壓縮版本。")
-        print("     伺服器將根據 Accept-Encoding 自動派發 .br 或 .gz 檔案。")
-    else:
-        print("[WARN] 沒有找到任何可壓縮的檔案。")
+    removed = remove_orphan_sidecars()
+    updated = sum(precompress(path) for path in _collect_files())
+    print(f"[OK] 更新 {updated} 份來源，移除 {removed} 份孤兒壓縮檔。")
 
 
 if __name__ == "__main__":

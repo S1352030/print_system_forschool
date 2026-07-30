@@ -15,7 +15,7 @@
 
 from functools import lru_cache
 from typing import List
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -47,6 +47,15 @@ class Settings(BaseSettings):
 
     # ── 上傳限制 ──────────────────────────────────────────────────
     MAX_UPLOAD_MB: int = Field(default=20, ge=1, le=100, description="單一檔案上傳大小上限(MB)")
+    UPLOAD_DIR: str = Field(default="./uploads", description="PDF 上傳目錄")
+    PDF_PARSE_CONCURRENCY: int = Field(default=1, ge=1, le=4, description="伺服器同時解析 PDF 的數量")
+
+    # ── 資料庫 ────────────────────────────────────────────────────
+    DATABASE_URL: str = Field(default="sqlite:///./db.sqlite3", description="SQLAlchemy 資料庫連線字串")
+
+    # ── 儲存空間監控 ──────────────────────────────────────────────
+    STORAGE_WARN_PERCENT: int = Field(default=80, ge=1, le=99, description="磁碟警告門檻")
+    STORAGE_CRITICAL_PERCENT: int = Field(default=90, ge=2, le=100, description="磁碟嚴重警告門檻")
 
     # ── Rate Limiting(每 IP 每分鐘)──────────────────────────────
     RATE_LIMIT_API_PER_MIN: int = Field(default=30, ge=1, description="一般 API 端點每分鐘請求數上限")
@@ -71,6 +80,7 @@ class Settings(BaseSettings):
 
     # ── 應用程式元資料 ────────────────────────────────────────────
     APP_VERSION: str = Field(default="2.0.0", description="應用程式版本號")
+    APP_BUILD_ID: str = Field(default="", description="部署建置識別碼")
 
     # ────────────────────────────────────────────────────────────
     #  衍生屬性(透過 property 計算,不直接來自環境變數)
@@ -92,6 +102,12 @@ class Settings(BaseSettings):
     @classmethod
     def _normalize_log_level(cls, v: str) -> str:
         return v.upper()
+
+    @model_validator(mode="after")
+    def _validate_storage_thresholds(self):
+        if self.STORAGE_CRITICAL_PERCENT <= self.STORAGE_WARN_PERCENT:
+            raise ValueError("STORAGE_CRITICAL_PERCENT 必須大於 STORAGE_WARN_PERCENT")
+        return self
 
 
 @lru_cache(maxsize=1)

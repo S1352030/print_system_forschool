@@ -1,122 +1,98 @@
 // Service Worker - 影印計價與通知系統
-const CACHE_NAME = 'print-system-v8';
-const MAX_CACHE_ENTRIES = 50; // 快取上限,防止無限增長
+const APP_CACHE = 'print-system-app-20260730';
+const PDF_ENGINE_CACHE = 'print-system-pdf-engine-5.7.284';
+const ACTIVE_CACHES = new Set([APP_CACHE, PDF_ENGINE_CACHE]);
+const MAX_APP_ENTRIES = 40;
 
-// ── Install：預快取核心靜態資源 ──────────────────────────────
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll([
-      '/',
-      '/style.css',
-      '/admin.css',
-    ]))
-  );
+  // 不預抓 PDF 引擎；使用者第一次開啟預覽時才下載。
+  event.waitUntil(Promise.all([
+    caches.open(APP_CACHE),
+    caches.open(PDF_ENGINE_CACHE),
+  ]));
   self.skipWaiting();
 });
 
-// ── Activate：清除舊版本快取 ──────────────────────────────
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => key !== CACHE_NAME)
-          .map((key) => caches.delete(key))
-      )
-    )
+      Promise.all(keys.filter((key) => !ACTIVE_CACHES.has(key)).map((key) => caches.delete(key))),
+    ),
   );
   self.clients.claim();
 });
 
-// ── Fetch：依請求類型選擇快取策略 ─────────────────────────
 self.addEventListener('fetch', (event) => {
   const { request } = event;
+  if (request.method !== 'GET') return;
+
   const url = new URL(request.url);
+  if (!['http:', 'https:'].includes(url.protocol)) return;
 
-  // 只處理 http/https 請求（排除 chrome-extension:// 等）
-  if (!url.protocol.startsWith('http')) {
-    return;
-  }
-
-  // 只快取 GET 請求（Cache API 不支援 POST 等方法）
-  if (request.method !== 'GET') {
-    return;
-  }
-
-  // API 請求與後台頁面：Network Only（永不快取，交由瀏覽器原生處理，避免 Basic Auth 與 520 問題）
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/admin')) {
-    return; // 不攔截，讓瀏覽器正常發送
-  }
-
-  // 字型檔案：Cache First（字型幾乎不會變動）
+  // API、後台、Blob、本地檔案與使用者 PDF 永不進入 Service Worker 快取。
   if (
-    url.pathname.endsWith('.woff2') ||
-    url.hostname === 'fonts.googleapis.com' ||
-    url.hostname === 'fonts.gstatic.com'
+    url.origin !== self.location.origin ||
+    url.pathname.startsWith('/api/') ||
+    url.pathname.startsWith('/admin') ||
+    url.pathname.toLowerCase().endsWith('.pdf')
   ) {
-    event.respondWith(cacheFirst(request));
     return;
   }
 
-  // HTML 頁面導覽：Network First + Cache Fallback
-  if (request.mode === 'navigate') {
-    event.respondWith(networkFirst(request));
+  if (url.pathname.startsWith('/static/pdfjs/5.7.284/')) {
+    event.respondWith(cacheFirst(request, PDF_ENGINE_CACHE));
     return;
   }
 
-  // 其他資源：Network First + Cache Fallback
+  // HTML、CSS 與應用程式模組一律先取網路，離線才使用上一份。
   event.respondWith(networkFirst(request));
 });
 
-// ── 策略：Network First ──────────────────────────────────
 async function networkFirst(request) {
   try {
     const response = await fetch(request);
-    if (response.ok && canCache(request)) {
-      const cache = await caches.open(CACHE_NAME);
-      cache.put(request, response.clone());
-      trimCache(cache); // 限制快取大小
+    if (isCacheable(response)) {
+      const cache = await caches.open(APP_CACHE);
+      await cache.put(request, response.clone());
+      await trimCache(cache, MAX_APP_ENTRIES);
     }
     return response;
-  } catch (err) {
+  } catch {
     const cached = await caches.match(request);
-    return cached || new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
+    return cached || new Response('Offline', {
+      status: 503,
+      statusText: 'Service Unavailable',
+    });
   }
 }
 
-// ── 策略：Cache First ────────────────────────────────────
-async function cacheFirst(request) {
-  const cached = await caches.match(request);
-  if (cached) {
-    return cached;
-  }
+async function cacheFirst(request, cacheName) {
+  const cache = await caches.open(cacheName);
+  const cached = await cache.match(request);
+  if (cached) return cached;
+
   try {
     const response = await fetch(request);
-    if (response.ok && canCache(request)) {
-      const cache = await caches.open(CACHE_NAME);
-      cache.put(request, response.clone());
-      trimCache(cache);
-    }
+    if (isCacheable(response)) await cache.put(request, response.clone());
     return response;
-  } catch (err) {
-    return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
+  } catch {
+    return new Response('Offline', {
+      status: 503,
+      statusText: 'Service Unavailable',
+    });
   }
 }
 
-// ── 輔助：判斷請求是否可快取 ──────────────────────────────
-function canCache(request) {
-  const url = new URL(request.url);
-  return request.method === 'GET' && url.protocol.startsWith('http');
+function isCacheable(response) {
+  if (!response.ok || response.type !== 'basic') return false;
+  const cacheControl = response.headers.get('Cache-Control') || '';
+  return !/\b(?:no-store|private)\b/i.test(cacheControl);
 }
 
-// ── 輔助：限制快取項目數量（LRU 淘汰最舊的）──────────────
-async function trimCache(cache) {
+async function trimCache(cache, maxEntries) {
   const keys = await cache.keys();
-  if (keys.length > MAX_CACHE_ENTRIES) {
-    // 刪除最舊的快取項目
-    const deleteCount = keys.length - MAX_CACHE_ENTRIES;
-    for (let i = 0; i < deleteCount; i++) {
-      await cache.delete(keys[i]);
-    }
+  const overflow = keys.length - maxEntries;
+  for (let index = 0; index < overflow; index += 1) {
+    await cache.delete(keys[index]);
   }
 }

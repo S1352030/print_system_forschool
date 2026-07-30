@@ -17,12 +17,12 @@ import { bindPdfNavButtons, previewPastOrder } from './preview.js';
 import { bindHistoryEvents, fetchHistory, invalidateHistoryCache } from './history.js';
 import { apiGet, ApiError } from './api.js';
 import { escHtml } from './utils.js';
+import { showAlert, showConfirm } from './dialog-api.js';
 
 // ── 對話框轉發 ────────────────────────────────────────────────
 // dialog.js 把 showAlert / showConfirm 掛在 window 上(非模組)。
 // 這裡把它們重新匯出,讓其他 ES module 可 import 使用。
-export const showAlert = (msg, type, title) => window.showAlert(msg, type, title);
-export const showConfirm = (msg, type, title) => window.showConfirm(msg, type, title);
+export { showAlert, showConfirm };
 
 // 給 upload.js 在上傳成功後呼叫,觸發歷史訂單更新
 export { invalidateHistoryCache };
@@ -40,12 +40,12 @@ function switchTab(tab) {
 
   const apply = () => updateTabDOM(tab);
 
-  if (!document.startViewTransition) { apply(); return; }
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!document.startViewTransition || reducedMotion) { apply(); return; }
   document.documentElement.classList.add('tab-transition');   // 限定 Fade Through 動畫
   const transition = document.startViewTransition(apply);
   transition.finished.finally(() => document.documentElement.classList.remove('tab-transition'));
 }
-window.switchTab = switchTab;
 
 function updateTabDOM(tab) {
   const tabUpload = document.getElementById('tab-upload');
@@ -55,18 +55,20 @@ function updateTabDOM(tab) {
   const pageTitle = document.getElementById('page-title');
   const pageSubtitle = document.getElementById('page-subtitle');
 
-  if (tab === 'upload') {
-    tabUpload.classList.add('active');
-    tabHistory.classList.remove('active');
-    uploadPanel.classList.remove('hidden');
-    historyPanel.classList.add('hidden');
+  const showUpload = tab === 'upload';
+  tabUpload.classList.toggle('active', showUpload);
+  tabHistory.classList.toggle('active', !showUpload);
+  tabUpload.setAttribute('aria-selected', String(showUpload));
+  tabHistory.setAttribute('aria-selected', String(!showUpload));
+  tabUpload.tabIndex = showUpload ? 0 : -1;
+  tabHistory.tabIndex = showUpload ? -1 : 0;
+  uploadPanel.classList.toggle('hidden', !showUpload);
+  historyPanel.classList.toggle('hidden', showUpload);
+
+  if (showUpload) {
     pageTitle.textContent = '自助影印上傳';
     pageSubtitle.textContent = '請填寫資料並設定列印選項';
   } else {
-    tabUpload.classList.remove('active');
-    tabHistory.classList.add('active');
-    uploadPanel.classList.add('hidden');
-    historyPanel.classList.remove('hidden');
     pageTitle.textContent = '歷史訂單查詢';
     pageSubtitle.textContent = '輸入姓名/學號即可查看您的列印紀錄';
 
@@ -76,6 +78,25 @@ function updateTabDOM(tab) {
       fetchHistory(true);
     }
   }
+}
+
+function bindTabs() {
+  const tabs = [...document.querySelectorAll('[role="tab"][data-tab]')];
+  tabs.forEach((tab, index) => {
+    tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+    tab.addEventListener('keydown', (event) => {
+      let nextIndex = null;
+      if (event.key === 'ArrowRight') nextIndex = (index + 1) % tabs.length;
+      if (event.key === 'ArrowLeft') nextIndex = (index - 1 + tabs.length) % tabs.length;
+      if (event.key === 'Home') nextIndex = 0;
+      if (event.key === 'End') nextIndex = tabs.length - 1;
+      if (nextIndex === null) return;
+      event.preventDefault();
+      const nextTab = tabs[nextIndex];
+      switchTab(nextTab.dataset.tab);
+      nextTab.focus();
+    });
+  });
 }
 
 // ── 主題切換(MD3 Expressive 輻射揭示)──────────────────────────
@@ -223,10 +244,15 @@ window.previewPastOrder = (orderId, fileName, fitMode) => {
 };
 
 // ── 初始化 ────────────────────────────────────────────────────
+let initialized = false;
+
 export function initApp() {
+  if (initialized) return;
+  initialized = true;
   bindUploadEvents();
   bindPdfNavButtons();
   bindHistoryEvents();
+  bindTabs();
   bindThemeToggle();
   registerServiceWorker();
   updateOnlineStatus();
@@ -243,3 +269,5 @@ export function initApp() {
     updatePriceSummary();
   }
 }
+
+initApp();

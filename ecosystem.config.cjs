@@ -1,0 +1,30 @@
+module.exports = {
+  apps: [{
+    name: 'print-system',
+    script: 'venv/bin/uvicorn',
+    args: [
+      'main:app',
+      '--host', '127.0.0.1',
+      '--port', '8000',
+      '--workers', '1',
+      '--limit-concurrency', '32',
+      '--backlog', '64',
+      '--timeout-keep-alive', '5',
+    ].join(' '),
+    cwd: __dirname,
+    interpreter: 'none',
+    instances: 1,
+    exec_mode: 'fork',
+    autorestart: true,
+    max_memory_restart: '450M',
+    restart_delay: 2000,
+    kill_timeout: 10000,
+    listen_timeout: 10000,
+    merge_logs: true,
+    time: true,
+    env: {
+      PYTHONUNBUFFERED: '1',
+      PDF_PARSE_CONCURRENCY: '1',
+    },
+  }],
+};

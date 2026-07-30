@@ -6,7 +6,7 @@
  * 使用者可點按鈕載入下一頁。
  */
 
-import { showAlert } from './app.js';
+import { showAlert } from './dialog-api.js';
 import { previewPastOrder } from './preview.js';
 import { apiGet, ApiError } from './api.js';
 import { escHtml, escJsString, formatDate } from './utils.js';

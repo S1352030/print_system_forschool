@@ -1,6 +1,7 @@
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Index, text, event
 from sqlalchemy.orm import declarative_base, sessionmaker
 from datetime import datetime, timezone, timedelta
+from config import settings
 
 # 快取 TZ 物件，避免每次呼叫都重新建立
 _TZ_TAIPEI = timezone(timedelta(hours=8))
@@ -11,13 +12,13 @@ def get_taipei_now():
 
 # ── 連線設定 ──────────────────────────────────────────────
 # SQLite 資料庫檔案會建立在同一資料夾下的 db.sqlite3
-DATABASE_URL = "sqlite:///./db.sqlite3"
+DATABASE_URL = settings.DATABASE_URL
 
 engine = create_engine(
     DATABASE_URL,
     connect_args={"check_same_thread": False},  # SQLite 多執行緒需加此參數
-    pool_size=5,
-    max_overflow=10,
+    pool_size=3,
+    max_overflow=1,
     # 不設 pool_pre_ping:SQLite 為本地檔案,不像 PG/MySQL 會斷線,
     # 每次借出連線都先跑 SELECT 1 探活是純 overhead,在高頻請求下累積成無謂的 DB 往返。
 )
@@ -28,7 +29,7 @@ def _set_sqlite_pragma(dbapi_conn, connection_record):
     cursor = dbapi_conn.cursor()
     cursor.execute("PRAGMA journal_mode=WAL")        # WAL 模式：允許讀寫併發
     cursor.execute("PRAGMA synchronous=NORMAL")      # 平衡安全性與寫入速度
-    cursor.execute("PRAGMA cache_size=-8000")         # 8MB 頁面快取
+    cursor.execute("PRAGMA cache_size=-4000")         # 每連線約 4MB 頁面快取
     cursor.execute("PRAGMA journal_size_limit=16777216")  # WAL 日誌上限 16MB
     cursor.execute("PRAGMA busy_timeout=5000")        # 鎖定等待 5 秒
     cursor.close()

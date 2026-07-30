@@ -7,8 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
-  <link rel="stylesheet" href="/admin.css?v=20260723c">
-  <!-- PDF.js 改為延遲載入:僅在實際預覽 PDF 時才由 pdf-modal.js 動態注入。 -->
+  <link rel="stylesheet" href="/admin.css?v=20260730a">
+  <link rel="stylesheet" href="/static/pdf-preview.css?v=20260730a">
   <script src="/static/dialog.js"></script>
 </head>
 <body>
@@ -100,53 +100,76 @@
   </div>
 </div>
 
-<div class="modal-backdrop" id="pdf-modal" onclick="closeModal(event)">
+<dialog class="modal-backdrop" id="pdf-modal" aria-labelledby="modal-title">
   <div class="modal-box">
     <div class="modal-header">
       <div>
         <h3 id="modal-title">PDF 預覽</h3>
         <div class="modal-meta" id="modal-meta"></div>
       </div>
-      <div style="display: flex; gap: 8px; align-items: center;">
-        <button class="btn-download-pdf" id="btn-download-pdf" style="display: none;" onclick="downloadCurrentPdf()">📥 下載 PDF</button>
-        <button class="btn-close-modal" onclick="closePdfModal()">✕</button>
+      <div class="modal-header-actions">
+        <button type="button" class="btn-download-pdf" id="btn-download-pdf"
+                data-admin-pdf-download hidden>📥 下載 PDF</button>
+        <button type="button" class="btn-close-modal" data-admin-pdf-close
+                aria-label="關閉 PDF 預覽">✕</button>
       </div>
     </div>
     <div class="modal-settings" id="modal-settings"></div>
-    <div class="modal-paper-bar">
-      <span id="admin-pdf-paper" class="paper-badge">—</span>
-      <span class="modal-fit-toggle" title="切換預覽模式(僅供預覽,不影響訂單設定)">
-        <button type="button" id="admin-fit-btn">留白</button>
-        <button type="button" id="admin-cover-btn">裁切</button>
-      </span>
-    </div>
-    <div class="modal-pdf-wrap" style="position: relative; display: flex; flex-direction: column; align-items: center; overflow: hidden;">
-      <div style="flex: 1; overflow: auto; width: 100%; display: flex; justify-content: center; align-items: flex-start; padding: 10px;">
-        <div id="admin-pdf-a4-frame" class="pdf-a4-frame">
-          <canvas id="admin-pdf-canvas"></canvas>
-          <div class="pdf-doc-outline" id="admin-pdf-doc-outline">
-            <span class="pdf-doc-label" id="admin-pdf-doc-label"></span>
+    <div id="admin-pdf-preview" class="pdf-preview" data-pdf-preview>
+      <div class="modal-paper-bar pdf-preview__topline">
+        <span class="paper-badge" data-pdf-paper>—</span>
+        <span class="pdf-preview__status" data-pdf-status role="status" aria-live="polite"></span>
+        <span class="modal-fit-toggle" title="切換預覽模式，僅供預覽，不影響訂單設定">
+          <button type="button" id="admin-fit-btn" aria-pressed="false">留白</button>
+          <button type="button" id="admin-cover-btn" aria-pressed="false">裁切</button>
+        </span>
+      </div>
+      <progress class="pdf-preview__progress" data-pdf-progress aria-label="PDF 載入進度" hidden></progress>
+      <div class="pdf-preview__viewport" data-pdf-viewport tabindex="0"
+           aria-label="PDF 預覽區，可用左右方向鍵或滑動翻頁">
+        <div class="pdf-a4-frame" data-pdf-frame>
+          <canvas data-pdf-canvas aria-label="PDF 預覽"></canvas>
+          <div class="pdf-doc-outline" data-pdf-doc-outline aria-hidden="true">
+            <span class="pdf-doc-label" data-pdf-doc-label></span>
           </div>
-          <div class="pdf-a4-label" id="admin-pdf-a4-label">A4 · 210×297mm</div>
+          <div class="pdf-a4-label" data-pdf-a4-label aria-hidden="true">A4 · 210×297mm</div>
         </div>
       </div>
-      <div style="display: flex; gap: 15px; align-items: center; padding: 8px 16px; background: rgba(0,0,0,0.6); color: white; border-radius: 20px; position: absolute; bottom: 10px; z-index: 10;">
-        <button type="button" id="admin-pdf-prev" style="background: none; border: none; color: white; cursor: pointer; font-size: 16px;">◀</button>
-        <span style="font-size: 14px;"><span id="admin-pdf-num">1</span> / <span id="admin-pdf-count">1</span></span>
-        <button type="button" id="admin-pdf-next" style="background: none; border: none; color: white; cursor: pointer; font-size: 16px;">▶</button>
-        <span style="width: 1px; height: 18px; background: rgba(255,255,255,0.3);"></span>
-        <span class="md3-tooltip-wrap">
-          <button type="button" id="admin-pdf-annotate-toggle" style="background: none; border: 1px solid rgba(255,255,255,0.3); color: white; cursor: pointer; padding: 4px 10px; font-size: 12px; border-radius: 12px;">📐 邊界</button>
-          <span class="md3-tooltip" role="tooltip">紅框＝原文件邊界<br>灰色區＝A4 上的留白</span>
-        </span>
+      <div class="pdf-preview__controls" aria-label="PDF 預覽控制">
+        <button type="button" class="pdf-preview__icon-button" data-pdf-prev aria-label="上一頁">◀</button>
+        <label class="pdf-preview__page-field">
+          <span class="visually-hidden">目前頁碼</span>
+          <input data-pdf-page type="number" min="1" value="1" inputmode="numeric">
+          <span aria-hidden="true">/</span>
+          <span data-pdf-count aria-label="總頁數">1</span>
+        </label>
+        <button type="button" class="pdf-preview__icon-button" data-pdf-next aria-label="下一頁">▶</button>
+        <label class="pdf-preview__select">
+          <span class="visually-hidden">縮放比例</span>
+          <select data-pdf-zoom aria-label="縮放比例">
+            <option value="fit">符合畫面</option>
+            <option value="1.25">125%</option>
+            <option value="1.5">150%</option>
+            <option value="2">200%</option>
+          </select>
+        </label>
+        <button type="button" class="pdf-preview__text-button" data-pdf-boundary
+                aria-label="顯示列印邊界" aria-pressed="false">邊界</button>
+      </div>
+      <div class="pdf-preview__error" data-pdf-error role="alert" hidden>
+        <span data-pdf-error-message></span>
+        <div class="pdf-preview__error-actions">
+          <button type="button" class="pdf-preview__text-button" data-pdf-retry>重新載入</button>
+          <a class="pdf-preview__text-button" data-pdf-download hidden>下載原始 PDF</a>
+        </div>
       </div>
     </div>
   </div>
-</div>
+</dialog>
 
 <div id="toast-container"></div>
 
-<script type="module" src="/static/js/admin/app.js?v=20260723c"></script>
+<script type="module" src="/static/js/admin/app.js?v=20260730a"></script>
 
 </body>
 </html>
