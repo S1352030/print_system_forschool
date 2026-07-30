@@ -39,13 +39,38 @@ echo "[5/7] 增量預壓縮靜態資源"
 python precompress.py
 
 echo "[6/7] 以單一程序重新載入服務"
-pm2 reload ecosystem.config.cjs --only print-system --update-env
+EXPECTED_EXEC="$(readlink -f "$PROJECT_DIR/venv/bin/python")"
+CURRENT_EXEC="$(
+  pm2 jlist | python -c '
+import json
+import sys
+
+processes = json.load(sys.stdin)
+print(next((
+    item.get("pm2_env", {}).get("pm_exec_path", "")
+    for item in processes
+    if item.get("name") == "print-system"
+), ""))
+'
+)"
+
+if [ -n "$CURRENT_EXEC" ] && [ "$CURRENT_EXEC" != "$EXPECTED_EXEC" ]; then
+  echo "偵測到舊版 PM2 啟動方式，執行一次性安全遷移"
+  pm2 delete print-system
+fi
+
+if pm2 describe print-system >/dev/null 2>&1; then
+  pm2 reload ecosystem.config.cjs --only print-system --update-env
+else
+  pm2 start ecosystem.config.cjs --only print-system --update-env
+fi
 
 echo "[7/7] 輪詢新版本健康狀態"
 for attempt in $(seq 1 20); do
   HEALTH_JSON="$(curl --silent --show-error --fail http://127.0.0.1:8000/health 2>/dev/null || true)"
   HEALTH_BUILD="$(printf '%s' "$HEALTH_JSON" | python -c "import json,sys; print(json.load(sys.stdin).get('build_id',''))" 2>/dev/null || true)"
   if [ "$HEALTH_BUILD" = "$APP_BUILD_ID" ]; then
+    pm2 save --force >/dev/null
     echo "部署完成：$APP_BUILD_ID"
     exit 0
   fi

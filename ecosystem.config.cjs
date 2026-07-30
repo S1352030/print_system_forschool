@@ -1,8 +1,9 @@
 module.exports = {
   apps: [{
     name: 'print-system',
-    script: 'venv/bin/uvicorn',
+    script: 'venv/bin/python',
     args: [
+      '-m', 'uvicorn',
       'main:app',
       '--host', '127.0.0.1',
       '--port', '8000',
@@ -25,6 +26,7 @@ module.exports = {
     env: {
       PYTHONUNBUFFERED: '1',
       PDF_PARSE_CONCURRENCY: '1',
+      APP_BUILD_ID: process.env.APP_BUILD_ID || '',
     },
   }],
 };
