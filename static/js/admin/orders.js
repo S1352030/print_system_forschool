@@ -5,6 +5,7 @@
 
 import { apiGet, apiPut, apiDelete, ApiError } from '../api.js';
 import { escHtml, formatDate } from '../utils.js';
+import { showConfirm } from '../dialog-api.js';
 
 const API_BASE = '';
 const PAGE_SIZE = 50;
@@ -141,22 +142,24 @@ export function renderTable(data) {
         <td data-label="金額" class="price">NT$ ${(order.total_price || 0).toLocaleString()}</td>
         <td data-label="已付款">
           <label class="toggle" id="toggle-paid-${order.id}">
-            <input type="checkbox" title="已付款" ${order.is_paid ? 'checked' : ''} onchange="updateOrder(${order.id}, 'is_paid', this.checked, this)" />
+            <input type="checkbox" title="已付款" ${order.is_paid ? 'checked' : ''}
+                   data-order-id="${order.id}" data-order-field="is_paid" />
             <span class="toggle-track"></span>
             <span class="toggle-thumb"></span>
           </label>
         </td>
         <td data-label="已列印">
           <label class="toggle" id="toggle-printed-${order.id}">
-            <input type="checkbox" title="已列印" ${order.is_printed ? 'checked' : ''} onchange="updateOrder(${order.id}, 'is_printed', this.checked, this)" />
+            <input type="checkbox" title="已列印" ${order.is_printed ? 'checked' : ''}
+                   data-order-id="${order.id}" data-order-field="is_printed" />
             <span class="toggle-track"></span>
             <span class="toggle-thumb"></span>
           </label>
         </td>
         <td data-label="操作">
           <div class="d-flex gap-2">
-            <button class="btn-view-pdf" onclick="openPdfModal(${order.id})">📄 查看</button>
-            <button class="btn-delete" onclick="deleteOrder(${order.id})">🗑️ 刪除</button>
+            <button type="button" class="btn-view-pdf" data-order-action="preview" data-order-id="${order.id}">📄 查看</button>
+            <button type="button" class="btn-delete" data-order-action="delete" data-order-id="${order.id}">🗑️ 刪除</button>
           </div>
         </td>
       </tr>

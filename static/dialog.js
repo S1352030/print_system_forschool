@@ -1,6 +1,5 @@
-(function () {
-  const dialogQueue = [];
-  let isDialogShowing = false;
+const dialogQueue = [];
+let isDialogShowing = false;
 
   const ICONS = {
     info: `<svg class="m3-dialog-icon-svg m3-dialog-type-info" viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>`,
@@ -153,7 +152,7 @@
     return message.replace(/^[⚠️❌✅]\s*/, '');
   }
 
-  window.showAlert = function (message, type = null, title = '') {
+  export function showAlert(message, type = null, title = '') {
     const detectedType = type || detectTypeFromMessage(message, 'info');
     const cleanMessage = stripEmojis(message);
     let defaultTitle = '';
@@ -168,9 +167,9 @@
       isConfirm: false,
       type: detectedType
     });
-  };
+  }
 
-  window.showConfirm = function (message, type = null, title = '確認操作') {
+  export function showConfirm(message, type = null, title = '確認操作') {
     const detectedType = type || detectTypeFromMessage(message, 'question');
     const cleanMessage = stripEmojis(message);
     return showM3Dialog({
@@ -179,5 +178,4 @@
       isConfirm: true,
       type: detectedType
     });
-  };
-})();
+  }

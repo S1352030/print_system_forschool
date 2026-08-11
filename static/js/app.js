@@ -1,34 +1,19 @@
 /**
  * 主應用模組(使用者端 index.html 用)
  * 負責:
- * 1. 對話框轉發(把全域 showAlert/showConfirm 暴露給其他 ES module 使用)
- * 2. Tab 切換(檔案上傳 / 歷史訂單)
- * 3. 主題切換(深/淺模式 + View Transitions)
- * 4. 公告載入(localStorage 快取 + SWR)
- * 5. Service Worker 註冊
- * 6. 離線偵測
- * 7. 把需要 inline onclick 的函式掛到 window
+ * 1. Tab 切換(檔案上傳 / 歷史訂單)
+ * 2. 主題切換(深/淺模式 + View Transitions)
+ * 3. 公告載入(localStorage 快取 + SWR)
+ * 4. Service Worker 註冊
+ * 5. 離線偵測
  */
 
-import { bindUploadEvents, checkFormValidity, updatePriceSummary,
-         updateFileSetting, updateFileOtherText, removeFile,
-         changeActiveFile, previewFile, updateFitMode } from './upload.js';
-import { bindPdfNavButtons, previewPastOrder } from './preview.js';
-import { bindHistoryEvents, fetchHistory, invalidateHistoryCache } from './history.js';
+import { bindUploadEvents, checkFormValidity, updatePriceSummary } from './upload.js';
+import { bindPdfNavButtons } from './preview.js';
+import { bindHistoryEvents, fetchHistory } from './history.js';
 import { apiGet, ApiError } from './api.js';
 import { escHtml } from './utils.js';
-import { showAlert, showConfirm } from './dialog-api.js';
-
-// ── 對話框轉發 ────────────────────────────────────────────────
-// dialog.js 把 showAlert / showConfirm 掛在 window 上(非模組)。
-// 這裡把它們重新匯出,讓其他 ES module 可 import 使用。
-export { showAlert, showConfirm };
-
-// 給 upload.js 在上傳成功後呼叫,觸發歷史訂單更新
-export { invalidateHistoryCache };
-export function refreshHistory() {
-  fetchHistory(false);
-}
+import { registerServiceWorker } from './service-worker-registration.js';
 
 // ── Tab 切換(MD3 Fade Through)──────────────────────────────
 function switchTab(tab) {
@@ -185,32 +170,6 @@ function renderAnnouncements(items, container, card) {
   }
 }
 
-// ── Service Worker 註冊 ──────────────────────────────────────
-// 新版 SW（如 v8→v9）下載完成後，sw.js 的 skipWaiting() 會立即接管；
-// 這裡監聽 controllerchange，在新 SW 接管的「那一刻」自動重載頁面，
-// 讓既有訪客不必手動按 Ctrl+Shift+R 或清快取，就能吃到新版 JS。
-function registerServiceWorker() {
-  if ('serviceWorker' in navigator) {
-    // 防止新 SW 觸發多個 client 控制權變更時，導致無限 Reload 迴圈
-    let refreshing = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (refreshing) return;
-      refreshing = true;
-      console.log('[SW] Controller changed, reloading page for update...');
-      window.location.reload();
-    });
-
-    // 註冊 SW 並維持原有的錯誤處理
-    navigator.serviceWorker.register('/sw.js')
-      .then((registration) => {
-        console.log('[SW] Registered correctly:', registration.scope);
-      })
-      .catch((error) => {
-        console.error('[SW] Registration failed:', error);
-      });
-  }
-}
-
 // ── 離線狀態偵測 ──────────────────────────────────────────────
 function updateOnlineStatus() {
   const banner = document.getElementById('offline-banner');
@@ -224,25 +183,6 @@ function updateOnlineStatus() {
 window.addEventListener('online', updateOnlineStatus);
 window.addEventListener('offline', updateOnlineStatus);
 
-// ── 把 inline onclick 用到的函式掛到 window ───────────────────
-// 這些函式在 HTML 中以 onclick="updateFileSetting(...)" 形式呼叫,
-// ES module 預設是閉包,必須外掛到 window 才能被 inline 呼叫。
-window.updateFileSetting = updateFileSetting;
-window.updateFileOtherText = updateFileOtherText;
-window.updateFitMode = updateFitMode;
-window.removeFile = removeFile;
-window.changeActiveFile = changeActiveFile;
-window.previewFile = previewFile;
-window.previewPastOrder = (orderId, fileName, fitMode) => {
-  const searchName = (document.getElementById('history_search_name')?.value || '').trim()
-    || sessionStorage.getItem('print_user_name');
-  if (!searchName) {
-    showAlert('請先輸入您的姓名或學號!', 'warning');
-    return;
-  }
-  previewPastOrder(orderId, fileName, searchName, fitMode);
-};
-
 // ── 初始化 ────────────────────────────────────────────────────
 let initialized = false;
 
@@ -254,7 +194,7 @@ export function initApp() {
   bindHistoryEvents();
   bindTabs();
   bindThemeToggle();
-  registerServiceWorker();
+  void registerServiceWorker();
   updateOnlineStatus();
   loadActiveAnnouncements();
 
@@ -270,4 +210,8 @@ export function initApp() {
   }
 }
 
-initApp();
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp, { once: true });
+} else {
+  initApp();
+}

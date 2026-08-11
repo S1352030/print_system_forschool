@@ -4,6 +4,7 @@
 
 import { apiGet, apiPost, apiPut, apiDelete, ApiError } from '../api.js';
 import { escHtml, formatDate } from '../utils.js';
+import { showConfirm } from '../dialog-api.js';
 
 const API_BASE = '';
 let announcements = [];
@@ -33,13 +34,14 @@ export function renderAnnouncements(data) {
       <td class="mono">${formatDate(ann.created_at)}</td>
       <td>
         <label class="toggle">
-          <input type="checkbox" title="顯示" ${ann.is_active ? 'checked' : ''} onchange="updateAnnouncementStatus(${ann.id}, this.checked, this)" />
+          <input type="checkbox" title="顯示" ${ann.is_active ? 'checked' : ''}
+                 data-announcement-id="${ann.id}" data-announcement-status />
           <span class="toggle-track"></span>
           <span class="toggle-thumb"></span>
         </label>
       </td>
       <td>
-        <button class="btn-delete" onclick="deleteAnnouncement(${ann.id})">🗑️ 刪除</button>
+        <button type="button" class="btn-delete" data-announcement-action="delete" data-announcement-id="${ann.id}">🗑️ 刪除</button>
       </td>
     </tr>
   `).join('');

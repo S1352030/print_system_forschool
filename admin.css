@@ -55,7 +55,7 @@
   --info: #3498db;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: var(--primary); color: var(--text); font-family: 'Noto Sans TC', sans-serif; min-height: 100vh; }
+body { background: var(--primary); color: var(--text); font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang TC', 'Microsoft JhengHei', sans-serif; min-height: 100vh; }
 
 /* Header */
 .site-header {
@@ -86,7 +86,7 @@ body { background: var(--primary); color: var(--text); font-family: 'Noto Sans T
 .stat-card.unprinted::before { background: var(--warning); }
 .stat-card.total::before { background: var(--success); }
 .stat-label { font-size: .78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: .35rem; }
-.stat-value { font-family: 'JetBrains Mono', monospace; font-size: 1.7rem; font-weight: 600; }
+.stat-value { font-family: ui-monospace, 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 1.7rem; font-weight: 600; }
 .stat-card.unpaid .stat-value { color: #ff6b6b; }
 .stat-card.unprinted .stat-value { color: var(--warning); }
 .stat-card.total .stat-value { color: var(--success); }
@@ -106,8 +106,8 @@ tbody tr { border-bottom: 1px solid var(--border); transition: background var(--
 tbody tr:last-child { border-bottom: none; }
 tbody tr:hover { background: rgba(255,255,255,.03); }
 td { padding: .7rem 1rem; font-size: .88rem; vertical-align: middle; }
-td.mono { font-family: 'JetBrains Mono', monospace; font-size: .82rem; color: var(--muted); }
-td.price { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: var(--text); }
+td.mono { font-family: ui-monospace, 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: .82rem; color: var(--muted); }
+td.price { font-family: ui-monospace, 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-weight: 600; color: var(--text); }
 
 /* Print setting badges */
 .setting-badges { display: flex; gap: 5px; flex-wrap: wrap; }

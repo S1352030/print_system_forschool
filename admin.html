@@ -4,12 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>影印計價後台管理系統</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+  <script data-theme-bootstrap>(()=>{const e=sessionStorage.getItem('theme'),t=window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.classList.toggle('dark',e==='dark'||(!e&&t));const s=['theme-blue','theme-green','theme-purple','theme-teal','theme-rose','theme-orange'];let a=sessionStorage.getItem('selected-palette');s.includes(a)||(a=s[Math.floor(Math.random()*s.length)],sessionStorage.setItem('selected-palette',a));document.documentElement.classList.add(a)})();</script>
   <link rel="stylesheet" href="/admin.css?v=20260730a">
   <link rel="stylesheet" href="/static/pdf-preview.css?v=20260730a">
-  <script src="/static/dialog.js"></script>
 </head>
 <body>
 
@@ -19,7 +16,7 @@
     <h1>影印計價後台管理</h1>
     <small>Print Order Management System</small>
   </div>
-  <button class="btn-refresh" onclick="loadOrders()">↻ 重新整理</button>
+  <button id="btn-refresh-orders" class="btn-refresh">↻ 重新整理</button>
 </header>
 
 <div class="stats-row">
@@ -50,7 +47,7 @@
           <label class="stat-label" for="announce-input">發佈新公告</label>
           <textarea id="announce-input" class="form-control" rows="4" placeholder="請輸入公告內容..."></textarea>
         </div>
-        <button id="btn-publish-announce" class="btn-view-pdf" onclick="publishAnnouncement()">
+        <button id="btn-publish-announce" class="btn-view-pdf">
           📢 發布公告
         </button>
       </div>

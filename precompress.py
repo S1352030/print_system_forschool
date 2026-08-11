@@ -17,7 +17,10 @@ _GLOB_PATTERNS = [
     "sw.js",
     "static/**/*.css",
     "static/**/*.js",
+    "static/builds/**/*.html",
+    "static/builds/**/*.mjs",
     "static/pdfjs/**/*.mjs",
+    "static/pdfjs/**/*.wasm",
 ]
 
 BROTLI_QUALITY = 11

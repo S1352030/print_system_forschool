@@ -18,4 +18,8 @@ AI_CHANGELOG.md
 # Zstd 日誌輪替目錄
 logs/
 # 部署備份目錄
-backups/
+backups/
+# Node/Vite build dependencies and immutable release artifacts
+node_modules/
+static/builds/
+.deploy.lock

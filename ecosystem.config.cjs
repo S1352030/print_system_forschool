@@ -27,6 +27,7 @@ module.exports = {
       PYTHONUNBUFFERED: '1',
       PDF_PARSE_CONCURRENCY: '1',
       APP_BUILD_ID: process.env.APP_BUILD_ID || '',
+      BACKEND_BUILD_ID: process.env.BACKEND_BUILD_ID || process.env.APP_BUILD_ID || '',
     },
   }],
 };

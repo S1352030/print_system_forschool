@@ -13,10 +13,24 @@
     print(settings.ADMIN_USERNAME)
 """
 
+import re
 from functools import lru_cache
 from typing import List
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+_APP_BUILD_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+
+
+def normalize_app_build_id(value: str) -> str:
+    """正規化並驗證可安全用於 ``static/builds/<id>`` 的建置識別碼。"""
+    normalized = value.strip()
+    if normalized and not _APP_BUILD_ID_PATTERN.fullmatch(normalized):
+        raise ValueError(
+            "APP_BUILD_ID 僅可包含英數字、底線與連字號，且長度不可超過 64 字元"
+        )
+    return normalized
 
 
 class Settings(BaseSettings):
@@ -80,7 +94,8 @@ class Settings(BaseSettings):
 
     # ── 應用程式元資料 ────────────────────────────────────────────
     APP_VERSION: str = Field(default="2.0.0", description="應用程式版本號")
-    APP_BUILD_ID: str = Field(default="", description="部署建置識別碼")
+    APP_BUILD_ID: str = Field(default="", description="目前啟用的前端建置識別碼")
+    BACKEND_BUILD_ID: str = Field(default="", description="實際執行中的後端 Git 建置識別碼")
 
     # ────────────────────────────────────────────────────────────
     #  衍生屬性(透過 property 計算,不直接來自環境變數)
@@ -102,6 +117,11 @@ class Settings(BaseSettings):
     @classmethod
     def _normalize_log_level(cls, v: str) -> str:
         return v.upper()
+
+    @field_validator("APP_BUILD_ID", "BACKEND_BUILD_ID", mode="after")
+    @classmethod
+    def _normalize_app_build_id(cls, value: str) -> str:
+        return normalize_app_build_id(value)
 
     @model_validator(mode="after")
     def _validate_storage_thresholds(self):

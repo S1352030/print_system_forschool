@@ -97,7 +97,7 @@ const server = http.createServer(async (request, response) => {
     sendPdf(request, response);
     return;
   }
-  if (url.pathname === '/api/orders') {
+  if (url.pathname === '/api/orders' || url.pathname === '/api/orders/history') {
     sendJson(response, {
       items: [{
         id: 1,
@@ -159,19 +159,69 @@ await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 const { port } = server.address();
 const origin = `http://127.0.0.1:${port}`;
 
-async function exercise(browserType, device) {
+function resolveExecutablePath(browserType) {
   const bundledExecutable = browserType.executablePath();
   const systemChromium = process.platform === 'win32'
     ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
     : null;
-  const executablePath = existsSync(bundledExecutable)
+  return existsSync(bundledExecutable)
     ? bundledExecutable
     : browserType.name() === 'chromium' && systemChromium && existsSync(systemChromium)
       ? systemChromium
-      : undefined;
+      : null;
+}
+
+async function verifyFirstInstallDoesNotReload() {
+  const executablePath = resolveExecutablePath(chromium);
+  assert.ok(executablePath, 'Chromium executable is required for the Service Worker smoke test');
+  const browser = await chromium.launch({
+    headless: true,
+    executablePath,
+  });
+  const context = await browser.newContext({
+    ...devices['Pixel 7'],
+    serviceWorkers: 'allow',
+  });
+  const page = await context.newPage();
+  const documentRequests = [];
+  const googleFontRequests = [];
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    if (request.resourceType() === 'document' && url.origin === origin) {
+      documentRequests.push(request.url());
+    }
+    if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
+      googleFontRequests.push(request.url());
+    }
+  });
+
+  try {
+    await page.goto(origin, { waitUntil: 'domcontentloaded' });
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
+    await page.waitForTimeout(500);
+    assert.equal(documentRequests.length, 1, 'first Service Worker install must not reload the page');
+    assert.equal(
+      await page.evaluate(() => performance.getEntriesByType('navigation').length),
+      1,
+      'first install must create only one navigation entry',
+    );
+    assert.deepEqual(googleFontRequests, [], 'Google Fonts must not be requested');
+  } finally {
+    await context.close();
+    await browser.close();
+  }
+}
+
+async function exercise(browserType, device) {
+  const executablePath = resolveExecutablePath(browserType);
+  if (!executablePath) {
+    console.warn(`${browserType.name()} smoke test skipped: browser executable is unavailable.`);
+    return false;
+  }
   const browser = await browserType.launch({
     headless: true,
-    ...(executablePath ? { executablePath } : {}),
+    executablePath,
   });
   const context = await browser.newContext({
     ...device,
@@ -193,6 +243,14 @@ async function exercise(browserType, device) {
 
   await page.goto(origin, { waitUntil: 'domcontentloaded' });
   assert.equal(engineRequests, 0, 'PDF engine must remain lazy before file selection');
+
+  await page.evaluate(() => {
+    sessionStorage.setItem('print_user_name', '測試者');
+    document.querySelector('#history_search_name').value = '測試者';
+  });
+  await page.locator('#tab-history').click();
+  await page.locator('#history-list .history-item').waitFor({ state: 'visible' });
+  await page.locator('#tab-upload').click();
 
   await page.locator('#pdf_file').setInputFiles({
     name: 'mobile-preview.pdf',
@@ -246,8 +304,8 @@ async function exercise(browserType, device) {
     buffer: fixturePdf,
   });
   await page.evaluate(() => {
-    window.previewFile(0);
-    window.previewFile(1);
+    document.querySelector('#file-pager-prev')?.click();
+    document.querySelector('#file-pager-next')?.click();
   });
   await page.waitForFunction(() =>
     document.querySelector('[data-pdf-canvas]')?.getAttribute('aria-label')
@@ -280,12 +338,16 @@ async function exercise(browserType, device) {
   assert.deepEqual(pageErrors, []);
   await context.close();
   await browser.close();
+  return true;
 }
 
 try {
+  await verifyFirstInstallDoesNotReload();
   await exercise(chromium, devices['Pixel 7']);
-  await exercise(webkit, devices['iPhone 14']);
-  console.log('Chromium and WebKit mobile PDF preview smoke tests passed.');
+  const ranWebKit = await exercise(webkit, devices['iPhone 14']);
+  console.log(
+    `Service Worker cold start and Chromium mobile smoke tests passed; WebKit ${ranWebKit ? 'passed' : 'was skipped'}.`,
+  );
 } finally {
   await new Promise((resolve) => server.close(resolve));
 }

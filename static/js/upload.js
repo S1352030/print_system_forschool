@@ -41,6 +41,46 @@ const btnText = document.getElementById('btn-text');
 const btnSpinner = document.getElementById('btn-spinner');
 const dropArea = document.getElementById('drop-area');
 
+function fileIndexFrom(element) {
+  const index = Number.parseInt(element?.dataset.fileIndex ?? '', 10);
+  return Number.isInteger(index) ? index : null;
+}
+
+function handleFileListClick(event) {
+  const control = event.target.closest?.('[data-file-action]');
+  if (!control) return;
+  const index = fileIndexFrom(control);
+  if (index === null) return;
+  if (control.dataset.fileAction === 'preview') previewFile(index);
+  if (control.dataset.fileAction === 'remove') removeFile(index);
+}
+
+function handleFileListKeydown(event) {
+  if (!['Enter', ' '].includes(event.key)) return;
+  const control = event.target.closest?.('[data-file-action="preview"]');
+  if (!control) return;
+  event.preventDefault();
+  const index = fileIndexFrom(control);
+  if (index !== null) previewFile(index);
+}
+
+function handleFileListChange(event) {
+  const input = event.target.closest?.('[data-file-setting]');
+  if (!input) return;
+  const index = fileIndexFrom(input);
+  if (index === null) return;
+  const key = input.dataset.fileSetting;
+  if (key === 'fitMode') updateFitMode(index, input.value);
+  else updateFileSetting(index, key, input.value);
+}
+
+function handleFileListInput(event) {
+  const input = event.target.closest?.('[data-file-other-text]');
+  if (!input) return;
+  const index = fileIndexFrom(input);
+  if (index !== null) updateFileOtherText(index, input.value);
+}
+
 // ── 拖曳上傳事件綁定 ──────────────────────────────────────────
 export function bindUploadEvents() {
   if (dropArea) {
@@ -85,6 +125,15 @@ export function bindUploadEvents() {
   if (uploadForm) uploadForm.addEventListener('submit', handleSubmit);
   if (userNameInput) userNameInput.addEventListener('input', checkFormValidity);
   if (pickupLocationInput) pickupLocationInput.addEventListener('input', checkFormValidity);
+
+  document.getElementById('file-pager-prev')?.addEventListener('click', () => changeActiveFile(-1));
+  document.getElementById('file-pager-next')?.addEventListener('click', () => changeActiveFile(1));
+
+  const filesList = document.getElementById('selected-files-list');
+  filesList?.addEventListener('click', handleFileListClick);
+  filesList?.addEventListener('keydown', handleFileListKeydown);
+  filesList?.addEventListener('change', handleFileListChange);
+  filesList?.addEventListener('input', handleFileListInput);
 }
 
 // ── 檔名重複後綴檢查與清除 ────────────────────────────────────
@@ -224,7 +273,7 @@ export async function addFiles(files) {
   }
 }
 
-// ── 檔案設定變更(供 onclick 呼叫)──────────────────────────────
+// ── 檔案設定變更 ──────────────────────────────────────────────
 export function updateFileSetting(idx, key, value) {
   if (isCooldown) return;
   if (selectedFiles[idx]) {
@@ -339,22 +388,22 @@ function renderFileList() {
           <span class="setting-label">裝訂位置</span>
           <div class="chip-group">
             <label>
-              <input type="radio" name="binding_${idx}" value="top_left" ${fileObj.binding === 'top_left' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'binding', 'top_left')">
+              <input type="radio" name="binding_${idx}" value="top_left" ${fileObj.binding === 'top_left' ? 'checked' : ''} data-file-index="${idx}" data-file-setting="binding">
               <span class="material-symbols-outlined chip-icon"><svg><use href="#i-north_west"/></svg></span>
               <span>左上角</span>
             </label>
             <label>
-              <input type="radio" name="binding_${idx}" value="top_right" ${fileObj.binding === 'top_right' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'binding', 'top_right')">
+              <input type="radio" name="binding_${idx}" value="top_right" ${fileObj.binding === 'top_right' ? 'checked' : ''} data-file-index="${idx}" data-file-setting="binding">
               <span class="material-symbols-outlined chip-icon"><svg><use href="#i-north_east"/></svg></span>
               <span>右上角</span>
             </label>
             <label>
-              <input type="radio" name="binding_${idx}" value="other" ${fileObj.binding === 'other' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'binding', 'other')">
+              <input type="radio" name="binding_${idx}" value="other" ${fileObj.binding === 'other' ? 'checked' : ''} data-file-index="${idx}" data-file-setting="binding">
               <span class="material-symbols-outlined chip-icon"><svg><use href="#i-edit"/></svg></span>
               <span>其他</span>
             </label>
           </div>
-          <input type="text" id="binding_other_text_${idx}" class="binding-other-input binding-other-text-input ${fileObj.binding === 'other' ? '' : 'hidden'}" placeholder="請說明裝訂方式… (限 10 字)" maxlength="10" value="${escHtml(fileObj.bindingOtherText || '')}" oninput="updateFileOtherText(${idx}, this.value)">
+          <input type="text" id="binding_other_text_${idx}" class="binding-other-input binding-other-text-input ${fileObj.binding === 'other' ? '' : 'hidden'}" placeholder="請說明裝訂方式… (限 10 字)" maxlength="10" value="${escHtml(fileObj.bindingOtherText || '')}" data-file-index="${idx}" data-file-other-text>
         </div>
   ` : '';
 
@@ -363,12 +412,12 @@ function renderFileList() {
               <span class="setting-label">列印方式</span>
               <div class="chip-group">
                 <label>
-                  <input type="radio" name="duplex_${idx}" value="single" ${fileObj.duplex === 'single' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'duplex', 'single')">
+                  <input type="radio" name="duplex_${idx}" value="single" ${fileObj.duplex === 'single' ? 'checked' : ''} data-file-index="${idx}" data-file-setting="duplex">
                   <span class="material-symbols-outlined chip-icon"><svg><use href="#i-article"/></svg></span>
                   <span>單面</span>
                 </label>
                 <label>
-                  <input type="radio" name="duplex_${idx}" value="double" ${fileObj.duplex === 'double' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'duplex', 'double')">
+                  <input type="radio" name="duplex_${idx}" value="double" ${fileObj.duplex === 'double' ? 'checked' : ''} data-file-index="${idx}" data-file-setting="duplex">
                   <span class="material-symbols-outlined chip-icon"><svg><use href="#i-menu_book"/></svg></span>
                   <span>雙面</span>
                 </label>
@@ -382,12 +431,12 @@ function renderFileList() {
               <span class="setting-label">文件處理</span>
               <div class="chip-group">
                 <label>
-                  <input type="radio" name="fit_mode_${idx}" value="fit" ${fileObj.fitMode === 'fit' ? 'checked' : ''} onchange="updateFitMode(${idx}, 'fit')">
+                  <input type="radio" name="fit_mode_${idx}" value="fit" ${fileObj.fitMode === 'fit' ? 'checked' : ''} data-file-index="${idx}" data-file-setting="fitMode">
                   <span class="material-symbols-outlined chip-icon"><svg><use href="#i-fit_page"/></svg></span>
                   <span>留白</span>
                 </label>
                 <label>
-                  <input type="radio" name="fit_mode_${idx}" value="cover" ${fileObj.fitMode === 'cover' ? 'checked' : ''} onchange="updateFitMode(${idx}, 'cover')">
+                  <input type="radio" name="fit_mode_${idx}" value="cover" ${fileObj.fitMode === 'cover' ? 'checked' : ''} data-file-index="${idx}" data-file-setting="fitMode">
                   <span class="material-symbols-outlined chip-icon"><svg><use href="#i-crop"/></svg></span>
                   <span>裁切</span>
                 </label>
@@ -398,11 +447,11 @@ function renderFileList() {
   filesList.innerHTML = `
     <div class="file-item-card">
       <div class="file-item-header">
-        <div class="file-item-title-wrapper" onclick="previewFile(${idx})">
+        <div class="file-item-title-wrapper" role="button" tabindex="0" data-file-action="preview" data-file-index="${idx}">
           <span class="material-symbols-outlined file-item-icon"><svg><use href="#i-description"/></svg></span>
           <span class="file-item-name" title="${escHtml(file.name)}">${escHtml(file.name)} (${(file.size / 1024).toFixed(0)} KB) ${pagesText}</span>
         </div>
-        <button type="button" onclick="removeFile(${idx})" class="file-item-remove-btn"
+        <button type="button" data-file-action="remove" data-file-index="${idx}" class="file-item-remove-btn"
                 aria-label="移除 ${escHtml(file.name)}">
           <span class="material-symbols-outlined remove-icon"><svg><use href="#i-close"/></svg></span>
         </button>
@@ -413,12 +462,12 @@ function renderFileList() {
             <span class="setting-label">色彩模式</span>
             <div class="chip-group">
               <label>
-                <input type="radio" name="color_mode_${idx}" value="bw" ${fileObj.colorMode === 'bw' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'colorMode', 'bw')">
+                <input type="radio" name="color_mode_${idx}" value="bw" ${fileObj.colorMode === 'bw' ? 'checked' : ''} data-file-index="${idx}" data-file-setting="colorMode">
                 <span class="material-symbols-outlined chip-icon"><svg><use href="#i-invert_colors"/></svg></span>
                 <span>黑白</span>
               </label>
               <label>
-                <input type="radio" name="color_mode_${idx}" value="color" ${fileObj.colorMode === 'color' ? 'checked' : ''} onchange="updateFileSetting(${idx}, 'colorMode', 'color')">
+                <input type="radio" name="color_mode_${idx}" value="color" ${fileObj.colorMode === 'color' ? 'checked' : ''} data-file-index="${idx}" data-file-setting="colorMode">
                 <span class="material-symbols-outlined chip-icon"><svg><use href="#i-palette"/></svg></span>
                 <span>彩色</span>
               </label>

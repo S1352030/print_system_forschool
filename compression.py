@@ -18,6 +18,7 @@ import os
 import gzip
 import io
 import hashlib
+import stat as stat_module
 from starlette.types import ASGIApp, Receive, Scope, Send, Message
 from starlette.datastructures import MutableHeaders
 from starlette.requests import Request
@@ -50,36 +51,128 @@ _COMPRESSIBLE_PREFIXES = (
 # ── 靜態檔案元資料快取（啟動時載入，避免每次請求都呼叫 os.stat）───
 _static_file_cache: dict[str, dict] = {}
 
+
+def _parse_accept_encoding(header_value: str | None) -> dict[str, float]:
+    """解析 Accept-Encoding，重複 token 採最高合法 q 值。"""
+    if header_value is None:
+        # RFC 9110 §12.5.3：欄位不存在代表任何 content-coding 都可接受。
+        return {"*": 1.0}
+    qualities: dict[str, float] = {}
+    for member in header_value.split(","):
+        parts = [part.strip() for part in member.split(";")]
+        token = parts[0].lower()
+        if not token:
+            continue
+        quality = 1.0
+        for parameter in parts[1:]:
+            name, separator, value = parameter.partition("=")
+            if separator and name.strip().lower() == "q":
+                try:
+                    parsed = float(value.strip())
+                    quality = parsed if 0.0 <= parsed <= 1.0 else 0.0
+                except ValueError:
+                    quality = 0.0
+                break
+        qualities[token] = max(qualities.get(token, 0.0), quality)
+    return qualities
+
+
+def _encoding_quality(qualities: dict[str, float], encoding: str) -> float:
+    """明確 content-coding 優先於 wildcard。"""
+    if encoding in qualities:
+        return qualities[encoding]
+    return qualities.get("*", 0.0)
+
+
+def _identity_is_acceptable(qualities: dict[str, float]) -> bool:
+    """Identity 預設可接受；identity;q=0 或未覆寫的 *;q=0 才禁止。"""
+    if "identity" in qualities:
+        return qualities["identity"] > 0
+    if "*" in qualities:
+        return qualities["*"] > 0
+    return True
+
+
+def _select_content_encoding(
+    header_value: str | None,
+    *,
+    allow_br: bool,
+    allow_gzip: bool,
+) -> str | None:
+    """回傳 br/gzip/identity；沒有可接受 representation 時回傳 None。"""
+    qualities = _parse_accept_encoding(header_value)
+    candidates: list[tuple[float, int, str]] = []
+    if allow_br:
+        candidates.append((_encoding_quality(qualities, "br"), 1, "br"))
+    if allow_gzip:
+        candidates.append((_encoding_quality(qualities, "gzip"), 0, "gzip"))
+    if "identity" in qualities:
+        candidates.append((qualities["identity"], -1, "identity"))
+    acceptable = [candidate for candidate in candidates if candidate[0] > 0]
+    selected = max(acceptable, default=None)
+    if selected:
+        return selected[2]
+    return "identity" if _identity_is_acceptable(qualities) else None
+
+
+def _etag_from_stat(stat_result: os.stat_result, representation: str) -> str:
+    """依實際傳送的 representation 產生 strong ETag。"""
+    etag_raw = (
+        f"{representation}-{stat_result.st_mtime_ns}-{stat_result.st_size}"
+    ).encode()
+    return f'"{hashlib.md5(etag_raw).hexdigest()}"'
+
+
+def _if_none_match_matches(header_value: str | None, etag: str) -> bool:
+    """GET/HEAD 的 If-None-Match 使用 weak comparison，並支援標籤清單。"""
+    if not header_value:
+        return False
+    for candidate in header_value.split(","):
+        normalized = candidate.strip()
+        if normalized == "*":
+            return True
+        if normalized.startswith("W/"):
+            normalized = normalized[2:].strip()
+        if normalized == etag:
+            return True
+    return False
+
+
 def _get_file_meta(file_path: str) -> dict:
     """取得檔案元資料，快取以避免重複 os.stat 呼叫。"""
     cached = _static_file_cache.get(file_path)
     if cached:
         try:
             current_stat = os.stat(file_path)
-            # 若檔案修改時間未變，直接回傳快取
-            if current_stat.st_mtime == cached["mtime"]:
+            # 來源的奈秒 mtime 與大小都未變時才重用快取。
+            if (
+                current_stat.st_mtime_ns == cached["stat"].st_mtime_ns
+                and current_stat.st_size == cached["stat"].st_size
+            ):
                 return cached
         except OSError:
             pass
     # 重新讀取
     stat = os.stat(file_path)
-    etag_raw = f"{stat.st_mtime}-{stat.st_size}".encode()
-    etag = f'"{hashlib.md5(etag_raw).hexdigest()}"'
-    br_path = file_path + ".br"
-    gz_path = file_path + ".gz"
-    br_exists = os.path.exists(br_path)
-    gz_exists = os.path.exists(gz_path)
-    meta = {
-        "stat": stat,
-        "mtime": stat.st_mtime,
-        "etag": etag,
-        "br_exists": br_exists,
-        "br_mtime": os.path.getmtime(br_path) if br_exists else 0,
-        "gz_exists": gz_exists,
-        "gz_mtime": os.path.getmtime(gz_path) if gz_exists else 0,
-    }
+    meta = {"stat": stat}
     _static_file_cache[file_path] = meta
     return meta
+
+
+def _usable_sidecar_stat(
+    sidecar_path: str,
+    source_stat: os.stat_result,
+) -> os.stat_result | None:
+    """即時確認 sidecar 仍存在、是一般檔案且不早於來源。"""
+    try:
+        sidecar_stat = os.stat(sidecar_path)
+    except OSError:
+        return None
+    if not stat_module.S_ISREG(sidecar_stat.st_mode):
+        return None
+    if sidecar_stat.st_mtime_ns < source_stat.st_mtime_ns:
+        return None
+    return sidecar_stat
 
 
 def serve_precompressed(
@@ -105,13 +198,42 @@ def serve_precompressed(
     extra_headers : dict, optional
         額外的回應標頭（例如 Service-Worker-Allowed）
     """
-    # ── ETag 條件式快取（基於原始檔案，使用快取避免重複 stat）───
+    # ── 先完成內容協商，再依實際 representation 產生 ETag ─────────
     meta = _get_file_meta(file_path)
-    etag = meta["etag"]
+    accept_encoding = request.headers.get("accept-encoding")
+    selected_path = file_path
+    selected_stat = meta["stat"]
+    content_encoding: str | None = None
+    br_stat = (
+        _usable_sidecar_stat(file_path + ".br", meta["stat"])
+        if HAS_BROTLI
+        else None
+    )
+    gzip_stat = _usable_sidecar_stat(file_path + ".gz", meta["stat"])
+    negotiated_encoding = _select_content_encoding(
+        accept_encoding,
+        allow_br=br_stat is not None,
+        allow_gzip=gzip_stat is not None,
+    )
+    if negotiated_encoding is None:
+        not_acceptable_headers = {
+            "Cache-Control": "no-store",
+            "Vary": "Accept-Encoding",
+        }
+        if extra_headers:
+            not_acceptable_headers.update(extra_headers)
+        return Response(status_code=406, headers=not_acceptable_headers)
 
-    if_none_match = request.headers.get("if-none-match")
-    if if_none_match and if_none_match == etag:
-        return Response(status_code=304, headers={"ETag": etag})
+    if negotiated_encoding == "br":
+        selected_path = file_path + ".br"
+        selected_stat = br_stat
+        content_encoding = "br"
+    elif negotiated_encoding == "gzip":
+        selected_path = file_path + ".gz"
+        selected_stat = gzip_stat
+        content_encoding = "gzip"
+
+    etag = _etag_from_stat(selected_stat, content_encoding or "identity")
 
     # ── 組裝回應標頭 ─────────────────────────────────────────
     headers: dict[str, str] = {
@@ -121,25 +243,18 @@ def serve_precompressed(
     }
     if extra_headers:
         headers.update(extra_headers)
+    if content_encoding:
+        headers["Content-Encoding"] = content_encoding
 
-    accept_encoding = request.headers.get("accept-encoding", "")
+    if _if_none_match_matches(request.headers.get("if-none-match"), etag):
+        return Response(status_code=304, headers=headers)
 
-    # ── 優先嘗試 Brotli (.br) ────────────────────────────────
-    if HAS_BROTLI and "br" in accept_encoding:
-        br_path = file_path + ".br"
-        if meta["br_exists"] and meta["br_mtime"] >= meta["mtime"]:
-            headers["Content-Encoding"] = "br"
-            return FileResponse(br_path, media_type=media_type, headers=headers)
-
-    # ── 次選 Gzip (.gz) ─────────────────────────────────────
-    if "gzip" in accept_encoding:
-        gz_path = file_path + ".gz"
-        if meta["gz_exists"] and meta["gz_mtime"] >= meta["mtime"]:
-            headers["Content-Encoding"] = "gzip"
-            return FileResponse(gz_path, media_type=media_type, headers=headers)
-
-    # ── 降級：回傳原始未壓縮檔案 ─────────────────────────────
-    return FileResponse(file_path, media_type=media_type, headers=headers)
+    return FileResponse(
+        selected_path,
+        media_type=media_type,
+        headers=headers,
+        stat_result=selected_stat,
+    )
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -185,14 +300,29 @@ class BrotliGzipMiddleware:
             return
 
         # 從 ASGI scope 解析 Accept-Encoding
-        accept_encoding = ""
+        accept_encoding: str | None = None
         for header_name, header_value in scope.get("headers", []):
             if header_name == b"accept-encoding":
                 accept_encoding = header_value.decode("latin-1")
                 break
 
-        use_br = HAS_BROTLI and ("br" in accept_encoding)
-        use_gzip = "gzip" in accept_encoding
+        negotiated_encoding = _select_content_encoding(
+            accept_encoding,
+            allow_br=HAS_BROTLI,
+            allow_gzip=True,
+        )
+        if negotiated_encoding is None:
+            response = Response(
+                status_code=406,
+                headers={
+                    "Cache-Control": "no-store",
+                    "Vary": "Accept-Encoding",
+                },
+            )
+            await response(scope, receive, send)
+            return
+        use_br = negotiated_encoding == "br"
+        use_gzip = negotiated_encoding == "gzip"
 
         if not use_br and not use_gzip:
             # 客戶端不支援任何壓縮，直接 pass-through

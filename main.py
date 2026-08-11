@@ -27,7 +27,7 @@ from compressed_static import PrecompressedStaticFiles
 # Zstandard 日誌系統
 from log_manager import setup_logging
 # 集中式設定(取代散落的 os.getenv)
-from config import settings
+from config import normalize_app_build_id, settings
 # Pydantic 請求模型
 from schemas import AnnouncementCreate, AnnouncementUpdate, OrderStatusUpdate
 
@@ -213,6 +213,69 @@ ensure_order_columns()
 import time as _time
 _APP_START_TIME = _time.monotonic()
 
+# ── 不可變前端建置入口 ──────────────────────────────────────────
+STATIC_ROOT = Path("static")
+_FRONTEND_ENTRY_NAMES = frozenset({"index.html", "admin.html"})
+
+
+def _active_frontend_build_id(build_id: str | None = None) -> str | None:
+    """回傳正規化後的前端 build id；空值代表開發模式原始檔 fallback。"""
+    configured = settings.APP_BUILD_ID if build_id is None else build_id
+    return normalize_app_build_id(configured) or None
+
+
+def _active_backend_build_id() -> str:
+    """回傳實際後端 release；正常部署時應與 frontend build 相同。"""
+    return (
+        normalize_app_build_id(settings.BACKEND_BUILD_ID)
+        or _active_frontend_build_id()
+        or settings.APP_VERSION
+    )
+
+
+def _frontend_entry_path(
+    entry_name: str,
+    *,
+    build_id: str | None = None,
+    static_root: Path | None = None,
+) -> Path:
+    """解析首頁/後台入口；正式建置永遠限制在 ``static/builds/<id>``。"""
+    if entry_name not in _FRONTEND_ENTRY_NAMES:
+        raise ValueError(f"不支援的前端入口檔：{entry_name}")
+
+    active_build_id = _active_frontend_build_id(build_id)
+    if active_build_id is None:
+        return Path(entry_name)
+
+    root = STATIC_ROOT if static_root is None else Path(static_root)
+    return root / "builds" / active_build_id / entry_name
+
+
+def _validate_frontend_build(
+    *,
+    build_id: str | None = None,
+    static_root: Path | None = None,
+) -> str | None:
+    """正式啟動前確認同一 build 的兩個 HTML 入口均已完整產生。"""
+    active_build_id = _active_frontend_build_id(build_id)
+    if active_build_id is None:
+        return None
+
+    missing: list[str] = []
+    for name in sorted(_FRONTEND_ENTRY_NAMES):
+        entry_path = _frontend_entry_path(
+            name,
+            build_id=active_build_id,
+            static_root=static_root,
+        )
+        if not entry_path.is_file():
+            missing.append(str(entry_path))
+    if missing:
+        raise RuntimeError(
+            "APP_BUILD_ID 已設定但前端建置產物不完整：" + ", ".join(missing)
+        )
+    return active_build_id
+
 # ── 舊訂單清理(啟動執行一次 + APScheduler 定期執行)──────────────
 def _cleanup_old_orders_once() -> int:
     """
@@ -353,6 +416,12 @@ async def lifespan(app: FastAPI):
     """
     global _scheduler
 
+    active_frontend_build = _validate_frontend_build()
+    if active_frontend_build is None:
+        log.info("APP_BUILD_ID 未設定，使用開發模式前端原始檔")
+    else:
+        log.info("前端建置驗證通過：%s", active_frontend_build)
+
     # 啟動:首次清理(放執行緒池避免阻塞 lifespan)
     log.info("應用程式啟動,執行首次舊訂單清理...")
     await asyncio.to_thread(_cleanup_old_orders_once)
@@ -413,6 +482,12 @@ class SecurityAndCacheMiddleware:
             return
 
         path = scope.get("path", "")
+        method = scope.get("method", "")
+        query_string = scope.get("query_string", b"")
+        request_has_authorization = any(
+            name == b"authorization" and bool(value)
+            for name, value in scope.get("headers", [])
+        )
 
         async def send_wrapper(message):
             if message["type"] == "http.response.start":
@@ -425,7 +500,7 @@ class SecurityAndCacheMiddleware:
                 
                 # 2. Content-Security-Policy (強化防護，攔截外部腳本注入如卡巴斯基)
                 content_type = headers.get("content-type", "")
-                csp = "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdnjs.cloudflare.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://cdnjs.cloudflare.com https://fonts.googleapis.com blob:; worker-src 'self' blob:; frame-src 'self' blob: data:; object-src 'self' blob: data:"
+                csp = "default-src 'self'; script-src 'self' 'sha256-Q+2UG9QqKHi6mrJXxzBhVuSuWvhvxQ9AEtwosCCqZms=' 'wasm-unsafe-eval' https://cdnjs.cloudflare.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; connect-src 'self' https://cdnjs.cloudflare.com blob:; worker-src 'self' blob:; frame-src 'self' blob: data:; object-src 'self' blob: data:"
                 if "application/pdf" not in content_type.lower():
                     csp += "; frame-ancestors 'self'"
                 headers["Content-Security-Policy"] = csp
@@ -438,59 +513,68 @@ class SecurityAndCacheMiddleware:
                     if h_lower in headers:
                         del headers[h_lower]
                         
-                # 4. 快取原則處理
-                cache_control = headers.get("Cache-Control", "")
-                
-                # 清除不推薦的快取指令(must-revalidate 與上游框架誤加的過時指令)
-                # 注意:保留 no-store — 健康檢查、動態敏感回應需要它
-                if cache_control and "must-revalidate" in cache_control.lower():
-                    directives = [d.strip() for d in cache_control.split(",") if d.strip()]
-                    cleaned = [d for d in directives if "must-revalidate" not in d.lower()]
-                    cache_control = ", ".join(cleaned)
-                        
-                if path.startswith("/static/pdfjs/5.7.284/"):
+                # 4. 快取契約：瀏覽器與 Cloudflare 分層控制，錯誤/敏感回應永不儲存。
+                response_status = int(message.get("status", 0))
+                for cache_header in (
+                    "CDN-Cache-Control",
+                    "Cloudflare-CDN-Cache-Control",
+                    "Cache-Tag",
+                ):
+                    if cache_header in headers:
+                        del headers[cache_header]
+
+                if response_status >= 400 or request_has_authorization:
+                    cache_control = "no-store"
+                    cloudflare_cache_control = "no-store"
+                elif (
+                    method in {"GET", "HEAD"}
+                    and not query_string
+                    and (
+                        path.startswith("/static/builds/")
+                        or path.startswith("/static/pdfjs/5.7.284/")
+                    )
+                ):
                     cache_control = "public, max-age=31536000, immutable"
-                elif path.startswith("/static/pdfjs/"):
+                    cloudflare_cache_control = cache_control
+                elif path == "/" and method in {"GET", "HEAD"} and not query_string:
                     cache_control = "public, no-cache"
+                    cloudflare_cache_control = (
+                        "public, max-age=3600, stale-while-revalidate=60, "
+                        "stale-if-error=86400"
+                    )
+                    headers["Cache-Tag"] = "print-app"
+                elif (
+                    path == "/api/announcements"
+                    and method in {"GET", "HEAD"}
+                    and not query_string
+                ):
+                    cache_control = "public, max-age=300"
+                    cloudflare_cache_control = "public, max-age=300"
+                    headers["Cache-Tag"] = "print-announcements"
+                elif path == "/":
+                    # 帶 query 或非唯讀方法的首頁不進公開快取，避免無界 cache key。
+                    cache_control = "no-store"
+                    cloudflare_cache_control = "no-store"
+                elif path == "/sw.js":
+                    cache_control = "no-cache"
+                    cloudflare_cache_control = "no-store"
+                elif (
+                    path == "/health"
+                    or path.startswith("/admin")
+                    or path.startswith("/api/")
+                ):
+                    cache_control = "no-store"
+                    cloudflare_cache_control = "no-store"
                 elif path.startswith("/static/"):
-                    # /static/ 底下同時包含 PDF.js 函式庫與前端 ES module（app.js、upload.js 等）。
-                    # 前端模組由 app.js 以相對路徑靜態 import，import 的 URL 沒有版本號，
-                    # 若設 immutable（1 年快取），部署新版後瀏覽器/CDN 會持續派發舊版模組，
-                    # 導致「新版 app.js 配舊版 upload.js」的 ES module 版本錯位（import 失敗 → 全站無反應）。
-                    # 改用 no-cache + ETag：檔案沒變回 304（零成本），檔案變了就拿新版，
-                    # 從根本消除無版本號模組被永久快取的問題。與 compression.py 的設計意圖一致。
+                    # 未版本化資源只供開發 fallback；正式環境應使用 /static/builds/<id>/。
                     cache_control = "public, no-cache"
-                elif path.startswith("/api/") or path.startswith("/admin"):
-                    if not cache_control:
-                        cache_control = "private, no-cache"
-                    else:
-                        has_low_max_age = False
-                        for directive in cache_control.split(","):
-                            d = directive.strip().lower()
-                            if d.startswith("max-age="):
-                                try:
-                                    age = int(d.split("=")[1])
-                                    if age <= 180:
-                                        has_low_max_age = True
-                                except ValueError:
-                                    pass
-                        if has_low_max_age:
-                            directives = [
-                                d.strip() for d in cache_control.split(",") 
-                                if not d.strip().lower().startswith("max-age=")
-                            ]
-                            if "no-cache" not in [d.lower() for d in directives]:
-                                directives.append("no-cache")
-                            cache_control = ", ".join(directives)
+                    cloudflare_cache_control = "no-store"
                 else:
-                    if not cache_control:
-                        cache_control = "no-cache"
-                        
+                    cache_control = headers.get("Cache-Control", "") or "no-cache"
+                    cloudflare_cache_control = "no-store"
+
                 headers["Cache-Control"] = cache_control
-                if path == "/":
-                    headers["CDN-Cache-Control"] = "public, max-age=300"
-                elif path.startswith("/api/") or path.startswith("/admin"):
-                    headers["CDN-Cache-Control"] = "no-store"
+                headers["Cloudflare-CDN-Cache-Control"] = cloudflare_cache_control
                 
                 # 5. 強制 charset=utf-8 (文字、JSON、JS、CSS 等)
                 content_type = headers.get("content-type", "")
@@ -684,15 +768,22 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 @app.api_route("/", methods=["GET", "HEAD"])
 async def serve_frontend(request: Request):
     """提供使用者上傳頁面（優先派發 .br → .gz → 原始檔）"""
-    response = serve_precompressed("index.html", request, media_type="text/html; charset=utf-8")
-    response.headers["Cache-Control"] = "public, no-cache"
-    response.headers["CDN-Cache-Control"] = "public, max-age=300"
-    return response
+    entry_path = _frontend_entry_path("index.html")
+    return serve_precompressed(
+        str(entry_path),
+        request,
+        media_type="text/html; charset=utf-8",
+    )
 
 @app.get("/admin")
 async def serve_admin(request: Request, username: str = Depends(authenticate_admin)):
     """提供後台管理頁面（優先派發 .br → .gz → 原始檔）"""
-    return serve_precompressed("admin.html", request, media_type="text/html; charset=utf-8")
+    entry_path = _frontend_entry_path("admin.html")
+    return serve_precompressed(
+        str(entry_path),
+        request,
+        media_type="text/html; charset=utf-8",
+    )
 
 @app.get("/style.css")
 async def serve_style(request: Request):
@@ -1081,7 +1172,7 @@ async def get_user_orders(
         headers={"Cache-Control": "private, no-cache"},
     )
 
-@app.get("/api/announcements")
+@app.api_route("/api/announcements", methods=["GET", "HEAD"])
 async def get_active_announcements(
     db: Session = Depends(get_db),
     _rl: None = Depends(rate_limit("api")),
@@ -1321,7 +1412,8 @@ async def health_check(db: Session = Depends(get_db)):
             "db": db_ok,
             "uptime_seconds": uptime_seconds,
             "version": settings.APP_VERSION,
-            "build_id": settings.APP_BUILD_ID or settings.APP_VERSION,
+            "build_id": _active_backend_build_id(),
+            "frontend_build_id": _active_frontend_build_id(),
         },
         headers={"Cache-Control": "no-store"},
     )

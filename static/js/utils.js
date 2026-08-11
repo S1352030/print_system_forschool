@@ -1,6 +1,6 @@
 /**
  * 通用工具函式模組
- * 提供 HTML/JS 跳脫、日期格式化等跨模組共用功能。
+ * 提供 HTML 跳脫、日期格式化等跨模組共用功能。
  */
 
 /**
@@ -14,17 +14,6 @@ export function escHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
-}
-
-/**
- * 跳脫 JavaScript 字串字面值內的特殊字元。
- * 用於將變數安全嵌入 onclick="..." 等 inline handler 的字串參數。
- */
-export function escJsString(str) {
-  return String(str ?? '')
-    .replace(/\\/g, '\\\\')
-    .replace(/'/g, "\\'")
-    .replace(/"/g, '\\"');
 }
 
 /**

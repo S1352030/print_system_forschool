@@ -9,7 +9,7 @@
 import { showAlert } from './dialog-api.js';
 import { previewPastOrder } from './preview.js';
 import { apiGet, ApiError } from './api.js';
-import { escHtml, escJsString, formatDate } from './utils.js';
+import { escHtml, formatDate } from './utils.js';
 
 const CACHE_TTL_MS = 30000; // 30 秒內不重複發送背景請求
 const PAGE_SIZE = 50;
@@ -222,7 +222,10 @@ function renderHistoryList(orders) {
             <span class="history-item-id">訂單編號 #${order.id}</span>
             <span class="history-item-date">${formatDate(order.created_at)}</span>
           </div>
-          <div class="history-item-filename" onclick="previewPastOrder(${order.id}, '${escJsString(order.file_name)}', '${order.fit_mode || 'fit'}')" title="點擊預覽此檔案">
+          <div class="history-item-filename" role="button" tabindex="0"
+               data-history-action="preview" data-order-id="${order.id}"
+               data-file-name="${escHtml(order.file_name)}" data-fit-mode="${escHtml(order.fit_mode || 'fit')}"
+               title="點擊預覽此檔案">
             <span class="material-symbols-outlined"><svg><use href="#i-picture_as_pdf"/></svg></span>
             <span>${escHtml(order.file_name)}</span>
           </div>
@@ -243,6 +246,24 @@ function renderHistoryList(orders) {
     .join('');
 }
 
+async function previewHistoryTarget(target) {
+  const searchName = (document.getElementById('history_search_name')?.value || '').trim()
+    || sessionStorage.getItem('print_user_name');
+  if (!searchName) {
+    await showAlert('請先輸入您的姓名或學號!', 'warning');
+    return;
+  }
+
+  const orderId = Number.parseInt(target.dataset.orderId || '', 10);
+  if (!Number.isInteger(orderId)) return;
+  await previewPastOrder(
+    orderId,
+    target.dataset.fileName || '',
+    searchName,
+    target.dataset.fitMode || 'fit',
+  );
+}
+
 /**
  * 綁定歷史訂單搜尋按鈕事件。
  */
@@ -258,4 +279,17 @@ export function bindHistoryEvents() {
       }
     });
   }
+
+  const list = document.getElementById('history-list');
+  list?.addEventListener('click', (event) => {
+    const target = event.target.closest?.('[data-history-action="preview"]');
+    if (target) void previewHistoryTarget(target);
+  });
+  list?.addEventListener('keydown', (event) => {
+    if (!['Enter', ' '].includes(event.key)) return;
+    const target = event.target.closest?.('[data-history-action="preview"]');
+    if (!target) return;
+    event.preventDefault();
+    void previewHistoryTarget(target);
+  });
 }
