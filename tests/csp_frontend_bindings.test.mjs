@@ -89,6 +89,8 @@ test('Service Worker 對 build 與 PDF.js cache-first，導覽 network-first 且
 
 test('部署失敗會回復可驗證的前一 Git 版本，purge 重試保留原模式', async () => {
   const source = await read('deploy.sh');
+  assert.match(source, /VENV_PYTHON="\$PROJECT_DIR\/venv\/bin\/python"/);
+  assert.match(source, /export PATH="\$PROJECT_DIR\/venv\/bin:\$PATH"/);
   assert.match(source, /PREVIOUS_GIT_REVISION="\$\(git rev-parse HEAD\)"/);
   assert.match(source, /PULL_ATTEMPTED=true\s+git pull --ff-only origin main/);
   assert.match(source, /git reset --keep "\$PREVIOUS_GIT_REVISION"/);

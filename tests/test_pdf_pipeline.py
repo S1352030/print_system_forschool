@@ -23,6 +23,7 @@ os.environ["ADMIN_USERNAME"] = "test-admin"
 os.environ["ADMIN_PASSWORD"] = "test-password"
 os.environ["TRUSTED_PROXIES"] = ""
 os.environ["APP_BUILD_ID"] = ""
+os.environ["BACKEND_BUILD_ID"] = ""
 
 from fastapi.testclient import TestClient  # noqa: E402
 

@@ -10,6 +10,13 @@ LOCK_FILE="${DEPLOY_LOCK_FILE:-$PROJECT_DIR/.deploy.lock}"
 cd "$PROJECT_DIR"
 mkdir -p "$BACKUP_DIR" "$BUILD_ROOT"
 
+VENV_PYTHON="$PROJECT_DIR/venv/bin/python"
+if [ ! -x "$VENV_PYTHON" ]; then
+  echo "缺少部署必要的虛擬環境 Python：$VENV_PYTHON" >&2
+  exit 1
+fi
+export PATH="$PROJECT_DIR/venv/bin:$PATH"
+
 exec 9>"$LOCK_FILE"
 if ! flock -n 9; then
   echo "已有另一個部署正在執行：$LOCK_FILE" >&2
