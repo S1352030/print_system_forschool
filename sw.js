@@ -10,17 +10,18 @@ self.addEventListener('install', (event) => {
   event.waitUntil(Promise.all([
     caches.open(APP_CACHE),
     caches.open(PDF_ENGINE_CACHE),
-  ]));
-  self.skipWaiting();
+  ]).catch(() => {}).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
+  event.waitUntil(Promise.all([
+    // 快取不可用時仍讓 Worker 啟用，網路請求可以繼續工作。
     caches.keys().then((keys) =>
       Promise.all(keys.filter((key) => !ACTIVE_CACHES.has(key)).map((key) => caches.delete(key))),
-    ),
-  );
-  self.clients.claim();
+    ).catch(() => {}),
+    // 導覽下載與 Worker 啟動並行；不支援或啟用失敗時使用一般 fetch。
+    Promise.resolve().then(() => self.registration.navigationPreload?.enable()).catch(() => {}),
+  ]).then(() => self.clients.claim()));
 });
 
 self.addEventListener('fetch', (event) => {
@@ -33,6 +34,9 @@ self.addEventListener('fetch', (event) => {
   // API、後台、Blob、本地檔案與使用者 PDF 永不進入 Service Worker 快取。
   if (
     url.origin !== self.location.origin ||
+    request.headers.has('authorization') ||
+    url.pathname === '/health' ||
+    url.pathname === '/sw.js' ||
     url.pathname.startsWith('/api/') ||
     url.pathname.startsWith('/admin') ||
     url.pathname.toLowerCase().endsWith('.pdf')
@@ -47,61 +51,89 @@ self.addEventListener('fetch', (event) => {
   if (url.search && (isVersionedPdfEngine || isVersionedAppAsset)) return;
 
   if (isVersionedPdfEngine) {
-    event.respondWith(cacheFirst(request, PDF_ENGINE_CACHE, MAX_PDF_ENGINE_ENTRIES));
+    respondWithBackground(event, (tasks) => cacheFirst(event, tasks, PDF_ENGINE_CACHE, MAX_PDF_ENGINE_ENTRIES));
     return;
   }
 
   // Vite 等建置工具產生的雜湊資源內容不可變，優先由快取供應。
   if (isVersionedAppAsset) {
-    event.respondWith(cacheFirst(request, APP_CACHE, MAX_APP_ENTRIES));
+    respondWithBackground(event, (tasks) => cacheFirst(event, tasks, APP_CACHE, MAX_APP_ENTRIES));
     return;
   }
 
   // 首頁與導覽請求先取網路，離線時才回退至最近快取的頁面。
   if (request.mode === 'navigate' || url.pathname === '/') {
-    event.respondWith(networkFirst(request));
+    respondWithBackground(event, (tasks) => networkFirst(event, tasks));
     return;
   }
 
   // 尚未進入建置目錄的來源 CSS/JS 維持 network-first，確保開發時不吃舊檔。
-  event.respondWith(networkFirst(request));
+  respondWithBackground(event, (tasks) => networkFirst(event, tasks));
 });
 
-async function networkFirst(request) {
+function respondWithBackground(event, handler) {
+  const tasks = [];
+  const response = handler(tasks);
+  event.respondWith(response);
+  // 同步登記生命週期；回應交給瀏覽器後，仍保證快取工作有時間完成。
+  event.waitUntil(response.then(() => Promise.all(tasks)).catch(() => {}));
+}
+
+async function fetchResponse(event) {
+  if (event.request.mode === 'navigate') {
+    try {
+      const preloaded = await event.preloadResponse;
+      if (preloaded) return preloaded;
+    } catch { /* 預載失敗仍嘗試一般網路請求。 */ }
+  }
+  return fetch(event.request);
+}
+
+function cacheInBackground(request, response, tasks, cacheName, maxEntries) {
+  if (!isCacheable(response)) return;
+  // 在瀏覽器開始消費 body 前複製；儲存失敗不得改變成功的網路回應。
+  const copy = response.clone();
+  tasks.push((async () => {
+    const cache = await caches.open(cacheName);
+    await cache.put(request, copy);
+    await trimCache(cache, maxEntries);
+  })().catch(() => {}));
+}
+
+function offlineResponse() {
+  return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
+}
+
+async function networkFirst(event, tasks) {
+  const { request } = event;
   try {
-    const response = await fetch(request);
-    if (isCacheable(response)) {
-      const cache = await caches.open(APP_CACHE);
-      await cache.put(request, response.clone());
-      await trimCache(cache, MAX_APP_ENTRIES);
-    }
+    const response = await fetchResponse(event);
+    cacheInBackground(request, response, tasks, APP_CACHE, MAX_APP_ENTRIES);
     return response;
   } catch {
-    const cached = await caches.match(request);
-    return cached || new Response('Offline', {
-      status: 503,
-      statusText: 'Service Unavailable',
-    });
+    try {
+      const cache = await caches.open(APP_CACHE);
+      const cached = await cache.match(request);
+      if (cached) return cached;
+    } catch { /* 離線且無法讀取快取。 */ }
+    return offlineResponse();
   }
 }
 
-async function cacheFirst(request, cacheName, maxEntries = null) {
-  const cache = await caches.open(cacheName);
-  const cached = await cache.match(request);
-  if (cached) return cached;
+async function cacheFirst(event, tasks, cacheName, maxEntries) {
+  const { request } = event;
+  try {
+    const cache = await caches.open(cacheName);
+    const cached = await cache.match(request);
+    if (cached) return cached;
+  } catch { /* 快取讀取失敗時直接使用網路。 */ }
 
   try {
-    const response = await fetch(request);
-    if (isCacheable(response)) {
-      await cache.put(request, response.clone());
-      if (Number.isInteger(maxEntries)) await trimCache(cache, maxEntries);
-    }
+    const response = await fetchResponse(event);
+    cacheInBackground(request, response, tasks, cacheName, maxEntries);
     return response;
   } catch {
-    return new Response('Offline', {
-      status: 503,
-      statusText: 'Service Unavailable',
-    });
+    return offlineResponse();
   }
 }
 

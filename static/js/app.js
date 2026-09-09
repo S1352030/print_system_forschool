@@ -14,22 +14,24 @@ import { bindHistoryEvents, fetchHistory } from './history.js';
 import { apiGet, ApiError } from './api.js';
 import { escHtml } from './utils.js';
 import { registerServiceWorker } from './service-worker-registration.js';
+import { createViewTransitionRunner } from './motion.js';
+
+const runViewTransition = createViewTransitionRunner(
+  document,
+  () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+);
+let requestedTab = null;
 
 // ── Tab 切換(MD3 Fade Through)──────────────────────────────
 function switchTab(tab) {
   const currentTab = document.querySelector('.md3-tab.active');
   if (!currentTab) return;
-  const currentTabId = currentTab.id;
-  if ((tab === 'upload' && currentTabId === 'tab-upload') ||
-      (tab === 'history' && currentTabId === 'tab-history')) return;
-
-  const apply = () => updateTabDOM(tab);
-
-  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (!document.startViewTransition || reducedMotion) { apply(); return; }
-  document.documentElement.classList.add('tab-transition');   // 限定 Fade Through 動畫
-  const transition = document.startViewTransition(apply);
-  transition.finished.finally(() => document.documentElement.classList.remove('tab-transition'));
+  if (tab === (requestedTab ?? currentTab.dataset.tab)) return;
+  requestedTab = tab;
+  void runViewTransition(() => updateTabDOM(tab), 'tab-transition').catch((error) => {
+    requestedTab = null;
+    console.error('無法切換分頁:', error);
+  });
 }
 
 function updateTabDOM(tab) {
@@ -88,6 +90,9 @@ function bindTabs() {
 function bindThemeToggle() {
   const btn = document.getElementById('theme-toggle');
   if (!btn) return;
+  const updateLabel = () => btn.setAttribute('aria-label',
+    document.documentElement.classList.contains('dark') ? '切換為淺色模式' : '切換為深色模式');
+  updateLabel();
   btn.addEventListener('click', (event) => {
     // 輻射原點:游標座標;event.detail === 0 為鍵盤 Enter/Space 合成 click,退回按鈕中心
     let x = event.clientX, y = event.clientY;
@@ -102,20 +107,18 @@ function bindThemeToggle() {
       Math.max(y, window.innerHeight - y)
     );
     const root = document.documentElement;
-    root.style.setProperty('--theme-transition-x', `${x}px`);
-    root.style.setProperty('--theme-transition-y', `${y}px`);
-    root.style.setProperty('--theme-transition-r', `${endRadius}px`);
-
     const apply = () => {
+      root.style.setProperty('--theme-transition-x', `${x}px`);
+      root.style.setProperty('--theme-transition-y', `${y}px`);
+      root.style.setProperty('--theme-transition-r', `${endRadius}px`);
       const isDark = root.classList.toggle('dark');
-      sessionStorage.setItem('theme', isDark ? 'dark' : 'light');
+      updateLabel();
+      try { sessionStorage.setItem('theme', isDark ? 'dark' : 'light'); }
+      catch { /* Theme switching also works when storage is unavailable. */ }
     };
-
-    if (!document.startViewTransition) { apply(); return; }
-
-    root.classList.add('theme-transition');           // 限定輻射動畫 + 防破窗
-    const transition = document.startViewTransition(apply);
-    transition.finished.finally(() => root.classList.remove('theme-transition'));
+    void runViewTransition(apply, 'theme-transition').catch((error) => {
+      console.error('無法切換主題:', error);
+    });
   });
 }
 

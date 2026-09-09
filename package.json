@@ -9,7 +9,10 @@
   "scripts": {
     "build": "vite build",
     "test:frontend": "node --test tests/*.test.mjs",
+    "test:browser": "node tests/browser_service_worker_smoke.mjs && node tests/browser_preview_smoke.mjs",
     "verify-build": "node scripts/verify-build.mjs",
+    "measure:load": "node scripts/measure-load.mjs",
+    "verify:cdn": "node scripts/check-cdn.mjs",
     "purge:cloudflare": "node scripts/purge-cloudflare.mjs"
   },
   "devDependencies": {

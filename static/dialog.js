@@ -1,3 +1,5 @@
+import { waitForElementAnimations } from './js/motion.js';
+
 const dialogQueue = [];
 let isDialogShowing = false;
 
@@ -27,6 +29,8 @@ let isDialogShowing = false;
       dialog = document.createElement('dialog');
       dialog.id = 'm3-dialog';
       dialog.className = 'm3-dialog';
+      dialog.setAttribute('aria-labelledby', 'm3-dialog-title');
+      dialog.setAttribute('aria-describedby', 'm3-dialog-content');
       dialog.innerHTML = `
         <div class="m3-dialog-container">
           <div class="m3-dialog-icon" id="m3-dialog-icon"></div>
@@ -74,34 +78,30 @@ let isDialogShowing = false;
 
     // Handle Escape button or closing from outside
     let resolved = false;
-    const cleanUp = (value) => {
+    const cleanUp = async (value) => {
       if (resolved) return;
       resolved = true;
 
       // Add close animation class to start fading out
       dialog.classList.add('m3-dialog-closing');
 
-      const onTransitionEnd = () => {
-        dialog.classList.remove('m3-dialog-closing');
-        dialog.close();
-        
-        // Remove keydown handler
-        dialog.removeEventListener('keydown', keydownHandler);
+      await waitForElementAnimations(dialog);
+      dialog.close();
+      dialog.classList.remove('m3-dialog-closing');
 
-        // Remove event handlers by cloning
-        const newConfirm = confirmBtn.cloneNode(true);
-        const newDismiss = dismissBtn.cloneNode(true);
-        confirmBtn.replaceWith(newConfirm);
-        dismissBtn.replaceWith(newDismiss);
+      // Remove keydown handler
+      dialog.removeEventListener('keydown', keydownHandler);
 
-        resolve(value);
+      // Remove event handlers by cloning
+      const newConfirm = confirmBtn.cloneNode(true);
+      const newDismiss = dismissBtn.cloneNode(true);
+      confirmBtn.replaceWith(newConfirm);
+      dismissBtn.replaceWith(newDismiss);
 
-        isDialogShowing = false;
-        processQueue();
-      };
+      resolve(value);
 
-      // Wait for CSS animation to finish (150ms)
-      setTimeout(onTransitionEnd, 150);
+      isDialogShowing = false;
+      processQueue();
     };
 
     // Keyboard Enter handling

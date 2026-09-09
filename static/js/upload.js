@@ -27,6 +27,7 @@ const PRICE_MAP = { bw: 1, color: 2 };
 
 let selectedFiles = [];
 let activeFileIndex = 0;
+let renderedFile = null;
 let isCooldown = false;
 let cooldownTimer = null;
 
@@ -345,6 +346,8 @@ function renderFileList() {
 
   if (selectedFiles.length === 0) {
     listContainer.classList.add('hidden');
+    filesList.replaceChildren();
+    renderedFile = null;
     resetPreview();
     return;
   }
@@ -373,20 +376,25 @@ function renderFileList() {
   if (warningMsg) warningMsg.classList.toggle('hidden', !hasSettingsError);
 
   const fileObj = selectedFiles[activeFileIndex];
+  const currentCard = filesList.querySelector('.file-item-card');
+  if (currentCard && renderedFile === fileObj) {
+    syncFileCard(currentCard, fileObj);
+    return;
+  }
   const idx = activeFileIndex;
   const file = fileObj.file;
   const pagesText = fileObj.parseError
-    ? `<span class="file-item-pages file-item-pages--error">(PDF 無法解析)</span>`
+    ? '(PDF 無法解析)'
     : fileObj.pages === null
-    ? `<span class="file-item-pages">(計算頁數中…)</span>`
-    : `<span class="file-item-pages">(${fileObj.pages} 頁)</span>`;
+    ? '(計算頁數中…)'
+    : `(${fileObj.pages} 頁)`;
   const showBinding = fileObj.pages === null || fileObj.pages > 1;
   const showDuplex = fileObj.pages === null || fileObj.pages > 1;
 
-  const bindingHtml = showBinding ? `
-        <div class="setting-col">
+  const bindingHtml = `
+        <div class="setting-col ${showBinding ? '' : 'hidden'}" data-setting-section="binding">
           <span class="setting-label">裝訂位置</span>
-          <div class="chip-group">
+          <div class="chip-group" role="radiogroup" aria-label="裝訂位置">
             <label>
               <input type="radio" name="binding_${idx}" value="top_left" ${fileObj.binding === 'top_left' ? 'checked' : ''} data-file-index="${idx}" data-file-setting="binding">
               <span class="material-symbols-outlined chip-icon"><svg><use href="#i-north_west"/></svg></span>
@@ -403,14 +411,14 @@ function renderFileList() {
               <span>其他</span>
             </label>
           </div>
-          <input type="text" id="binding_other_text_${idx}" class="binding-other-input binding-other-text-input ${fileObj.binding === 'other' ? '' : 'hidden'}" placeholder="請說明裝訂方式… (限 10 字)" maxlength="10" value="${escHtml(fileObj.bindingOtherText || '')}" data-file-index="${idx}" data-file-other-text>
+          <input type="text" id="binding_other_text_${idx}" class="binding-other-input binding-other-text-input ${fileObj.binding === 'other' ? '' : 'hidden'}" aria-label="其他裝訂方式" placeholder="請說明裝訂方式… (限 10 字)" maxlength="10" value="${escHtml(fileObj.bindingOtherText || '')}" data-file-index="${idx}" data-file-other-text>
         </div>
-  ` : '';
+  `;
 
-  const duplexHtml = showDuplex ? `
-            <div class="setting-col-flex">
+  const duplexHtml = `
+            <div class="setting-col-flex ${showDuplex ? '' : 'hidden'}" data-setting-section="duplex">
               <span class="setting-label">列印方式</span>
-              <div class="chip-group">
+              <div class="chip-group" role="radiogroup" aria-label="列印方式">
                 <label>
                   <input type="radio" name="duplex_${idx}" value="single" ${fileObj.duplex === 'single' ? 'checked' : ''} data-file-index="${idx}" data-file-setting="duplex">
                   <span class="material-symbols-outlined chip-icon"><svg><use href="#i-article"/></svg></span>
@@ -423,13 +431,13 @@ function renderFileList() {
                 </label>
               </div>
             </div>
-  ` : '';
+  `;
 
   // 文件處理方式:fit(留白)/cover(裁切),即時反映於右側預覽
   const fitModeHtml = `
             <div class="setting-col-flex">
               <span class="setting-label">文件處理</span>
-              <div class="chip-group">
+              <div class="chip-group" role="radiogroup" aria-label="文件處理">
                 <label>
                   <input type="radio" name="fit_mode_${idx}" value="fit" ${fileObj.fitMode === 'fit' ? 'checked' : ''} data-file-index="${idx}" data-file-setting="fitMode">
                   <span class="material-symbols-outlined chip-icon"><svg><use href="#i-fit_page"/></svg></span>
@@ -449,7 +457,7 @@ function renderFileList() {
       <div class="file-item-header">
         <div class="file-item-title-wrapper" role="button" tabindex="0" data-file-action="preview" data-file-index="${idx}">
           <span class="material-symbols-outlined file-item-icon"><svg><use href="#i-description"/></svg></span>
-          <span class="file-item-name" title="${escHtml(file.name)}">${escHtml(file.name)} (${(file.size / 1024).toFixed(0)} KB) ${pagesText}</span>
+          <span class="file-item-name" title="${escHtml(file.name)}">${escHtml(file.name)} (${(file.size / 1024).toFixed(0)} KB) <span class="file-item-pages" data-file-pages>${pagesText}</span></span>
         </div>
         <button type="button" data-file-action="remove" data-file-index="${idx}" class="file-item-remove-btn"
                 aria-label="移除 ${escHtml(file.name)}">
@@ -460,7 +468,7 @@ function renderFileList() {
         <div class="file-item-options">
           <div class="setting-col-flex">
             <span class="setting-label">色彩模式</span>
-            <div class="chip-group">
+            <div class="chip-group" role="radiogroup" aria-label="色彩模式">
               <label>
                 <input type="radio" name="color_mode_${idx}" value="bw" ${fileObj.colorMode === 'bw' ? 'checked' : ''} data-file-index="${idx}" data-file-setting="colorMode">
                 <span class="material-symbols-outlined chip-icon"><svg><use href="#i-invert_colors"/></svg></span>
@@ -480,6 +488,36 @@ function renderFileList() {
       </div>
     </div>
   `;
+  renderedFile = fileObj;
+  syncFileCard(filesList.querySelector('.file-item-card'), fileObj);
+}
+
+// Keep the same controls while settings or asynchronous page counts change.
+function syncFileCard(card, fileObj) {
+  for (const input of card.querySelectorAll('[data-file-setting]')) {
+    input.dataset.fileIndex = String(activeFileIndex);
+    input.name = `${input.dataset.fileSetting}_${activeFileIndex}`;
+    input.checked = fileObj[input.dataset.fileSetting] === input.value;
+  }
+  for (const control of card.querySelectorAll('[data-file-action], [data-file-other-text]')) {
+    control.dataset.fileIndex = String(activeFileIndex);
+  }
+  const pages = card.querySelector('[data-file-pages]');
+  pages.textContent = fileObj.parseError ? '(PDF 無法解析)'
+    : fileObj.pages === null ? '(計算頁數中…)' : `(${fileObj.pages} 頁)`;
+  pages.classList.toggle('file-item-pages--error', !!fileObj.parseError);
+
+  const showMultipage = fileObj.pages === null || fileObj.pages > 1;
+  for (const section of card.querySelectorAll('[data-setting-section]')) {
+    if (!showMultipage && section.contains(document.activeElement)) {
+      card.querySelector('[data-file-action="preview"]').focus();
+    }
+    section.classList.toggle('hidden', !showMultipage);
+  }
+  const otherInput = card.querySelector('[data-file-other-text]');
+  otherInput.classList.toggle('hidden', fileObj.binding !== 'other');
+  const value = fileObj.bindingOtherText || '';
+  if (otherInput.value !== value) otherInput.value = value;
 }
 
 // ── 表單驗證 ──────────────────────────────────────────────────
@@ -512,12 +550,14 @@ export function checkFormValidity() {
 }
 
 function toggleFormInputs(disabled) {
+  if (fileInput) fileInput.disabled = disabled;
   if (userNameInput) userNameInput.disabled = disabled;
   if (pickupLocationInput) pickupLocationInput.disabled = disabled;
   const listContainer = document.getElementById('file-list-container');
   const opacity = disabled ? '0.6' : '1';
   const pointerEvents = disabled ? 'none' : 'auto';
   if (listContainer) {
+    listContainer.inert = disabled;
     listContainer.style.pointerEvents = pointerEvents;
     listContainer.style.opacity = opacity;
   }

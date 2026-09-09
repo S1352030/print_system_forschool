@@ -53,7 +53,6 @@
 
   <!-- Left: Form & History Panel -->
   <div class="md3-card">
-    <div class="md3-content">          <!-- tab 切換的 transition target(標題+panel 一體滑動) -->
     <div class="header">
       <h1 id="page-title">自助影印上傳</h1>
       <p id="page-subtitle">請填寫資料並設定列印選項</p>
@@ -75,6 +74,8 @@
       </button>
     </div>
 
+    <!-- Only panel content transitions; navigation remains stable. -->
+    <div class="md3-content">
     <!-- Panel 1: Upload Form -->
     <div id="upload-panel" role="tabpanel" aria-labelledby="tab-upload">
       <form id="uploadForm">
@@ -92,7 +93,7 @@
         <label class="file-upload-container" id="drop-area">
           <span class="material-symbols-outlined"><svg><use href="#i-upload_file"/></svg></span>
           <p>點擊選擇 PDF 檔案<br>或將檔案拖曳至此處</p>
-          <input type="file" id="pdf_file" name="file" accept="application/pdf" multiple>
+          <input type="file" id="pdf_file" name="file" accept="application/pdf" multiple aria-label="選擇 PDF 檔案">
         </label>
 
         <div id="file-list-container" class="hidden">

@@ -39,6 +39,7 @@ function createPdf(paddingBytes = 180_000) {
 const fixturePdf = createPdf();
 let fallbackRequests = 0;
 let rangeRequests = 0;
+const uploadedForms = [];
 
 const mimeTypes = new Map([
   ['.html', 'text/html; charset=utf-8'],
@@ -51,8 +52,8 @@ const mimeTypes = new Map([
   ['.icc', 'application/vnd.iccprofile'],
 ]);
 
-function sendJson(response, value) {
-  response.writeHead(200, {
+function sendJson(response, value, status = 200) {
+  response.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
   });
@@ -87,6 +88,21 @@ function sendPdf(request, response) {
 
 const server = http.createServer(async (request, response) => {
   const url = new URL(request.url, 'http://127.0.0.1');
+  if (url.pathname === '/api/upload' && request.method === 'POST') {
+    const chunks = [];
+    for await (const chunk of request) chunks.push(chunk);
+    const form = await new Request('http://localhost/api/upload', {
+      method: 'POST', headers: request.headers, body: Buffer.concat(chunks),
+    }).formData();
+    uploadedForms.push({
+      name: form.get('user_name'), pickup: form.get('pickup_location'),
+      file: form.get('file').name, bytes: form.get('file').size,
+      color: form.get('color_mode'), binding: form.get('binding'),
+    });
+    sendJson(response, { order_id: uploadedForms.length, total_pages: 2,
+      total_price: form.get('color_mode') === 'color' ? 4 : 2 }, 201);
+    return;
+  }
   if (url.pathname === '/api/check-pages') {
     fallbackRequests += 1;
     response.writeHead(500);
@@ -225,7 +241,7 @@ async function exercise(browserType, device) {
   });
   const context = await browser.newContext({
     ...device,
-    serviceWorkers: 'block',
+    serviceWorkers: 'allow',
   });
   const page = await context.newPage();
   const pageErrors = [];
@@ -243,6 +259,7 @@ async function exercise(browserType, device) {
 
   await page.goto(origin, { waitUntil: 'domcontentloaded' });
   assert.equal(engineRequests, 0, 'PDF engine must remain lazy before file selection');
+  await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
 
   await page.evaluate(() => {
     sessionStorage.setItem('print_user_name', '測試者');
@@ -274,6 +291,42 @@ async function exercise(browserType, device) {
   assert.ok(engineRequests > 0, 'PDF engine should load after file selection');
   assert.equal(await page.locator('#pdf-preview-container canvas').count(), 1);
   assert.equal(fallbackRequests, 0, 'valid local PDF must not call /api/check-pages');
+
+  // A setting update must preserve the actual controls and their keyboard focus.
+  const colorRadio = page.getByRole('radio', { name: '黑白', exact: true });
+  await colorRadio.focus();
+  assert.equal(await colorRadio.evaluate((input) => document.activeElement === input), true);
+  await page.locator('.file-item-card').evaluate((card) => {
+    card.dataset.retainedForMotionTest = 'true';
+  });
+  await colorRadio.press('ArrowRight');
+  assert.equal(await page.getByRole('radio', { name: '彩色', exact: true }).isChecked(), true);
+  assert.equal(await page.getByRole('radio', { name: '彩色', exact: true })
+    .evaluate((input) => document.activeElement === input), true);
+  assert.equal(await page.locator('.file-item-card').getAttribute('data-retained-for-motion-test'), 'true');
+  await page.getByRole('radio', { name: '其他', exact: true }).press('Space');
+  const otherBinding = page.getByRole('textbox', { name: '其他裝訂方式', exact: true });
+  await otherBinding.fill('測試裝訂');
+  await page.getByRole('radio', { name: '單面', exact: true }).press('ArrowRight');
+  assert.equal(await otherBinding.inputValue(), '測試裝訂');
+  assert.equal(await page.locator('.file-item-card').getAttribute('data-retained-for-motion-test'), 'true');
+
+  const mobileCard = await page.locator('.md3-card').evaluate((card) => ({
+    compact: matchMedia('(max-width: 680px)').matches,
+    padding: getComputedStyle(card).padding,
+  }));
+  if (mobileCard.compact) assert.equal(mobileCard.padding, '16px 12px');
+  for (const selector of ['#file-pager-prev', '.file-item-remove-btn', '#theme-toggle']) {
+    const size = await page.locator(selector).boundingBox();
+    assert.ok(size.width >= 48 && size.height >= 48, `${selector} must keep a 48px touch target`);
+  }
+
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const themeBefore = await page.locator('html').evaluate((html) => html.classList.contains('dark'));
+  await page.locator('#theme-toggle').click();
+  await page.waitForFunction((before) => document.documentElement.classList.contains('dark') !== before, themeBefore);
+  assert.equal(await page.locator('html').evaluate((html) => html.classList.contains('theme-transition')), false);
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
 
   await page.getByRole('button', { name: '下一頁' }).click();
   await page.waitForFunction(() =>
@@ -313,6 +366,32 @@ async function exercise(browserType, device) {
   );
   assert.equal(await page.locator('#pdf-preview-container canvas').count(), 1);
   assert.equal(fallbackRequests, 0);
+
+  // Exercise submission with the real Service Worker and a local-only upload endpoint.
+  await page.locator('#user_name').fill('手機測試者');
+  await page.locator('#pickup_location').fill('明天中午');
+  await page.waitForFunction(() => document.querySelector('#price-total-amount').textContent === 'NT$ 6 元'
+    && !document.querySelector('#submit-btn').disabled);
+  const beforeUploads = uploadedForms.length;
+  await page.locator('#submit-btn').click();
+  await page.waitForFunction(() => document.querySelector('#m3-dialog-content')?.textContent.includes('上傳成功'));
+  assert.match(await page.locator('#m3-dialog-content').textContent(), /NT\$ 6 元/);
+  assert.deepEqual(uploadedForms.slice(beforeUploads), [
+    { name: '手機測試者', pickup: '明天中午', file: 'mobile-preview.pdf', bytes: fixturePdf.length, color: 'color', binding: '測試裝訂' },
+    { name: '手機測試者', pickup: '明天中午', file: 'second-preview.pdf', bytes: fixturePdf.length, color: 'bw', binding: 'top_left' },
+  ]);
+  await page.locator('#m3-dialog-btn-confirm').click();
+  await page.waitForFunction(() => !document.querySelector('#cooldown-banner').classList.contains('hidden'));
+  assert.equal(await page.locator('#pdf_file').isDisabled(), true);
+  assert.equal(await page.locator('#file-list-container').evaluate((element) => element.inert), true);
+  assert.equal(await page.evaluate(async () => {
+    for (const name of await caches.keys()) {
+      for (const request of await (await caches.open(name)).keys()) {
+        if (new URL(request.url).pathname.startsWith('/api/')) return true;
+      }
+    }
+    return false;
+  }), false, 'upload and history must not enter Service Worker caches');
 
   await page.goto(`${origin}/admin`, { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: /查看/ }).click();
