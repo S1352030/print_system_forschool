@@ -791,30 +791,50 @@ body {
   flex-wrap: wrap;
   margin-bottom: 6px;
 }
-.status-badge {
-  display: inline-flex;
+.history-progress-caption {
+  color: var(--on-surface-variant);
+  font-size: 11px;
+}
+.history-progress {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  margin: 10px 0 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 999px;
+  background: var(--surface);
+}
+.history-progress-step {
+  display: flex;
   align-items: center;
-  gap: 3px;
-  padding: 2px 6px;
-  border-radius: 6px;
-  font-size: 10.5px;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 8px 2px;
+  border-radius: 999px;
+  color: var(--on-surface-variant);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.history-progress-step[aria-current="step"] {
+  background: var(--primary);
+  color: var(--on-primary);
   font-weight: 700;
 }
-.status-paid {
-  background-color: var(--status-paid-bg);
-  color: var(--status-paid-text);
-}
-.status-unpaid {
-  background-color: var(--status-unpaid-bg);
-  color: var(--status-unpaid-text);
-}
-.status-printed {
-  background-color: var(--status-paid-bg);
-  color: var(--status-paid-text);
-}
-.status-queued {
-  background-color: var(--status-queued-bg);
-  color: var(--status-queued-text);
+.history-progress-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 10px;
+  line-height: 1;
 }
 #history-list::-webkit-scrollbar {
   width: 6px;
@@ -1335,10 +1355,6 @@ html.dark .theme-icon-moon {
   gap: 16px;
   flex-wrap: wrap;
   min-width: 0;
-}
-.history-item-badge-row {
-  display: flex;
-  gap: 6px;
 }
 .file-price-pending {
   color: var(--price-subtext);

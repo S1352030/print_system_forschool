@@ -183,12 +183,16 @@ function renderHistoryList(orders) {
   if (!listDiv) return;
   listDiv.innerHTML = orders
     .map((order) => {
-      const paidBadge = order.is_paid
-        ? '<span class="status-badge status-paid">🟢 已付款</span>'
-        : '<span class="status-badge status-unpaid">🔴 未付款</span>';
-      const printedBadge = order.is_printed
-        ? '<span class="status-badge status-printed">🟢 已列印</span>'
-        : '<span class="status-badge status-queued">🟡 排隊中</span>';
+      // 付款為最終階段；沿用後台的付款與列印欄位，無須變更訂單資料。
+      const currentStep = order.is_paid ? 3 : order.is_printed ? 2 : 1;
+      const progressSteps = ['未列印', '已列印', '已付款'];
+      const progressMarkup = progressSteps.map((label, index) => {
+        const step = index + 1;
+        return `<li class="history-progress-step"${step === currentStep ? ' aria-current="step"' : ''}>
+          <span class="history-progress-number" aria-hidden="true">${step}</span>
+          <span>${label}</span>
+        </li>`;
+      }).join('');
 
       const settingsBadges = [];
       settingsBadges.push(
@@ -235,11 +239,11 @@ function renderHistoryList(orders) {
           </div>
           <div class="history-item-details">
             <div class="history-item-price">NT$ ${(order.total_price || 0).toLocaleString()} 元</div>
-            <div class="history-item-badge-row">
-              ${paidBadge}
-              ${printedBadge}
-            </div>
+            <span class="history-progress-caption">進度 ${currentStep} / 3</span>
           </div>
+          <ol class="history-progress" aria-label="訂單進度：${progressSteps[currentStep - 1]}">
+            ${progressMarkup}
+          </ol>
         </div>
       `;
     })
