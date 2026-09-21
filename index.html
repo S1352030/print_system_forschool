@@ -141,6 +141,17 @@
           <div class="price-pending hidden" id="price-pending-hint">⏳ 部分檔案頁數計算中，金額可能更新...</div>
         </div>
 
+        <fieldset id="gift-card-fields" class="gift-card-fields">
+          <legend>禮物卡折抵（選填）</legend>
+          <label for="gift-card-code">禮物卡代碼</label>
+          <div class="gift-card-controls">
+            <input type="text" id="gift-card-code" maxlength="64" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="輸入禮物卡代碼" aria-describedby="gift-card-status">
+            <button type="button" id="gift-card-apply">套用</button>
+            <button type="button" id="gift-card-remove">移除</button>
+          </div>
+          <p id="gift-card-status" role="status">有禮物卡可折抵列印費用，剩餘金額下次繼續用。</p>
+        </fieldset>
+
         <button type="submit" class="md3-btn-filled" id="submit-btn" disabled>
           <span class="material-symbols-outlined btn-icon-svg"><svg><use href="#i-send"/></svg></span>
           <span id="btn-text">確認上傳</span>

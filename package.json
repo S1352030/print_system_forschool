@@ -10,6 +10,7 @@
     "build": "vite build",
     "test:frontend": "node --test tests/*.test.mjs",
     "test:browser": "node tests/browser_service_worker_smoke.mjs && node tests/browser_preview_smoke.mjs",
+    "test:browser:gift-cards": "node tests/browser_gift_cards_smoke.mjs",
     "verify-build": "node scripts/verify-build.mjs",
     "measure:load": "node scripts/measure-load.mjs",
     "verify:cdn": "node scripts/check-cdn.mjs",

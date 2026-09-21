@@ -1,4 +1,5 @@
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Index, text, event
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, Index, text, event, CheckConstraint
+import uuid
 from sqlalchemy.orm import declarative_base, sessionmaker
 from datetime import datetime, timezone, timedelta
 from config import settings
@@ -16,6 +17,7 @@ DATABASE_URL = settings.DATABASE_URL
 
 engine = create_engine(
     DATABASE_URL,
+    hide_parameters=True,  # 例外日誌不得包含禮物卡代碼等資料庫參數。
     connect_args={"check_same_thread": False},  # SQLite 多執行緒需加此參數
     pool_size=3,
     max_overflow=1,
@@ -60,6 +62,55 @@ class Order(Base):
     display_name  = Column(String,  nullable=True)               # 顯示用檔名
     physical_path = Column(String,  nullable=True)               # 系統實體檔名
     created_at  = Column(DateTime, default=get_taipei_now)        # 訂單建立時間
+    finance_key = Column(String, default=lambda: str(uuid.uuid4()), nullable=False)
+    gift_card_id = Column(Integer, nullable=True)
+    gift_card_discount = Column(Integer, nullable=False, default=0)
+    cash_received = Column(Integer, nullable=True)
+    is_cancelled = Column(Boolean, nullable=False, default=False)
+
+    @property
+    def amount_due(self):
+        return max(0, self.total_price - self.gift_card_discount)
+
+
+class GiftCard(Base):
+    __tablename__ = "gift_cards"
+    __table_args__ = (
+        CheckConstraint("balance >= 0 AND balance <= initial_amount"),
+        CheckConstraint("initial_amount > 0"),
+        {"sqlite_autoincrement": True},
+    )
+    id = Column(Integer, primary_key=True)
+    code = Column(String, nullable=False, unique=True)
+    initial_amount = Column(Integer, nullable=False)
+    balance = Column(Integer, nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True)
+    note = Column(String, nullable=False, default="")
+    source_order_id = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=get_taipei_now)
+
+
+class GiftCardTransaction(Base):
+    """獨立保存帳目及訂單摘要，刪除訂單時不連帶刪除。"""
+    __tablename__ = "gift_card_transactions"
+    id = Column(Integer, primary_key=True)
+    card_id = Column(Integer, nullable=False, index=True)
+    kind = Column(String, nullable=False)
+    amount = Column(Integer, nullable=False)
+    balance_after = Column(Integer, nullable=False)
+    order_id = Column(Integer, nullable=False)
+    order_key = Column(String, nullable=False)
+    order_summary = Column(String, nullable=False)
+    created_at = Column(DateTime, default=get_taipei_now)
+
+
+class OperationReceipt(Base):
+    """即使原訂單已清理，重送相同請求也不重新扣款／發卡。"""
+    __tablename__ = "operation_receipts"
+    request_id = Column(String, primary_key=True)
+    fingerprint = Column(String, nullable=False)
+    response_json = Column(String, nullable=False)
+    created_at = Column(DateTime, default=get_taipei_now)
 
 
 class Announcement(Base):
@@ -93,6 +144,11 @@ def ensure_order_columns():
         "pickup_location": "ALTER TABLE orders ADD COLUMN pickup_location VARCHAR",
         "display_name": "ALTER TABLE orders ADD COLUMN display_name VARCHAR",
         "physical_path": "ALTER TABLE orders ADD COLUMN physical_path VARCHAR",
+        "finance_key": "ALTER TABLE orders ADD COLUMN finance_key VARCHAR",
+        "gift_card_id": "ALTER TABLE orders ADD COLUMN gift_card_id INTEGER",
+        "gift_card_discount": "ALTER TABLE orders ADD COLUMN gift_card_discount INTEGER NOT NULL DEFAULT 0",
+        "cash_received": "ALTER TABLE orders ADD COLUMN cash_received INTEGER",
+        "is_cancelled": "ALTER TABLE orders ADD COLUMN is_cancelled BOOLEAN NOT NULL DEFAULT 0",
     }
 
     with engine.begin() as conn:
@@ -103,6 +159,9 @@ def ensure_order_columns():
         for column_name, statement in required_columns.items():
             if column_name not in existing_columns:
                 conn.execute(text(statement))
+
+        conn.execute(text("UPDATE orders SET finance_key = lower(hex(randomblob(16))) WHERE finance_key IS NULL"))
+        conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_orders_finance_key ON orders (finance_key)"))
 
         # 確保 user_name 索引存在（加速歷史訂單查詢）
         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_orders_user_name ON orders (user_name)"))

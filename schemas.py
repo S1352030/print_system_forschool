@@ -10,6 +10,7 @@ Pydantic 請求模型(Schema)
 """
 
 from pydantic import BaseModel, Field, field_validator
+from uuid import UUID
 
 
 class AnnouncementCreate(BaseModel):
@@ -45,3 +46,26 @@ class OrderStatusUpdate(BaseModel):
     """PUT /api/orders/{id} 的請求 body,兩個欄位皆為選填。"""
     is_paid: bool | None = Field(default=None, description="是否已付款")
     is_printed: bool | None = Field(default=None, description="是否已列印")
+
+
+class GiftCardCheck(BaseModel):
+    code: str = Field(min_length=1, max_length=64)
+
+
+class GiftCardStatusUpdate(BaseModel):
+    is_active: bool
+
+
+class GiftCardSearch(BaseModel):
+    search: str = Field(default="", max_length=64)
+    page: int = Field(default=1, ge=1)
+
+
+class OrderPayment(BaseModel):
+    request_id: UUID
+    cash_received: int = Field(ge=0, le=1000000, strict=True)
+    note: str = Field(default="", max_length=200)
+
+
+class OrderCancel(BaseModel):
+    request_id: UUID

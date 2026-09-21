@@ -1525,3 +1525,12 @@ html.tab-transition::view-transition-new(panel) {
     font-size: 15px;
   }
 }
+/* 禮物卡沿用目前主題色與可觸控的控制項尺寸。 */
+.gift-card-fields { border: 1px solid var(--md-sys-color-outline-variant); border-radius: 16px; margin: 16px 0; padding: 16px; min-width: 0; }
+.gift-card-fields legend { padding: 0 8px; font-weight: 600; }
+.gift-card-fields label { display: block; margin-bottom: 8px; }
+.gift-card-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+.gift-card-controls input { flex: 1 1 180px; width: 100%; min-width: 0; border: 1px solid var(--outline); border-radius: 8px; background: var(--surface); color: var(--on-surface); padding: 10px; font: inherit; }
+.gift-card-controls button { min-height: 44px; padding: 8px 16px; border: 0; border-radius: 20px; background: var(--primary-container); color: var(--on-primary-container); cursor: pointer; font: inherit; }
+.gift-card-fields p { font-size: 13px; line-height: 1.6; margin: 12px 0 0; }
+.gift-card-controls :focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }

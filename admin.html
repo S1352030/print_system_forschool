@@ -37,6 +37,23 @@
   </div>
 </div>
 
+<section class="table-section gift-admin-section" aria-labelledby="gift-admin-title">
+  <h2 class="section-title" id="gift-admin-title">禮物卡</h2>
+  <p>在訂單按「收款」，輸入實收金額，多收的差額會自動轉成禮物卡。</p>
+  <form id="gift-search-form" class="gift-admin-controls">
+    <label for="gift-search">查詢代碼</label>
+    <input id="gift-search" type="text" maxlength="64" autocomplete="off" placeholder="輸入完整代碼，留白顯示全部">
+    <button class="btn-view-pdf" type="submit">查詢／重新整理</button>
+  </form>
+  <p id="gift-admin-status" role="status"></p>
+  <div id="gift-card-list" class="gift-card-list"></div>
+  <div class="gift-admin-controls">
+    <button id="gift-prev" type="button" class="btn-view-pdf">上一頁</button>
+    <span id="gift-page"></span>
+    <button id="gift-next" type="button" class="btn-view-pdf">下一頁</button>
+  </div>
+</section>
+
 <div class="announcement-section">
   <div class="section-title">系統公告管理</div>
   <div class="row g-3">
@@ -96,6 +113,26 @@
     </table>
   </div>
 </div>
+
+<dialog id="payment-dialog" class="finance-dialog" aria-labelledby="payment-title">
+  <div class="finance-dialog-header"><h2 id="payment-title">確認收款</h2><button type="button" data-close-finance="payment-dialog" aria-label="關閉收款視窗">✕</button></div>
+  <form id="payment-form">
+    <p id="payment-summary"></p>
+    <label for="payment-cash">實際收到的現金（元）</label>
+    <input id="payment-cash" type="number" min="0" max="1000000" step="1" required inputmode="numeric">
+    <label for="payment-note">備註（選填）</label>
+    <input id="payment-note" type="text" maxlength="200" placeholder="例如：多付款保留至下次使用">
+    <p id="payment-preview" role="status"></p>
+    <button id="payment-submit" type="submit" class="btn-view-pdf">確認收款</button>
+  </form>
+  <div id="payment-result" role="status"></div>
+</dialog>
+
+<dialog id="gift-detail-dialog" class="finance-dialog" aria-labelledby="gift-detail-title">
+  <div class="finance-dialog-header"><h2 id="gift-detail-title">禮物卡交易紀錄</h2><button type="button" data-close-finance="gift-detail-dialog" aria-label="關閉交易紀錄">✕</button></div>
+  <div id="gift-detail-body"></div>
+  <div class="gift-admin-controls"><button id="gift-detail-prev" type="button" class="btn-view-pdf">上一頁</button><span id="gift-detail-page"></span><button id="gift-detail-next" type="button" class="btn-view-pdf">下一頁</button></div>
+</dialog>
 
 <dialog class="modal-backdrop" id="pdf-modal" aria-labelledby="modal-title">
   <div class="modal-box">

@@ -238,10 +238,11 @@ function renderHistoryList(orders) {
             <span class="hist-badge hist-badge-pages">${order.total_pages} 頁</span>
           </div>
           <div class="history-item-details">
-            <div class="history-item-price">NT$ ${(order.total_price || 0).toLocaleString()} 元</div>
-            <span class="history-progress-caption">進度 ${currentStep} / 3</span>
+            <div class="history-item-price">${order.is_cancelled ? '已取消' : `應付 NT$ ${(order.amount_due ?? order.total_price ?? 0).toLocaleString()} 元`}</div>
+            <span class="history-progress-caption">${order.is_cancelled ? '訂單已取消' : order.amount_due === 0 ? '禮物卡全額折抵' : `進度 ${currentStep} / 3`}</span>
           </div>
-          <ol class="history-progress" aria-label="訂單進度：${progressSteps[currentStep - 1]}">
+          ${order.gift_card_discount ? `<p>原價 ${order.total_price} 元 · 禮物卡${order.is_cancelled ? '已退回' : '折抵'} ${order.gift_card_discount} 元</p>` : ''}
+          <ol class="history-progress${order.is_cancelled ? ' hidden' : ''}" aria-label="訂單進度：${progressSteps[currentStep - 1]}">
             ${progressMarkup}
           </ol>
         </div>

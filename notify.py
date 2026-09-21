@@ -58,6 +58,7 @@ def send_line_notification(
     file_name: str,
     total_pages: int,
     total_price: float,
+    gift_card_discount: int = 0,
 ) -> dict:
     """
     發送新訂單通知至 LINE 官方帳號 (Messaging API)。
@@ -74,7 +75,7 @@ def send_line_notification(
     dict : LINE API 的回應內容；若發送失敗則包含 'error' 鍵。
     """
     # 檢查是否尚未設定金鑰
-    if "在此貼上" in LINE_CHANNEL_ACCESS_TOKEN or "在此貼上" in LINE_RECEIVER_ID:
+    if not LINE_CHANNEL_ACCESS_TOKEN or not LINE_RECEIVER_ID or "在此貼上" in LINE_CHANNEL_ACCESS_TOKEN or "在此貼上" in LINE_RECEIVER_ID:
         err_msg = "LINE 金鑰或接收者 ID 尚未設定，請先設定 LINE_CHANNEL_ACCESS_TOKEN 與 LINE_RECEIVER_ID。"
         print(f"[LINE Notify Warning] {err_msg}")
         return {"error": err_msg}
@@ -88,7 +89,9 @@ def send_line_notification(
         f"👤 上傳者：{user_name}\n"
         f"📄 檔名：{file_name}\n"
         f"📋 頁數：{total_pages} 頁\n"
-        f"💰 應收金額：NT$ {total_price:.0f} 元\n"
+        f"💰 原價：NT$ {total_price:.0f} 元\n"
+        f"🎁 禮物卡折抵：NT$ {gift_card_discount} 元\n"
+        f"💰 應收金額：NT$ {total_price - gift_card_discount:.0f} 元\n"
         "━━━━━━━━━━━━━━━━━━\n"
         f"🕐 時間：{now}"
     )

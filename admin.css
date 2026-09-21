@@ -436,3 +436,23 @@ td.price { font-family: ui-monospace, 'SFMono-Regular', Consolas, 'Liberation Mo
 .admin-load-more-btn:hover {
   background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
+.gift-admin-section p { color: var(--muted); line-height: 1.6; }
+.gift-admin-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 12px 0; }
+.gift-admin-controls input { flex: 1 1 220px; min-width: 0; }
+.gift-card-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 16px; }
+.gift-card-entry { border: 1px solid var(--border); border-radius: 16px; padding: 18px; background: var(--card); }
+.gift-card-entry code, .finance-dialog code { overflow-wrap: anywhere; font-size: 16px; display: block; margin: 12px 0; }
+.gift-card-entry strong { font-size: 20px; }
+.finance-dialog { width: min(520px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); margin: auto; overflow-y: auto; box-sizing: border-box; padding: 24px; border: 1px solid var(--border); border-radius: 24px; background: var(--card); color: var(--text); }
+.finance-dialog::backdrop { background: rgb(0 0 0 / 55%); }
+.finance-dialog-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.finance-dialog-header h2 { font-size: 22px; margin: 0 0 12px; }
+.finance-dialog-header button { background: transparent; border: 0; color: inherit; font-size: 20px; min-width: 44px; min-height: 44px; cursor: pointer; }
+.finance-dialog label { display: block; margin: 16px 0 8px; }
+.finance-dialog input, .gift-admin-controls input { box-sizing: border-box; border: 1px solid var(--border); border-radius: 8px; color: var(--text); background: var(--surface); padding: 12px; font: inherit; }
+.finance-dialog input { width: 100%; }
+.finance-dialog p { line-height: 1.7; white-space: pre-line; margin: 12px 0; }
+.finance-dialog button, .gift-admin-controls button { min-height: 44px; }
+.finance-dialog :focus-visible, .gift-admin-section :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.finance-transaction { padding: 12px 0; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.order-money-detail { display: block; font-size: 12px; color: var(--muted); line-height: 1.6; white-space: normal; }

@@ -3,7 +3,10 @@
  * 負責模組協調與事件綁定。
  */
 
-import { loadOrders, updateOrder, deleteOrder } from './orders.js';
+import { loadOrders, updateOrder, deleteOrder, findOrder } from './orders.js';
+import { bindAdminGiftCardEvents, loadGiftCards, openPayment, cancelOrder } from './gift-cards.js';
+import { apiPut } from '../api.js';
+import { showConfirm, showAlert } from '../dialog-api.js';
 import { openPdfModal, bindAdminPdfNavButtons, bindAdminFitToggle } from './pdf-modal.js';
 import { loadAnnouncements, publishAnnouncement, updateAnnouncementStatus, deleteAnnouncement } from './announcements.js';
 
@@ -28,13 +31,21 @@ function bindAdminEvents() {
     if (orderId === null) return;
     void updateOrder(orderId, checkbox.dataset.orderField, checkbox.checked, checkbox);
   });
-  orderTable?.addEventListener('click', (event) => {
+  orderTable?.addEventListener('click', async (event) => {
     const button = event.target.closest?.('[data-order-action]');
     if (!button) return;
     const orderId = parseId(button, 'orderId');
     if (orderId === null) return;
     if (button.dataset.orderAction === 'preview') void openPdfModal(orderId);
     if (button.dataset.orderAction === 'delete') void deleteOrder(orderId);
+    if (button.dataset.orderAction === 'payment') openPayment(findOrder(orderId));
+    if (button.dataset.orderAction === 'cancel') void cancelOrder(findOrder(orderId));
+    if (button.dataset.orderAction === 'unpay' && await showConfirm('將這筆舊訂單更正為未付款？之後可重新輸入實收金額。')) {
+      try {
+        await apiPut(`/api/orders/${orderId}`, { is_paid: false });
+        await loadOrders();
+      } catch (error) { await showAlert(error.message, 'error'); }
+    }
   });
 
   const announcementTable = document.getElementById('announce-tbody');
@@ -55,11 +66,13 @@ function bindAdminEvents() {
 }
 
 function initAdmin() {
+  bindAdminGiftCardEvents(loadOrders);
   bindAdminEvents();
   bindAdminPdfNavButtons();
   bindAdminFitToggle();
   void loadOrders();
   void loadAnnouncements();
+  void loadGiftCards(1);
 }
 
 if (document.readyState === 'loading') {

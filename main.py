@@ -33,6 +33,8 @@ from schemas import AnnouncementCreate, AnnouncementUpdate, OrderStatusUpdate
 
 # 引入資料庫模塊
 from database import Order, Announcement, get_db, engine, Base, ensure_order_columns, SessionLocal
+from gift_cards import (build_gift_card_router, begin_money_write, fingerprint,
+                        replay, save_receipt, redeem, private_json, normalize_code)
 # 引入通知模塊
 from notify import send_line_notification, send_line_text_notification
 
@@ -290,6 +292,7 @@ def _cleanup_old_orders_once() -> int:
     cutoff = get_taipei_now() - td(days=settings.ORDER_RETENTION_DAYS)
     db = SessionLocal()
     try:
+        begin_money_write(db)
         old_orders = db.query(Order).filter(
             Order.is_paid == True,
             Order.is_printed == True,
@@ -1007,17 +1010,22 @@ async def check_pdf_pages(file: UploadFile = File(...)):
         if os.path.exists(tmp_path):
             await asyncio.to_thread(os.remove, tmp_path)
 
-def _send_line_notification_bg(user_name: str, file_name: str, total_pages: int, total_price: float):
+def _send_line_notification_bg(user_name: str, file_name: str, total_pages: int, total_price: float,
+                               gift_card_discount: int = 0):
     notify_result = send_line_notification(
         user_name=user_name,
         file_name=file_name,
         total_pages=total_pages,
         total_price=total_price,
+        gift_card_discount=gift_card_discount,
     )
     if "error" in notify_result:
         log.error("LINE 通知發送失敗：%s", notify_result["error"])
     else:
         log.info("LINE 通知發送成功（使用者: %s, 檔案: %s）", user_name, file_name)
+
+app.include_router(build_gift_card_router(authenticate_admin, rate_limit))
+
 
 @app.post("/api/upload")
 async def upload_order(
@@ -1029,6 +1037,9 @@ async def upload_order(
     fit_mode: str = Form("fit"),
     binding: str | None = Form(None),
     pickup_location: str | None = Form(None),
+    gift_card_code: str | None = Form(None, max_length=64),
+    expected_discount: int = Form(0, ge=0),
+    request_id: uuid.UUID | None = Form(None),
     db: Session = Depends(get_db),  # 注入資料庫 Session
     _rl: None = Depends(rate_limit("upload")),  # 上傳限流(較嚴格)
 ) -> JSONResponse:
@@ -1040,6 +1051,10 @@ async def upload_order(
         raise HTTPException(status_code=400, detail="Invalid fit mode")
     if pickup_location and len(pickup_location) > 20:
         raise HTTPException(status_code=400, detail="取件時間長度不能超過 20 個字元。")
+    if gift_card_code and (request_id is None or expected_discount <= 0):
+        raise HTTPException(400, "請先套用禮物卡並確認折抵金額。")
+    if not gift_card_code and expected_discount:
+        raise HTTPException(400, "請提供禮物卡代碼。")
 
     physical_filename = f"{uuid.uuid4()}.pdf"
     final_path = os.path.join(UPLOAD_DIR, physical_filename)
@@ -1055,9 +1070,30 @@ async def upload_order(
             
         total_price = total_pages * PRICE_PER_PAGE_BY_COLOR[color_mode]
 
+        # 內容指紋讓回應遺失後的重試重用訂單；不能用同一識別碼偷換 PDF 或金額。
+        request_fp = None
+        if request_id:
+            def hash_pdf():
+                with open(part_path, "rb") as pdf_file:
+                    digest = hashlib.sha256()
+                    for chunk in iter(lambda: pdf_file.read(65536), b""):
+                        digest.update(chunk)
+                    return digest.hexdigest()
+            pdf_digest = await asyncio.to_thread(hash_pdf)
+            request_fp = fingerprint({"upload": pdf_digest, "name": user_name, "file": file.filename,
+                "color": color_mode, "duplex": duplex, "fit": fit_mode, "binding": binding,
+                "pickup": pickup_location, "card": normalize_code(gift_card_code or ""),
+                "discount": expected_discount})
+
         # 檔案完整且可解析後，於同一目錄原子改名；資料庫最後提交。
         await asyncio.to_thread(os.replace, part_path, final_path)
         file_ready = True
+
+        begin_money_write(db)
+        if request_id:
+            previous = replay(db, request_id, request_fp)
+            if previous is not None:
+                return private_json(previous, 201)
 
         new_order = Order(
             user_name=user_name,
@@ -1076,6 +1112,12 @@ async def upload_order(
         try:
             db.flush()
             new_order_id = new_order.id
+            balance = redeem(db, new_order, gift_card_code, expected_discount) if gift_card_code else None
+            response_data = {"status": "success", "order_id": new_order_id, "total_price": total_price,
+                             "gift_card_discount": new_order.gift_card_discount,
+                             "amount_due": new_order.amount_due, "gift_card_balance": balance}
+            if request_id:
+                save_receipt(db, request_id, request_fp, response_data)
             db.commit()
             committed = True
         except Exception:
@@ -1089,13 +1131,12 @@ async def upload_order(
             file_name=file.filename,
             total_pages=total_pages,
             total_price=total_price,
+            gift_card_discount=response_data["gift_card_discount"],
         )
 
-        return JSONResponse(
-            content={"status": "success", "order_id": new_order_id, "total_price": total_price},
-            status_code=201,
-        )
+        return private_json(response_data, 201)
     finally:
+        db.rollback()
         if os.path.exists(part_path):
             await asyncio.to_thread(os.remove, part_path)
         if file_ready and not committed and os.path.exists(final_path):
@@ -1129,6 +1170,7 @@ async def get_user_orders(
             Order.id, Order.file_name, Order.total_pages, Order.total_price,
             Order.color_mode, Order.duplex, Order.fit_mode, Order.binding, Order.pickup_location,
             Order.is_paid, Order.is_printed, Order.created_at,
+            Order.gift_card_discount, Order.is_cancelled,
         )
         .filter(Order.user_name == user_name.strip())
         .order_by(Order.id.desc())
@@ -1141,6 +1183,9 @@ async def get_user_orders(
             "color_mode": r.color_mode, "duplex": r.duplex,
             "fit_mode": r.fit_mode, "binding": r.binding, "pickup_location": r.pickup_location,
             "is_paid": r.is_paid, "is_printed": r.is_printed,
+            "gift_card_discount": r.gift_card_discount,
+            "amount_due": r.total_price - r.gift_card_discount,
+            "is_cancelled": r.is_cancelled,
             "created_at": str(r.created_at) if r.created_at else None,
         }
 
@@ -1275,7 +1320,7 @@ async def get_all_orders(
         orders = base_query.limit(settings.ORDERS_MAX_PAGE_SIZE).all()
         # HTTP header 只能 latin-1,用英文訊息避免 UnicodeEncodeError
         response = JSONResponse(
-            content=jsonable_encoder(orders),
+            content=[_admin_order_json(order) for order in orders],
             headers={
                 "X-Deprecation-Warning": (
                     f"Unpaginated calls are deprecated and capped at "
@@ -1290,12 +1335,19 @@ async def get_all_orders(
     total_pages = (total + effective_page_size - 1) // effective_page_size if total > 0 else 0
     items = base_query.offset((page - 1) * effective_page_size).limit(effective_page_size).all()
     return {
-        "items": jsonable_encoder(items),
+        "items": [_admin_order_json(order) for order in items],
         "total": total,
         "page": page,
         "page_size": effective_page_size,
         "total_pages": total_pages,
     }
+
+def _admin_order_json(order):
+    data = jsonable_encoder(order)
+    data.pop("finance_key", None)
+    data["amount_due"] = order.amount_due
+    return data
+
 
 @app.put("/api/orders/{order_id}")
 async def update_order_status(
@@ -1306,10 +1358,15 @@ async def update_order_status(
     _rl: None = Depends(rate_limit("admin")),
 ):
     """給後台用的 API：更新付款或列印狀態"""
+    begin_money_write(db)
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="找不到該訂單")
 
+    if order.is_cancelled:
+        raise HTTPException(409, "已取消的訂單不能更新付款或列印狀態。")
+    if payload.is_paid is False and (order.cash_received is not None or order.amount_due == 0):
+        raise HTTPException(409, "已有收款或全額折抵紀錄，不能直接改為未付款。")
     if payload.is_paid is not None:
         order.is_paid = payload.is_paid
     if payload.is_printed is not None:
@@ -1373,6 +1430,7 @@ async def delete_order(
     _rl: None = Depends(rate_limit("admin")),
 ):
     """給後台用的 API：刪除訂單及其實體 PDF 檔案"""
+    begin_money_write(db)
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="找不到該訂單")

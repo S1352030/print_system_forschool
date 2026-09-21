@@ -76,9 +76,9 @@ function updateLoadMoreButton() {
 }
 
 export function renderStats(data) {
-  const unpaidOrders = data.filter((o) => !o.is_paid);
-  const unpaidTotal = unpaidOrders.reduce((s, o) => s + (o.total_price || 0), 0);
-  const unprintedOrders = data.filter((o) => !o.is_printed);
+  const unpaidOrders = data.filter((o) => !o.is_paid && !o.is_cancelled);
+  const unpaidTotal = unpaidOrders.reduce((s, o) => s + (o.amount_due ?? o.total_price ?? 0), 0);
+  const unprintedOrders = data.filter((o) => !o.is_printed && !o.is_cancelled);
   const unprintedPages = unprintedOrders.reduce((s, o) => s + (o.total_pages || 0), 0);
   document.getElementById('stat-unpaid').textContent = 'NT$ ' + unpaidTotal.toLocaleString();
   document.getElementById('stat-unpaid-count').textContent = '共 ' + unpaidOrders.length + ' 筆未付款';
@@ -139,18 +139,17 @@ export function renderTable(data) {
         <td data-label="檔案" class="admin-file-cell" title="${escHtml(order.file_name)}">${escHtml(order.file_name)}</td>
         <td data-label="頁數" class="mono">${order.total_pages}</td>
         <td data-label="列印設定">${buildSettingBadges(order)}</td>
-        <td data-label="金額" class="price">NT$ ${(order.total_price || 0).toLocaleString()}</td>
+        <td data-label="金額" class="price">${order.is_cancelled ? '已取消' : `NT$ ${(order.amount_due ?? order.total_price ?? 0).toLocaleString()}`}
+          <span class="order-money-detail">原價 ${order.total_price} 元<br>禮物卡${order.is_cancelled ? '已退回' : '折抵'} ${order.gift_card_discount || 0} 元${order.cash_received !== null && order.cash_received !== undefined ? `<br>實收現金 ${order.cash_received} 元` : ''}</span>
+        </td>
         <td data-label="已付款">
-          <label class="toggle" id="toggle-paid-${order.id}">
-            <input type="checkbox" title="已付款" ${order.is_paid ? 'checked' : ''}
-                   data-order-id="${order.id}" data-order-field="is_paid" />
-            <span class="toggle-track"></span>
-            <span class="toggle-thumb"></span>
-          </label>
+          ${order.is_cancelled ? '已取消' : order.is_paid
+            ? `${order.amount_due === 0 ? '禮物卡全額折抵' : '已付款'}${order.cash_received == null && order.amount_due !== 0 ? `<button type="button" class="btn-view-pdf" data-order-action="unpay" data-order-id="${order.id}">更正為未付款</button>` : ''}`
+            : `<button type="button" class="btn-view-pdf" data-order-action="payment" data-order-id="${order.id}">收款</button>`}
         </td>
         <td data-label="已列印">
           <label class="toggle" id="toggle-printed-${order.id}">
-            <input type="checkbox" title="已列印" ${order.is_printed ? 'checked' : ''}
+            <input type="checkbox" title="已列印" ${order.is_printed ? 'checked' : ''} ${order.is_cancelled ? 'disabled' : ''}
                    data-order-id="${order.id}" data-order-field="is_printed" />
             <span class="toggle-track"></span>
             <span class="toggle-thumb"></span>
@@ -160,6 +159,7 @@ export function renderTable(data) {
           <div class="d-flex gap-2">
             <button type="button" class="btn-view-pdf" data-order-action="preview" data-order-id="${order.id}">📄 查看</button>
             <button type="button" class="btn-delete" data-order-action="delete" data-order-id="${order.id}">🗑️ 刪除</button>
+            ${!order.is_printed && !order.is_cancelled ? `<button type="button" class="btn-delete" data-order-action="cancel" data-order-id="${order.id}">取消訂單</button>` : ''}
           </div>
         </td>
       </tr>
@@ -180,6 +180,8 @@ export async function updateOrder(orderId, field, value, checkbox) {
     await apiPut(`${API_BASE}/api/orders/${orderId}`, { [field]: value });
     const order = findOrder(orderId);
     if (order) order[field] = value;
+    renderTable(_allOrders);
+    renderStats(_allOrders);
     showToast('訂單 #' + orderId + ' 狀態更新成功');
   } catch (error) {
     checkbox.checked = !value;
@@ -192,7 +194,7 @@ export async function updateOrder(orderId, field, value, checkbox) {
 }
 
 export async function deleteOrder(orderId) {
-  if (!(await showConfirm(`確定要刪除訂單 #${orderId} 嗎?此操作將無法復原。`))) return;
+  if (!(await showConfirm(`確定要刪除訂單 #${orderId} 嗎?此操作將無法復原。\n刪除不會退回禮物卡折抵；若不再列印，請先使用「取消訂單」。`))) return;
   try {
     await apiDelete(`${API_BASE}/api/orders/${orderId}`);
     _allOrders = _allOrders.filter((o) => o.id !== orderId);

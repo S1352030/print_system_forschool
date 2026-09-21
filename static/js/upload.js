@@ -19,6 +19,8 @@ import {
 } from './preview.js';
 import { apiPost, apiPostWithProgress, ApiError } from './api.js';
 import { escHtml } from './utils.js';
+import { bindGiftCardEvents, getGiftCard, giftCardReady, clearGiftCard,
+  updateGiftCardBalance, invalidateGiftCard } from './gift-card.js';
 
 const MAX_FILES = 5;
 const MAX_PDF_BYTES = 20 * 1024 * 1024;
@@ -29,7 +31,9 @@ let selectedFiles = [];
 let activeFileIndex = 0;
 let renderedFile = null;
 let isCooldown = false;
+let isSubmitting = false;
 let cooldownTimer = null;
+const hasPendingUpload = () => selectedFiles.some((item) => item.pendingUpload);
 
 // DOM 引用(模組頂層取得;此模組在 <script type="module"> 載入,
 // 此時 DOM 已就緒,因為 module 預設 defer)
@@ -84,6 +88,7 @@ function handleFileListInput(event) {
 
 // ── 拖曳上傳事件綁定 ──────────────────────────────────────────
 export function bindUploadEvents() {
+  bindGiftCardEvents(() => { updatePriceSummary(); checkFormValidity(); });
   if (dropArea) {
     ['dragenter', 'dragover'].forEach((evt) => {
       dropArea.addEventListener(evt, (e) => {
@@ -170,7 +175,7 @@ function sanitizeFilename(filename) {
 
 // ── 加入檔案 ──────────────────────────────────────────────────
 export async function addFiles(files) {
-  if (isCooldown) return;
+  if (isCooldown || isSubmitting || hasPendingUpload()) return;
   let nonPdfFound = false;
   let duplicateFound = false;
   let overLimit = false;
@@ -523,10 +528,16 @@ function syncFileCard(card, fileObj) {
 // ── 表單驗證 ──────────────────────────────────────────────────
 export function checkFormValidity() {
   if (!submitBtn) return;
-  if (isCooldown) {
+  if (isCooldown || isSubmitting) {
     submitBtn.disabled = true;
     return;
   }
+  if (hasPendingUpload()) {
+    submitBtn.disabled = false;
+    if (btnText) btnText.textContent = '重試確認上傳結果';
+    return;
+  }
+  if (btnText) btnText.textContent = '確認上傳';
   let allSettingsOk = selectedFiles.every(
     (fileObj) => Number.isInteger(fileObj.pages) && fileObj.pages > 0 && !fileObj.parseError,
   );
@@ -546,10 +557,13 @@ export function checkFormValidity() {
     pickupError.style.display = pickupLocationInput.value.length > 20 ? 'block' : 'none';
   }
   const nameOk = !!(userNameInput && userNameInput.value.trim());
-  submitBtn.disabled = !(nameOk && selectedFiles.length > 0 && allSettingsOk && pickupLengthOk);
+  submitBtn.disabled = !(nameOk && selectedFiles.length > 0 && allSettingsOk && pickupLengthOk && giftCardReady());
 }
 
 function toggleFormInputs(disabled) {
+  disabled = disabled || hasPendingUpload();
+  const giftFields = document.getElementById('gift-card-fields');
+  if (giftFields) giftFields.disabled = disabled;
   if (fileInput) fileInput.disabled = disabled;
   if (userNameInput) userNameInput.disabled = disabled;
   if (pickupLocationInput) pickupLocationInput.disabled = disabled;
@@ -619,8 +633,9 @@ function hideUploadProgress() {
 // ── 表單提交處理 ──────────────────────────────────────────────
 async function handleSubmit(e) {
   e.preventDefault();
-  if (isCooldown) return;
+  if (isCooldown || isSubmitting || (!giftCardReady() && !hasPendingUpload())) return;
   if (selectedFiles.length === 0) return;
+  isSubmitting = true;
 
   if (submitBtn) submitBtn.disabled = true;
   if (btnSpinner) btnSpinner.classList.remove('hidden');
@@ -630,6 +645,7 @@ async function handleSubmit(e) {
 
   let uploadedCount = 0;
   let totalPaidPrice = 0;
+  let totalDiscount = 0;
   let hasError = false;
 
   toggleFormInputs(true);
@@ -650,18 +666,41 @@ async function handleSubmit(e) {
     if (bindingVal) formData.append('binding', bindingVal);
     if (pickupLocationVal) formData.append('pickup_location', pickupLocationVal);
 
+    // 網路中斷時保留原請求及識別碼，下一次送出只重試該筆。
+    // 已明確失敗的請求才重新試算；回應不明時不可自動更換識別碼。
+    if (!fileObj.pendingUpload) {
+      const card = getGiftCard();
+      const discount = card ? Math.min(card.balance, fileObj.pages * PRICE_MAP[fileObj.colorMode]) : 0;
+      formData.append('request_id', crypto.randomUUID());
+      if (discount) {
+        formData.append('gift_card_code', card.code);
+        formData.append('expected_discount', String(discount));
+      }
+      fileObj.pendingUpload = formData;
+    }
+
     try {
       const result = await apiPostWithProgress(
         '/api/upload',
-        formData,
+        fileObj.pendingUpload,
         (percent) => updateUploadProgress(percent, `[${i + 1}/${selectedFiles.length}] ${fileObj.file.name}`)
       );
       uploadedCount++;
       totalPaidPrice += result.total_price;
+      totalDiscount += result.gift_card_discount || 0;
+      if (result.gift_card_balance !== null && result.gift_card_balance !== undefined) {
+        updateGiftCardBalance(result.gift_card_balance);
+      }
+      fileObj.uploaded = true;
+      fileObj.pendingUpload = null;
     } catch (error) {
       hideUploadProgress();
       const errMsg = error instanceof ApiError ? error.message : '網路錯誤';
-      await showAlert(`檔案「${fileObj.file.name}」上傳失敗:${errMsg}`, 'error');
+      if (error.status >= 400 && error.status < 500) {
+        fileObj.pendingUpload = null;
+        if (error.status === 409 && getGiftCard()) invalidateGiftCard();
+      }
+      await showAlert(`檔案「${fileObj.file.name}」上傳失敗:${errMsg}${fileObj.pendingUpload ? '\n結果尚未確認，請按「重試確認上傳結果」。重試不會重複建立訂單或扣款。' : ''}`, 'error');
       hasError = true;
       break;
     }
@@ -670,24 +709,29 @@ async function handleSubmit(e) {
   hideUploadProgress();
 
   if (uploadedCount > 0) {
-    await showAlert(`上傳成功!共成功上傳 ${uploadedCount} 個檔案,應收金額 NT$ ${totalPaidPrice} 元。\n通知已發送給管理員。`, 'success');
+    await showAlert(`上傳成功!共成功上傳 ${uploadedCount} 個檔案。\n原價 NT$ ${totalPaidPrice} 元，禮物卡折抵 NT$ ${totalDiscount} 元，應收金額 NT$ ${totalPaidPrice - totalDiscount} 元。${hasError ? '\n未完成的檔案已保留，請確認後重試。' : ''}`, 'success');
 
     sessionStorage.setItem('print_user_name', nameVal);
     const historySearchInput = document.getElementById('history_search_name');
     if (historySearchInput) historySearchInput.value = nameVal;
 
-    if (uploadForm) uploadForm.reset();
+    if (!hasError && uploadForm) uploadForm.reset();
+    if (!hasError) clearGiftCard();
     if (userNameInput) userNameInput.value = nameVal;
-    await Promise.allSettled(selectedFiles.map((item) => releasePdfFile(item.file)));
-    selectedFiles = [];
+    await Promise.allSettled(selectedFiles.filter((item) => item.uploaded).map((item) => releasePdfFile(item.file)));
+    selectedFiles = selectedFiles.filter((item) => !item.uploaded);
+    activeFileIndex = 0;
     renderFileList();
     updatePriceSummary();
-    resetPreview();
+    if (selectedFiles.length) await showPreview(selectedFiles[0]);
+    else resetPreview();
+    isSubmitting = false;
     startCooldown();
 
     invalidateHistoryCache();
     refreshHistory();
   } else {
+    isSubmitting = false;
     if (btnText) btnText.textContent = '確認上傳';
     if (btnSpinner) btnSpinner.classList.add('hidden');
     toggleFormInputs(false);
@@ -745,7 +789,13 @@ export function updatePriceSummary() {
   });
 
   breakdownDiv.innerHTML = rows;
-  totalAmountSpan.textContent = 'NT$ ' + totalPrice.toLocaleString() + ' 元';
+  const card = getGiftCard();
+  const discount = card ? Math.min(card.balance, totalPrice) : 0;
+  if (card) {
+    breakdownDiv.innerHTML += `<div class="price-file-row"><span>原價</span><span>NT$ ${totalPrice} 元</span></div>
+      <div class="price-file-row"><span>禮物卡折抵</span><span>− NT$ ${discount} 元</span></div>`;
+  }
+  totalAmountSpan.textContent = 'NT$ ' + (totalPrice - discount).toLocaleString() + ' 元';
   if (pendingHint) {
     if (hasPending) {
       pendingHint.classList.remove('hidden');

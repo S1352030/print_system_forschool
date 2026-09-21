@@ -34,13 +34,13 @@ async function _extractErrorMessage(response) {
   }
   if (body && typeof body === 'object') {
     // 制式錯誤格式
-    if (body.detail) return body.detail;
-    if (body.error) return body.error;
     // Pydantic 422 驗證錯誤(detail 是陣列)
     if (Array.isArray(body.detail)) {
       const first = body.detail[0];
       if (first && first.msg) return `參數錯誤:${first.msg}`;
     }
+    if (typeof body.detail === 'string') return body.detail;
+    if (body.error) return body.error;
   }
   return `${response.status} ${response.statusText}`;
 }
@@ -129,7 +129,8 @@ export function apiPostWithProgress(url, formData, onProgress) {
         // 嘗試從 response 解析錯誤訊息
         let msg = `${xhr.status} ${xhr.statusText}`;
         if (xhr.response && typeof xhr.response === 'object') {
-          if (xhr.response.detail) msg = xhr.response.detail;
+          if (Array.isArray(xhr.response.detail)) msg = `參數錯誤:${xhr.response.detail[0]?.msg || '請檢查輸入內容'}`;
+          else if (xhr.response.detail) msg = xhr.response.detail;
           else if (xhr.response.error) msg = xhr.response.error;
         }
         reject(new ApiError(msg, { status: xhr.status }));
