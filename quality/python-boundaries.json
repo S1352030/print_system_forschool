@@ -1,0 +1,12 @@
+{
+  "main": ["compression", "compressed_static", "log_manager", "config", "schemas", "database", "gift_cards", "notify"],
+  "config": [],
+  "schemas": [],
+  "database": ["config"],
+  "gift_cards": ["database", "schemas"],
+  "notify": [],
+  "compression": [],
+  "compressed_static": ["compression"],
+  "log_manager": [],
+  "precompress": []
+}

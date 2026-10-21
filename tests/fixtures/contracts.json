@@ -1,0 +1,1687 @@
+{
+  "components": {
+    "schemas": {
+      "AnnouncementCreate": {
+        "properties": {
+          "content": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "type": "object"
+      },
+      "AnnouncementUpdate": {
+        "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "Body_check_pdf_pages_api_check_pages_post": {
+        "properties": {
+          "file": {
+            "format": "binary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "type": "object"
+      },
+      "Body_upload_order_api_upload_post": {
+        "properties": {
+          "binding": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "color_mode": {
+            "default": "bw",
+            "type": "string"
+          },
+          "duplex": {
+            "default": "single",
+            "type": "string"
+          },
+          "expected_discount": {
+            "default": 0,
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          "file": {
+            "format": "binary",
+            "type": "string"
+          },
+          "fit_mode": {
+            "default": "fit",
+            "type": "string"
+          },
+          "gift_card_code": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pickup_location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "user_name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "file",
+          "user_name"
+        ],
+        "type": "object"
+      },
+      "GiftCardCheck": {
+        "properties": {
+          "code": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "type": "object"
+      },
+      "GiftCardSearch": {
+        "properties": {
+          "page": {
+            "default": 1,
+            "minimum": 1.0,
+            "type": "integer"
+          },
+          "search": {
+            "default": "",
+            "maxLength": 64,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "GiftCardStatusUpdate": {
+        "properties": {
+          "is_active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "is_active"
+        ],
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "OrderCancel": {
+        "properties": {
+          "request_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id"
+        ],
+        "type": "object"
+      },
+      "OrderPayment": {
+        "properties": {
+          "cash_received": {
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          "note": {
+            "default": "",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "request_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "cash_received"
+        ],
+        "type": "object"
+      },
+      "OrderStatusUpdate": {
+        "properties": {
+          "is_paid": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "is_printed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array"
+          },
+          "msg": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBasic": {
+        "scheme": "basic",
+        "type": "http"
+      }
+    }
+  },
+  "paths": {
+    "/": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "head": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
+      }
+    },
+    "/admin.css": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/announcements": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
+      }
+    },
+    "/api/admin/gift-cards": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
+      }
+    },
+    "/api/admin/gift-cards/search": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GiftCardSearch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
+      }
+    },
+    "/api/admin/gift-cards/{card_id}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "card_id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
+      },
+      "put": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "card_id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GiftCardStatusUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
+      }
+    },
+    "/api/admin/orders/{order_id}/cancel": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderCancel"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
+      }
+    },
+    "/api/admin/orders/{order_id}/payment": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderPayment"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
+      }
+    },
+    "/api/announcements": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "head": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnouncementCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
+      }
+    },
+    "/api/announcements/{announcement_id}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "announcement_id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
+      },
+      "put": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "announcement_id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnouncementUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
+      }
+    },
+    "/api/check-pages": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_check_pdf_pages_api_check_pages_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/gift-cards/check": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GiftCardCheck"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orders": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
+      }
+    },
+    "/api/orders/history": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "user_name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orders/{order_id}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
+      },
+      "put": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderStatusUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
+      }
+    },
+    "/api/orders/{order_id}/file": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "file_name",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
+      }
+    },
+    "/api/orders/{order_id}/file/{file_name}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "file_name",
+            "required": true,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBasic": []
+          }
+        ]
+      }
+    },
+    "/api/orders/{order_id}/preview": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "user_name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "file_name",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orders/{order_id}/preview/{file_name}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "file_name",
+            "required": true,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "user_name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/upload": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_order_api_upload_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/style.css": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sw.js": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "tables": {
+    "announcements": {
+      "columns": {
+        "content": {
+          "default": null,
+          "nullable": false,
+          "primary_key": false,
+          "type": "VARCHAR"
+        },
+        "created_at": {
+          "default": "callable",
+          "nullable": true,
+          "primary_key": false,
+          "type": "DATETIME"
+        },
+        "id": {
+          "default": null,
+          "nullable": false,
+          "primary_key": true,
+          "type": "INTEGER"
+        },
+        "is_active": {
+          "default": true,
+          "nullable": false,
+          "primary_key": false,
+          "type": "BOOLEAN"
+        }
+      },
+      "constraints": [
+        {
+          "columns": [
+            "id"
+          ],
+          "expression": null,
+          "kind": "PrimaryKeyConstraint"
+        }
+      ],
+      "indexes": []
+    },
+    "gift_card_transactions": {
+      "columns": {
+        "amount": {
+          "default": null,
+          "nullable": false,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        "balance_after": {
+          "default": null,
+          "nullable": false,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        "card_id": {
+          "default": null,
+          "nullable": false,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        "created_at": {
+          "default": "callable",
+          "nullable": true,
+          "primary_key": false,
+          "type": "DATETIME"
+        },
+        "id": {
+          "default": null,
+          "nullable": false,
+          "primary_key": true,
+          "type": "INTEGER"
+        },
+        "kind": {
+          "default": null,
+          "nullable": false,
+          "primary_key": false,
+          "type": "VARCHAR"
+        },
+        "order_id": {
+          "default": null,
+          "nullable": false,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        "order_key": {
+          "default": null,
+          "nullable": false,
+          "primary_key": false,
+          "type": "VARCHAR"
+        },
+        "order_summary": {
+          "default": null,
+          "nullable": false,
+          "primary_key": false,
+          "type": "VARCHAR"
+        }
+      },
+      "constraints": [
+        {
+          "columns": [
+            "id"
+          ],
+          "expression": null,
+          "kind": "PrimaryKeyConstraint"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "gift_card_transactions.card_id"
+          ],
+          "name": "ix_gift_card_transactions_card_id",
+          "unique": false
+        }
+      ]
+    },
+    "gift_cards": {
+      "columns": {
+        "balance": {
+          "default": null,
+          "nullable": false,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        "code": {
+          "default": null,
+          "nullable": false,
+          "primary_key": false,
+          "type": "VARCHAR"
+        },
+        "created_at": {
+          "default": "callable",
+          "nullable": true,
+          "primary_key": false,
+          "type": "DATETIME"
+        },
+        "id": {
+          "default": null,
+          "nullable": false,
+          "primary_key": true,
+          "type": "INTEGER"
+        },
+        "initial_amount": {
+          "default": null,
+          "nullable": false,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        "is_active": {
+          "default": true,
+          "nullable": false,
+          "primary_key": false,
+          "type": "BOOLEAN"
+        },
+        "note": {
+          "default": "",
+          "nullable": false,
+          "primary_key": false,
+          "type": "VARCHAR"
+        },
+        "source_order_id": {
+          "default": null,
+          "nullable": false,
+          "primary_key": false,
+          "type": "INTEGER"
+        }
+      },
+      "constraints": [
+        {
+          "columns": [
+            "code"
+          ],
+          "expression": null,
+          "kind": "UniqueConstraint"
+        },
+        {
+          "columns": [
+            "id"
+          ],
+          "expression": null,
+          "kind": "PrimaryKeyConstraint"
+        },
+        {
+          "columns": [],
+          "expression": "balance >= 0 AND balance <= initial_amount",
+          "kind": "CheckConstraint"
+        },
+        {
+          "columns": [],
+          "expression": "initial_amount > 0",
+          "kind": "CheckConstraint"
+        }
+      ],
+      "indexes": []
+    },
+    "operation_receipts": {
+      "columns": {
+        "created_at": {
+          "default": "callable",
+          "nullable": true,
+          "primary_key": false,
+          "type": "DATETIME"
+        },
+        "fingerprint": {
+          "default": null,
+          "nullable": false,
+          "primary_key": false,
+          "type": "VARCHAR"
+        },
+        "request_id": {
+          "default": null,
+          "nullable": false,
+          "primary_key": true,
+          "type": "VARCHAR"
+        },
+        "response_json": {
+          "default": null,
+          "nullable": false,
+          "primary_key": false,
+          "type": "VARCHAR"
+        }
+      },
+      "constraints": [
+        {
+          "columns": [
+            "request_id"
+          ],
+          "expression": null,
+          "kind": "PrimaryKeyConstraint"
+        }
+      ],
+      "indexes": []
+    },
+    "orders": {
+      "columns": {
+        "binding": {
+          "default": null,
+          "nullable": true,
+          "primary_key": false,
+          "type": "VARCHAR"
+        },
+        "cash_received": {
+          "default": null,
+          "nullable": true,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        "color_mode": {
+          "default": "bw",
+          "nullable": false,
+          "primary_key": false,
+          "type": "VARCHAR"
+        },
+        "created_at": {
+          "default": "callable",
+          "nullable": true,
+          "primary_key": false,
+          "type": "DATETIME"
+        },
+        "display_name": {
+          "default": null,
+          "nullable": true,
+          "primary_key": false,
+          "type": "VARCHAR"
+        },
+        "duplex": {
+          "default": "single",
+          "nullable": false,
+          "primary_key": false,
+          "type": "VARCHAR"
+        },
+        "file_name": {
+          "default": null,
+          "nullable": false,
+          "primary_key": false,
+          "type": "VARCHAR"
+        },
+        "finance_key": {
+          "default": "callable",
+          "nullable": false,
+          "primary_key": false,
+          "type": "VARCHAR"
+        },
+        "fit_mode": {
+          "default": "fit",
+          "nullable": false,
+          "primary_key": false,
+          "type": "VARCHAR"
+        },
+        "gift_card_discount": {
+          "default": 0,
+          "nullable": false,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        "gift_card_id": {
+          "default": null,
+          "nullable": true,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        "id": {
+          "default": null,
+          "nullable": false,
+          "primary_key": true,
+          "type": "INTEGER"
+        },
+        "is_cancelled": {
+          "default": false,
+          "nullable": false,
+          "primary_key": false,
+          "type": "BOOLEAN"
+        },
+        "is_paid": {
+          "default": false,
+          "nullable": false,
+          "primary_key": false,
+          "type": "BOOLEAN"
+        },
+        "is_printed": {
+          "default": false,
+          "nullable": false,
+          "primary_key": false,
+          "type": "BOOLEAN"
+        },
+        "physical_path": {
+          "default": null,
+          "nullable": true,
+          "primary_key": false,
+          "type": "VARCHAR"
+        },
+        "pickup_location": {
+          "default": null,
+          "nullable": true,
+          "primary_key": false,
+          "type": "VARCHAR"
+        },
+        "total_pages": {
+          "default": null,
+          "nullable": false,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        "total_price": {
+          "default": null,
+          "nullable": false,
+          "primary_key": false,
+          "type": "INTEGER"
+        },
+        "user_name": {
+          "default": null,
+          "nullable": false,
+          "primary_key": false,
+          "type": "VARCHAR"
+        }
+      },
+      "constraints": [
+        {
+          "columns": [
+            "id"
+          ],
+          "expression": null,
+          "kind": "PrimaryKeyConstraint"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            "orders.user_name"
+          ],
+          "name": "ix_orders_user_name",
+          "unique": false
+        }
+      ]
+    }
+  }
+}

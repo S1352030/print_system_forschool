@@ -7,8 +7,10 @@ uploads/
 how to open.txt
 .env
 git_commit_guidelines_v1.pdf
-AI_CHANGELOG.md
-.agents
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/openspec-*/
 .zcode/
 # 預壓縮產生的靜態資源(由 precompress.py 在伺服器上生成)
 # 涵蓋 HTML/CSS/JS 與 PDF.js 函式庫(pdf.worker.js 等),
@@ -24,3 +26,8 @@ node_modules/
 static/builds/
 .deploy.lock
 .codex-qa/
+.quality-reports/
+.pytest_cache/
+.venv/
+test-results/
+playwright-report/

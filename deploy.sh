@@ -343,6 +343,7 @@ nice -n 10 npm run build
 
 echo "[4/10] 執行前端測試"
 npm run test:frontend
+npm run check:specs
 
 echo "[5/10] 安裝鎖定的 Python 依賴並執行既有檢查"
 source venv/bin/activate
@@ -355,8 +356,10 @@ else
   python -m pip install --quiet -r requirements.txt
 fi
 if [ -f requirements-dev.txt ]; then
-  python -m pytest -q tests/test_pdf_pipeline.py
+  python -m pytest -q tests
 fi
+npm run check:syntax
+npm run check:architecture
 python -c "from main import app; print('匯入檢查通過')"
 sqlite3 db.sqlite3 "PRAGMA integrity_check;" | grep -qx "ok"
 

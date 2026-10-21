@@ -39,7 +39,9 @@ uvicorn.run(main.app, host='127.0.0.1', port=${port}, log_level='warning')
 `], { cwd: root, windowsHide: true, env: {
   ...process.env, PYTHONUTF8: '1', DATABASE_URL: `sqlite:///${path.join(temp, 'test.sqlite3').replaceAll('\\', '/')}`,
   UPLOAD_DIR: path.join(temp, 'uploads'), ADMIN_USERNAME: 'gift-test-admin', ADMIN_PASSWORD: 'gift-test-password',
-  LINE_CHANNEL_ACCESS_TOKEN: '', LINE_RECEIVER_ID: '', APP_BUILD_ID: '', BACKEND_BUILD_ID: '',
+  LINE_CHANNEL_ACCESS_TOKEN: '', LINE_RECEIVER_ID: '',
+  APP_BUILD_ID: process.env.QA_BROWSER_BUILD_ID || '',
+  BACKEND_BUILD_ID: process.env.QA_BROWSER_BUILD_ID || '',
 } });
 let serverOutput = '';
 server.stdout.on('data', (chunk) => { serverOutput += chunk.toString(); });
