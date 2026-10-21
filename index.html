@@ -121,9 +121,11 @@
 
 
         <div class="md3-text-field mb-24">
-          <input type="text" id="pickup_location" name="pickup_location" placeholder=" " maxlength="100" required>
-          <label for="pickup_location">你要什麼時候拿? (例如: 明天中午、下午3點，限20字)</label>
-          <div id="pickup-error">⚠️ 抱歉，輸入字數最多只能 20 個字喔！</div>
+          <input type="text" id="pickup_location" name="pickup_location" placeholder=" " maxlength="100" required
+                 aria-describedby="pickup-help pickup-error">
+          <label for="pickup_location">你要什麼時候拿？</label>
+          <div id="pickup-help" class="md3-supporting-text">例如：明天中午、下午 3 點（限 20 字）</div>
+          <div id="pickup-error" role="alert">⚠️ 抱歉，輸入字數最多只能 20 個字喔！</div>
         </div>
 
         <!-- 即時試算金額 -->
@@ -199,7 +201,7 @@
   <!-- Right Column -->
   <div class="right-column">
     <!-- PDF Preview -->
-    <div class="preview-card flex-1">
+    <div class="preview-card pdf-preview-card flex-1">
       <h2>
         <span class="material-symbols-outlined"><svg><use href="#i-preview"/></svg></span>
         PDF 預覽

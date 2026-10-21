@@ -39,7 +39,9 @@ uvicorn.run(main.app, host='127.0.0.1', port=${port}, log_level='warning')
 `], { cwd: root, windowsHide: true, env: {
   ...process.env, PYTHONUTF8: '1', DATABASE_URL: `sqlite:///${path.join(temp, 'test.sqlite3').replaceAll('\\', '/')}`,
   UPLOAD_DIR: path.join(temp, 'uploads'), ADMIN_USERNAME: 'gift-test-admin', ADMIN_PASSWORD: 'gift-test-password',
-  LINE_CHANNEL_ACCESS_TOKEN: '', LINE_RECEIVER_ID: '', APP_BUILD_ID: '', BACKEND_BUILD_ID: '',
+  LINE_CHANNEL_ACCESS_TOKEN: '', LINE_RECEIVER_ID: '',
+  APP_BUILD_ID: process.env.QA_BROWSER_BUILD_ID || '',
+  BACKEND_BUILD_ID: process.env.QA_BROWSER_BUILD_ID || '',
 } });
 let serverOutput = '';
 server.stdout.on('data', (chunk) => { serverOutput += chunk.toString(); });
@@ -117,9 +119,35 @@ try {
   await page.locator('#gift-detail-body').getByText('取消訂單退回 +2 元', { exact: true }).waitFor();
   await page.locator('[data-close-finance="gift-detail-dialog"]').click();
 
+  // 後台 M3：統計來自伺服器全庫 summary、載入更多隱藏、開關可用鍵盤操作、搜尋與深淺模式。
+  const summary = (await (await api.get(`${origin}/api/orders?page=1&page_size=1`)).json()).summary;
+  assert.equal(await page.locator('#stat-unpaid').textContent(), `NT$ ${summary.unpaid_amount.toLocaleString()}`);
+  assert.equal(await page.locator('#stat-unprinted').textContent(), `${summary.unprinted_pages.toLocaleString()} 頁`);
+  assert.equal(await page.locator('#admin-load-more-btn').isVisible(), false);
+  const printedSwitch = page.getByRole('switch', { name: `訂單 #${order.order_id} 已列印` });
+  await printedSwitch.focus();
+  await page.keyboard.press('Space');
+  await page.waitForFunction(() => document.querySelector('.toast-msg')?.textContent.includes('狀態更新成功'));
+  const printedRow = (await (await api.get(`${origin}/api/orders?page=1&search=${order.order_id}`)).json()).items;
+  assert.deepEqual(printedRow.map((row) => [row.id, row.is_printed]), [[order.order_id, true]]);
+  await page.locator('#order-search').fill(String(order.order_id));
+  await page.waitForFunction((id) => {
+    const rows = [...document.querySelectorAll('#order-tbody tr')];
+    return rows.length === 1 && rows[0].id === `row-${id}`;
+  }, order.order_id);
+  const adminBackground = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.goto(`${origin}/admin`);
+  const lightBackground = await adminBackground();
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.goto(`${origin}/admin`);
+  assert.notEqual(await adminBackground(), lightBackground);
+  await page.emulateMedia({ colorScheme: null });
+
   // 行動裝置：套用、試算、全額卡餘額與收款視窗不超出畫面。
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(origin);
+  assert.equal(await page.locator('label[for="pickup_location"]').evaluate((label) => label.scrollWidth <= label.clientWidth), true);
   await page.locator('#user_name').fill('手機測試');
   await page.locator('#pickup_location').fill('明天中午');
   await page.locator('#pdf_file').setInputFiles({ name: 'mobile.pdf', mimeType: 'application/pdf', buffer: Buffer.from(pdfs[5], 'base64') });
@@ -129,6 +157,12 @@ try {
   await page.locator('#gift-card-fields').scrollIntoViewIfNeeded();
   await page.screenshot({ path: path.join(screenshotDir, 'gift-mobile.png') });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  const giftRow = await page.evaluate(() => ['#gift-card-code', '#gift-card-apply', '#gift-card-remove']
+    .map((selector) => Math.round(document.querySelector(selector).getBoundingClientRect().top)));
+  assert.ok(Math.max(...giftRow) - Math.min(...giftRow) < 8, `gift card row wrapped: ${giftRow}`);
+  assert.equal(await page.locator('.pdf-preview-card').isVisible(), true);
+  await page.locator('.file-item-preview-btn').click();
+  await page.waitForFunction(() => document.querySelector('.pdf-preview-card').getBoundingClientRect().top < innerHeight);
 
   // 回應遺失：伺服器已扣款，但重試必須回原訂單，不再扣一次。
   let lost = false;

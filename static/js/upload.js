@@ -57,7 +57,19 @@ function handleFileListClick(event) {
   const index = fileIndexFrom(control);
   if (index === null) return;
   if (control.dataset.fileAction === 'preview') previewFile(index);
+  if (control.dataset.fileAction === 'reveal-preview') {
+    previewFile(index);
+    revealPreviewCard();
+  }
   if (control.dataset.fileAction === 'remove') removeFile(index);
+}
+
+// 手機版預覽卡在表單下方;只有使用者按「預覽」時才捲動過去。
+function revealPreviewCard() {
+  const card = document.getElementById('pdf-preview-container')?.closest('.pdf-preview-card');
+  if (!card) return;
+  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  requestAnimationFrame(() => card.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' }));
 }
 
 function handleFileListKeydown(event) {
@@ -464,6 +476,7 @@ function renderFileList() {
           <span class="material-symbols-outlined file-item-icon"><svg><use href="#i-description"/></svg></span>
           <span class="file-item-name" title="${escHtml(file.name)}">${escHtml(file.name)} (${(file.size / 1024).toFixed(0)} KB) <span class="file-item-pages" data-file-pages>${pagesText}</span></span>
         </div>
+        <button type="button" data-file-action="reveal-preview" data-file-index="${idx}" class="file-item-preview-btn">預覽</button>
         <button type="button" data-file-action="remove" data-file-index="${idx}" class="file-item-remove-btn"
                 aria-label="移除 ${escHtml(file.name)}">
           <span class="material-symbols-outlined remove-icon"><svg><use href="#i-close"/></svg></span>

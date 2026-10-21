@@ -1,0 +1,10 @@
+{
+  "recordedOn": "2026-10-12",
+  "originalRevision": "8371b83687c4e69c2dbefdc1017ad838c99a1eda",
+  "originalFrontendCases": 43,
+  "originalBackendCases": 37,
+  "minimumFrontendCases": 48,
+  "minimumBackendCases": 59,
+  "policy": "Do not lower the floor or skip/deselect tests to bypass failures. Retiring a test requires a reviewed specification change.",
+  "knownStableRelease": null
+}

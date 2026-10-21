@@ -10,15 +10,28 @@
 </head>
 <body>
 
+<!-- SVG icon sprite (Material Symbols Outlined) -->
+<svg xmlns="http://www.w3.org/2000/svg" class="hidden-svg" aria-hidden="true">
+  <symbol id="i-print" viewBox="0 -960 960 960"><path d="M640-640v-120H320v120h-80v-200h480v200h-80Zm-480 80h640-640Zm560 100q17 0 28.5-11.5T760-500q0-17-11.5-28.5T720-540q-17 0-28.5 11.5T680-500q0 17 11.5 28.5T720-460Zm-80 260v-160H320v160h320Zm80 80H240v-160H80v-240q0-51 35-85.5t85-34.5h560q51 0 85.5 34.5T880-520v240H720v160Zm80-240v-160q0-17-11.5-28.5T760-560H200q-17 0-28.5 11.5T160-520v160h80v-80h480v80h80Z"/></symbol>
+  <symbol id="i-refresh" viewBox="0 -960 960 960"><path d="M480-160q-134 0-227-93t-93-227q0-134 93-227t227-93q69 0 132 28.5T720-690v-110h80v280H520v-80h168q-32-56-87.5-88T480-720q-100 0-170 70t-70 170q0 100 70 170t170 70q77 0 139-44t87-116h84q-28 106-114 173t-196 67Z"/></symbol>
+  <symbol id="i-search" viewBox="0 -960 960 960"><path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/></symbol>
+  <symbol id="i-close" viewBox="0 -960 960 960"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></symbol>
+  <symbol id="i-download" viewBox="0 -960 960 960"><path d="M480-320 280-520l56-58 104 104v-326h80v326l104-104 56 58-200 200ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z"/></symbol>
+  <symbol id="i-campaign" viewBox="0 -960 960 960"><path d="M720-440v-80h160v80H720Zm48 280-128-96 48-64 128 96-48 64Zm-80-480-48-64 128-96 48 64-128 96ZM200-200v-160h-40q-33 0-56.5-23.5T80-440v-80q0-33 23.5-56.5T160-600h160l200-120v480L320-360h-40v160h-80Zm240-182v-196l-98 58H160v80h182l98 58Zm120 36v-268q27 24 43.5 58.5T620-480q0 41-16.5 75.5T560-346ZM300-480Z"/></symbol>
+</svg>
+
 <header class="site-header">
-  <div class="logo">🖨</div>
+  <div class="logo" aria-hidden="true"><svg class="admin-icon"><use href="#i-print"/></svg></div>
   <div>
     <h1>影印計價後台管理</h1>
     <small>Print Order Management System</small>
   </div>
-  <button id="btn-refresh-orders" class="btn-refresh">↻ 重新整理</button>
+  <button type="button" id="btn-refresh-orders" class="btn-refresh">
+    <svg class="admin-icon" aria-hidden="true"><use href="#i-refresh"/></svg>重新整理
+  </button>
 </header>
 
+<main class="admin-main">
 <div class="stats-row">
   <div class="stat-card unpaid">
     <div class="stat-label">未付款總金額</div>
@@ -26,7 +39,7 @@
     <div class="stat-sub" id="stat-unpaid-count">計算中…</div>
   </div>
   <div class="stat-card unprinted">
-    <div class="stat-label">待列印份數</div>
+    <div class="stat-label">待列印頁數</div>
     <div class="stat-value" id="stat-unprinted">—</div>
     <div class="stat-sub" id="stat-unprinted-pages">計算中…</div>
   </div>
@@ -37,61 +50,15 @@
   </div>
 </div>
 
-<section class="table-section gift-admin-section" aria-labelledby="gift-admin-title">
-  <h2 class="section-title" id="gift-admin-title">禮物卡</h2>
-  <p>在訂單按「收款」，輸入實收金額，多收的差額會自動轉成禮物卡。</p>
-  <form id="gift-search-form" class="gift-admin-controls">
-    <label for="gift-search">查詢代碼</label>
-    <input id="gift-search" type="text" maxlength="64" autocomplete="off" placeholder="輸入完整代碼，留白顯示全部">
-    <button class="btn-view-pdf" type="submit">查詢／重新整理</button>
-  </form>
-  <p id="gift-admin-status" role="status"></p>
-  <div id="gift-card-list" class="gift-card-list"></div>
-  <div class="gift-admin-controls">
-    <button id="gift-prev" type="button" class="btn-view-pdf">上一頁</button>
-    <span id="gift-page"></span>
-    <button id="gift-next" type="button" class="btn-view-pdf">下一頁</button>
+<section class="table-section" aria-labelledby="orders-title">
+  <div class="section-header">
+    <h2 class="section-title" id="orders-title">所有訂單</h2>
+    <form id="order-search-form" class="order-search" role="search">
+      <svg class="admin-icon" aria-hidden="true"><use href="#i-search"/></svg>
+      <input id="order-search" type="search" maxlength="64" autocomplete="off"
+             placeholder="搜尋姓名或訂單編號" aria-label="搜尋姓名或訂單編號">
+    </form>
   </div>
-</section>
-
-<div class="announcement-section">
-  <div class="section-title">系統公告管理</div>
-  <div class="row g-3">
-    <!-- Left: Publish Form -->
-    <div class="col-md-5">
-      <div class="stat-card announcement-editor-card">
-        <div>
-          <label class="stat-label" for="announce-input">發佈新公告</label>
-          <textarea id="announce-input" class="form-control" rows="4" placeholder="請輸入公告內容..."></textarea>
-        </div>
-        <button id="btn-publish-announce" class="btn-view-pdf">
-          📢 發布公告
-        </button>
-      </div>
-    </div>
-    <!-- Right: Announcement List -->
-    <div class="col-md-7">
-      <div class="table-wrapper announcement-table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th class="w-50-percent">內容</th>
-              <th>發佈時間</th>
-              <th>顯示</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody id="announce-tbody">
-            <tr class="state-row"><td colspan="4"><span class="spinner"></span>載入公告中…</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="table-section">
-  <div class="section-title">所有訂單</div>
   <div class="table-wrapper">
     <table>
       <thead>
@@ -112,10 +79,56 @@
       </tbody>
     </table>
   </div>
-</div>
+</section>
+
+<section class="table-section gift-admin-section" aria-labelledby="gift-admin-title">
+  <h2 class="section-title" id="gift-admin-title">禮物卡</h2>
+  <p>在訂單按「收款」，輸入實收金額，多收的差額會自動轉成禮物卡。</p>
+  <form id="gift-search-form" class="gift-admin-controls">
+    <label for="gift-search">查詢代碼</label>
+    <input id="gift-search" type="text" maxlength="64" autocomplete="off" placeholder="輸入完整代碼，留白顯示全部">
+    <button class="btn-view-pdf" type="submit">查詢／重新整理</button>
+  </form>
+  <p id="gift-admin-status" role="status"></p>
+  <div id="gift-card-list" class="gift-card-list"></div>
+  <div class="gift-admin-controls">
+    <button id="gift-prev" type="button" class="btn-outlined">上一頁</button>
+    <span id="gift-page"></span>
+    <button id="gift-next" type="button" class="btn-outlined">下一頁</button>
+  </div>
+</section>
+
+<section class="announcement-section" aria-labelledby="announce-title">
+  <h2 class="section-title" id="announce-title">系統公告管理</h2>
+  <div class="announcement-layout">
+    <div class="stat-card announcement-editor-card">
+      <label class="stat-label" for="announce-input">發佈新公告</label>
+      <textarea id="announce-input" rows="4" placeholder="請輸入公告內容..."></textarea>
+      <button type="button" id="btn-publish-announce" class="btn-view-pdf">
+        <svg class="admin-icon" aria-hidden="true"><use href="#i-campaign"/></svg>發布公告
+      </button>
+    </div>
+    <div class="table-wrapper announcement-table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th class="w-50-percent">內容</th>
+            <th>發佈時間</th>
+            <th>顯示</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="announce-tbody">
+          <tr class="state-row"><td colspan="4"><span class="spinner"></span>載入公告中…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+</main>
 
 <dialog id="payment-dialog" class="finance-dialog" aria-labelledby="payment-title">
-  <div class="finance-dialog-header"><h2 id="payment-title">確認收款</h2><button type="button" data-close-finance="payment-dialog" aria-label="關閉收款視窗">✕</button></div>
+  <div class="finance-dialog-header"><h2 id="payment-title">確認收款</h2><button type="button" data-close-finance="payment-dialog" aria-label="關閉收款視窗"><svg class="admin-icon" aria-hidden="true"><use href="#i-close"/></svg></button></div>
   <form id="payment-form">
     <p id="payment-summary"></p>
     <label for="payment-cash">實際收到的現金（元）</label>
@@ -129,9 +142,9 @@
 </dialog>
 
 <dialog id="gift-detail-dialog" class="finance-dialog" aria-labelledby="gift-detail-title">
-  <div class="finance-dialog-header"><h2 id="gift-detail-title">禮物卡交易紀錄</h2><button type="button" data-close-finance="gift-detail-dialog" aria-label="關閉交易紀錄">✕</button></div>
+  <div class="finance-dialog-header"><h2 id="gift-detail-title">禮物卡交易紀錄</h2><button type="button" data-close-finance="gift-detail-dialog" aria-label="關閉交易紀錄"><svg class="admin-icon" aria-hidden="true"><use href="#i-close"/></svg></button></div>
   <div id="gift-detail-body"></div>
-  <div class="gift-admin-controls"><button id="gift-detail-prev" type="button" class="btn-view-pdf">上一頁</button><span id="gift-detail-page"></span><button id="gift-detail-next" type="button" class="btn-view-pdf">下一頁</button></div>
+  <div class="gift-admin-controls"><button id="gift-detail-prev" type="button" class="btn-outlined">上一頁</button><span id="gift-detail-page"></span><button id="gift-detail-next" type="button" class="btn-outlined">下一頁</button></div>
 </dialog>
 
 <dialog class="modal-backdrop" id="pdf-modal" aria-labelledby="modal-title">
@@ -143,9 +156,9 @@
       </div>
       <div class="modal-header-actions">
         <button type="button" class="btn-download-pdf" id="btn-download-pdf"
-                data-admin-pdf-download hidden>📥 下載 PDF</button>
+                data-admin-pdf-download hidden><svg class="admin-icon" aria-hidden="true"><use href="#i-download"/></svg>下載 PDF</button>
         <button type="button" class="btn-close-modal" data-admin-pdf-close
-                aria-label="關閉 PDF 預覽">✕</button>
+                aria-label="關閉 PDF 預覽"><svg class="admin-icon" aria-hidden="true"><use href="#i-close"/></svg></button>
       </div>
     </div>
     <div class="modal-settings" id="modal-settings"></div>

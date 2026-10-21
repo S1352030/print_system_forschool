@@ -1,0 +1,47 @@
+schema: spec-driven
+
+context: |
+  Language: zh-TW
+  All artifacts must be written in zh-TW.
+  Keep OpenSpec structural headings and SHALL/MUST keywords in English.
+  Project: school PDF print orders; native HTML/CSS/ES modules + Vite 8.1.5,
+  FastAPI/Pydantic/SQLAlchemy + SQLite WAL, self-hosted PDF.js 5.7.284.
+  Node 22.23.2; Python 3.10+ (CI 3.13). No member accounts or printer driver.
+  Current boundaries: ARCHITECTURE.md. Workflow: AGENTS.md and docs/QUALITY.md.
+  Historical context: existing AI_CHANGELOG.md; known debt: docs/KNOWN_ISSUES.md.
+  Preserve original PDFs, server page pricing, transaction/idempotency/ledger,
+  API compatibility, authorization, cache privacy and existing tests.
+  Full acceptance: npm run check. Fast mode is partial and cannot mark stable.
+  Do not automatically deploy, reset Git, restore DB or rewrite business modules.
+
+rules:
+  proposal:
+    - State affected capabilities, files, public API/data/security impact and acceptance checks.
+  design:
+    - Describe compatibility, failure handling, local changes and safe rollback boundaries.
+  specs:
+    - Each requirement needs verifiable WHEN/THEN scenarios based on real project behavior.
+  tasks:
+    - Include spec review, focused implementation, regressions, existing Changelog and result evidence.
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always state what is out of scope
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing

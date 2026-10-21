@@ -3,7 +3,8 @@
  * 負責模組協調與事件綁定。
  */
 
-import { loadOrders, updateOrder, deleteOrder, findOrder } from './orders.js';
+import { loadOrders, updateOrder, deleteOrder, findOrder, searchOrders } from './orders.js';
+import { debounce } from '../utils.js';
 import { bindAdminGiftCardEvents, loadGiftCards, openPayment, cancelOrder } from './gift-cards.js';
 import { apiPut } from '../api.js';
 import { showConfirm, showAlert } from '../dialog-api.js';
@@ -21,6 +22,13 @@ function bindAdminEvents() {
   });
   document.getElementById('btn-publish-announce')?.addEventListener('click', () => {
     void publishAnnouncement();
+  });
+  const searchInput = document.getElementById('order-search');
+  const debouncedSearch = debounce(() => searchOrders(searchInput.value), 300);
+  searchInput?.addEventListener('input', debouncedSearch);
+  document.getElementById('order-search-form')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    searchOrders(searchInput.value);
   });
 
   const orderTable = document.getElementById('order-tbody');
