@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pypdf import PdfReader
 from sqlalchemy.orm import Session
-from sqlalchemy import text
+from sqlalchemy import or_, text
 
 # 壓縮模組（Brotli 優先 + Gzip 備用）
 from compression import BrotliGzipMiddleware, serve_precompressed
@@ -1295,6 +1295,7 @@ async def get_all_orders(
     request: Request,
     page: int | None = Query(default=None, ge=1, description="頁碼(從 1 開始);不帶則回傳舊版全量格式"),
     page_size: int | None = Query(default=None, ge=1, description="每頁筆數(上限由 ORDERS_MAX_PAGE_SIZE 控制)"),
+    q: str | None = Query(default=None, max_length=64, description="姓名包含;純數字時也比對訂單編號(僅分頁模式)"),
     db: Session = Depends(get_db),
     username: str = Depends(authenticate_admin),
     _rl: None = Depends(rate_limit("admin")),
@@ -1305,7 +1306,8 @@ async def get_all_orders(
     向後相容設計:
     - 不帶 page 參數 → 回傳舊版純陣列(但加安全上限 ORDERS_MAX_PAGE_SIZE,
       並附 X-Deprecation-Warning header 提示未來將淘汰)。
-    - 帶 page 參數 → 回傳分頁結構 {items, total, page, page_size, total_pages}。
+    - 帶 page 參數 → 回傳分頁結構 {items, total, page, page_size, total_pages, summary};
+      summary 為全庫統計,不受分頁與 q 影響。
     """
     # 釐清有效 page_size(不論哪種模式都套用上限保護)
     effective_page_size = (
@@ -1331,6 +1333,12 @@ async def get_all_orders(
         return response
 
     # 分頁模式
+    search = (q or "").strip()
+    if search:
+        condition = Order.user_name.contains(search, autoescape=True)
+        if search.isdigit():
+            condition = or_(condition, Order.id == int(search))
+        base_query = base_query.filter(condition)
     total = base_query.count()
     total_pages = (total + effective_page_size - 1) // effective_page_size if total > 0 else 0
     items = base_query.offset((page - 1) * effective_page_size).limit(effective_page_size).all()
@@ -1340,6 +1348,22 @@ async def get_all_orders(
         "page": page,
         "page_size": effective_page_size,
         "total_pages": total_pages,
+        "summary": _admin_order_summary(db),
+    }
+
+
+def _admin_order_summary(db: Session) -> dict:
+    """全庫未取消訂單的未付款／待列印統計,供後台統計卡使用。"""
+    rows = db.query(
+        Order.total_price, Order.gift_card_discount, Order.total_pages, Order.is_paid, Order.is_printed,
+    ).filter(Order.is_cancelled == False).all()
+    unpaid = [r for r in rows if not r.is_paid]
+    unprinted = [r for r in rows if not r.is_printed]
+    return {
+        "unpaid_count": len(unpaid),
+        "unpaid_amount": sum(max(0, r.total_price - r.gift_card_discount) for r in unpaid),
+        "unprinted_count": len(unprinted),
+        "unprinted_pages": sum(r.total_pages or 0 for r in unprinted),
     }
 
 def _admin_order_json(order):

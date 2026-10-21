@@ -1,5 +1,51 @@
 # AI Changelog
 
+### [2026/10/21 19:49] - 後台改用 Material 3 共用主題並修正統計、隱藏與手機版版面
+
+**1. 改了哪裡 (What changed):**
+- 修改的檔案路徑：`main.py`
+- 具體變更：`GET /api/orders` 分頁格式新增全庫 `summary`（未付款筆數／金額、待列印筆數／頁數），新增選填 `q`（姓名包含、純數字時比對編號，萬用字元跳脫）；舊陣列格式不變。
+
+- 修改的檔案路徑：`static/material-common.css`
+- 具體變更：接收原本 style.css 的 M3 token、六組配色、`html.dark` 與 `.hidden`，成為前後台共用主題來源。
+
+- 修改的檔案路徑：`style.css`
+- 具體變更：移出共用 token；取件時間改短標籤加輔助說明；禮物卡按鈕不換行、48px；歷史 badge 與 tooltip、spinner 改用 token；新增手機版「預覽」按鈕樣式。
+
+- 修改的檔案路徑：`admin.css`
+- 具體變更：以 M3 token 重寫後台樣式（頂部應用列、統計卡、tonal／outlined／text 按鈕、可聚焦 switch、chips、snackbar、按鈕群組），跟隨深淺模式與配色；刪除與 pdf-preview.css 重複的 PDF 框樣式。
+
+- 修改的檔案路徑：`admin.html`
+- 具體變更：訂單區塊移到統計卡下方並加入搜尋欄；以 SVG 圖示取代 emoji；「待列印份數」改為「待列印頁數」；加入 `<main>` 與 section 標題。
+
+- 修改的檔案路徑：`static/js/admin/orders.js`
+- 具體變更：統計改用伺服器 summary（沒有時退回已載入資料）；新增搜尋與過期回應防護；狀態更新／刪除後重新取得 summary；開關加上 `role="switch"` 與 aria-label；「刪除」與「取消訂單」分開並移除 emoji。
+
+- 修改的檔案路徑：`static/js/admin/app.js`、`static/js/admin/announcements.js`
+- 具體變更：綁定搜尋欄（300ms debounce）；公告開關加上 switch 語意、移除 emoji。
+
+- 修改的檔案路徑：`index.html`、`static/js/upload.js`、`static/pdf-preview.css`
+- 具體變更：取件時間欄位加 aria-describedby；PDF 預覽卡加 `pdf-preview-card`；手機版檔案卡新增「預覽」按鈕並捲到預覽卡；PDF 控制列改用 M3 docked toolbar 的 surface 色。
+
+- 修改的檔案路徑：`tests/test_core_contracts.py`、`tests/browser_gift_cards_smoke.mjs`、`tests/fixtures/contracts.json`
+- 具體變更：新增跨頁統計／搜尋／萬用字元 pytest（後端 60 案例，最低門檻維持 59）；瀏覽器驗證 summary、載入更多隱藏、鍵盤切換開關、搜尋、深淺模式及手機版版面；契約手動加入選填 `q`。
+
+- 修改的檔案路徑：`ARCHITECTURE.md`、`docs/KNOWN_ISSUES.md`
+- 具體變更：記錄共用 token 來源與 `/api/orders` 的 summary／q；新增 TEST-03（手機版 placeholder 版面改動使 WebKit 崩潰）。
+
+- 新增的檔案路徑：`openspec/changes/align-m3-ui-and-admin-summary/`
+- 具體變更：proposal、design、tasks 與 print-orders／interface-design delta specs。
+
+**2. 為什麼要改 (Why it changed):**
+- 原始問題或動機：使用者要求依 Material 3 Expressive 修正不合規處。實測發現後台統計只算前 50 筆會少算未付款、`admin.css` 缺 `.hidden` 使「載入更多（還剩 0 筆）」常駐、已列印開關無法用鍵盤操作，後台也沒有跟隨主題；前台手機版預覽卡離檔案設定太遠、標籤被截斷、按鈕換行。
+- 決策原因：token 集中到兩頁已 import 的共用檔，不增加請求；保留所有 JS／測試使用的 class 與 data 屬性，只換樣式，避免重寫模組；統計交給伺服器計算才能跨頁正確；不導入 @material/web（僅維護、無 Expressive 元件）。
+
+**3. 後續影響與注意事項 (Impact & Watchouts):**
+- API 為相容新增；`tests/fixtures/contracts.json` 的 `q` 參數需人工審查。
+- 部署需照常重新建置與預壓縮；後台色彩會隨使用者系統深淺模式與隨機配色改變，屬刻意行為。
+- 手機版 `.pdf-placeholder` 版面刻意未改：二分測試確認任何手機版尺寸改動（隱藏、單行、甚至只改 min-height）都會讓 Playwright WebKit 在 browser_preview_smoke 穩定崩潰，原因未查明，已記入 docs/KNOWN_ISSUES.md（TEST-03）。
+- 未在真實 iPhone／Android 與正式站驗收。
+
 ### [2026/10/12 21:23] - 建立AI長期迭代規格、架構防護與自動回歸品質系統
 
 **1. 改了哪裡 (What changed):**

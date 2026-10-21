@@ -142,6 +142,33 @@ def test_order_pagination_legacy_shape_and_private_fields(client):
     assert client.get("/api/orders/history?user_name=page-user&page=0").status_code == 422
 
 
+def test_admin_order_summary_counts_all_pages_and_search_filters_items(client):
+    with SessionLocal() as db:
+        db.add_all([Order(user_name="王同學", file_name=f"{i}.pdf", total_pages=2, total_price=4,
+                         gift_card_discount=1) for i in range(59)])
+        db.add(Order(user_name="李同學", file_name="lee.pdf", total_pages=2, total_price=4, gift_card_discount=1))
+        db.add(Order(user_name="已完成", file_name="done.pdf", total_pages=9, total_price=9,
+                     is_paid=True, is_printed=True))
+        db.add(Order(user_name="已取消", file_name="void.pdf", total_pages=5, total_price=5, is_cancelled=True))
+        db.add(Order(user_name="全額折抵%", file_name="free.pdf", total_pages=1, total_price=2, gift_card_discount=5))
+        db.commit()
+        target_id = db.query(Order.id).filter(Order.user_name == "李同學").scalar()
+    page = client.get("/api/orders?page=1&page_size=50", auth=AUTH).json()
+    assert len(page["items"]) == 50 and page["total"] == 63
+    assert page["summary"] == {"unpaid_count": 61, "unpaid_amount": 60 * 3,
+                               "unprinted_count": 61, "unprinted_pages": 60 * 2 + 1}
+    named = client.get("/api/orders?page=1&page_size=50&q=%20王%20", auth=AUTH).json()
+    assert named["total"] == 59 and all(item["user_name"] == "王同學" for item in named["items"])
+    assert named["summary"] == page["summary"]
+    by_id = client.get(f"/api/orders?page=1&q={target_id}", auth=AUTH).json()
+    assert [item["id"] for item in by_id["items"]] == [target_id]
+    wildcard = client.get("/api/orders?page=1&q=%25", auth=AUTH).json()
+    assert [item["user_name"] for item in wildcard["items"]] == ["全額折抵%"]
+    assert client.get("/api/orders?page=1&q=" + "x" * 65, auth=AUTH).status_code == 422
+    legacy = client.get("/api/orders?q=王", auth=AUTH).json()
+    assert isinstance(legacy, list) and len(legacy) == 63
+
+
 @pytest.mark.parametrize("color,price", [("bw", 3), ("color", 6)])
 def test_actual_pdf_pricing_options_and_owner_preview(client, color, price):
     pdf = make_pdf(pages=3)

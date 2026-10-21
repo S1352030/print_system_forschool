@@ -170,8 +170,9 @@
   gap: 4px;
   min-height: 64px;
   padding: 8px 12px;
-  color: var(--md-sys-color-inverse-on-surface);
-  background: var(--md-sys-color-inverse-surface);
+  /* M3 docked toolbar: surface container, not the inverse (snackbar) colors. */
+  color: var(--md-sys-color-on-surface);
+  background: var(--md-sys-color-surface-container-highest);
 }
 
 .pdf-preview__icon-button,

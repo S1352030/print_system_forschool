@@ -34,14 +34,14 @@ export function renderAnnouncements(data) {
       <td class="mono">${formatDate(ann.created_at)}</td>
       <td>
         <label class="toggle">
-          <input type="checkbox" title="顯示" ${ann.is_active ? 'checked' : ''}
+          <input type="checkbox" role="switch" aria-label="顯示公告 #${ann.id}" ${ann.is_active ? 'checked' : ''}
                  data-announcement-id="${ann.id}" data-announcement-status />
           <span class="toggle-track"></span>
           <span class="toggle-thumb"></span>
         </label>
       </td>
       <td>
-        <button type="button" class="btn-delete" data-announcement-action="delete" data-announcement-id="${ann.id}">🗑️ 刪除</button>
+        <button type="button" class="btn-delete" data-announcement-action="delete" data-announcement-id="${ann.id}">刪除</button>
       </td>
     </tr>
   `).join('');

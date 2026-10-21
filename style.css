@@ -1,298 +1,5 @@
 @import url("./static/material-common.css");
 
-:root {
-  color-scheme: light;
-  /* MD3 Design Token Aliases */
-  --md-sys-color-primary: var(--primary);
-  --md-sys-color-on-primary: var(--on-primary);
-  --md-sys-color-primary-container: var(--primary-container);
-  --md-sys-color-on-primary-container: var(--on-primary-container);
-  --md-sys-color-surface: var(--surface);
-  --md-sys-color-surface-container: var(--surface-container);
-  --md-sys-color-on-surface: var(--on-surface);
-  --md-sys-color-on-surface-variant: var(--on-surface-variant);
-  --md-sys-color-outline: var(--outline);
-  --md-sys-color-outline-variant: rgba(var(--on-surface-rgb), 0.16);
-  --md-sys-color-error: var(--error);
-  --md-sys-color-error-container: color-mix(in srgb, var(--error) 16%, var(--surface));
-  --md-sys-color-on-error-container: var(--error);
-  --md-sys-color-inverse-surface: var(--on-surface);
-  --md-sys-color-inverse-on-surface: var(--surface);
-  --md-sys-color-surface-container-low: color-mix(in srgb, var(--surface) 80%, var(--surface-container));
-  --md-sys-color-surface-container-high: color-mix(in srgb, var(--surface-container) 98%, var(--on-surface) 2%);
-  --md-sys-color-surface-container-highest: color-mix(in srgb, var(--surface-container) 96%, var(--on-surface) 4%);
-  --pdf-preview-paper: #ffffff;
-  
-  /* MD3 Shape Tokens */
-  --md-sys-shape-corner-none: 0px;
-  --md-sys-shape-corner-extra-small: 4px;
-  --md-sys-shape-corner-small: 8px;
-  --md-sys-shape-corner-medium: 12px;
-  --md-sys-shape-corner-large: 16px;
-  --md-sys-shape-corner-extra-large: 28px;
-  --md-sys-shape-corner-full: 9999px;
-  
-  /* MD3 Motion Tokens */
-  --md-sys-motion-easing-emphasized: cubic-bezier(0.2, 0, 0, 1);
-  --md-sys-motion-easing-emphasized-decel: cubic-bezier(0.05, 0.7, 0.1, 1);
-  --md-sys-motion-easing-emphasized-accel: cubic-bezier(0.3, 0, 0.8, 0.15);
-  --md-sys-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
-  --md-sys-motion-duration-short: 200ms;
-  --md-sys-motion-duration-medium: 300ms;
-  --md-sys-motion-duration-long: 500ms;
-  
-  /* MD3 Elevation (tonal surface colors) */
-  --md-sys-elevation-1: color-mix(in srgb, var(--surface) 95%, var(--primary) 5%);
-  --md-sys-elevation-2: color-mix(in srgb, var(--surface) 92%, var(--primary) 8%);
-  --md-sys-elevation-3: color-mix(in srgb, var(--surface) 89%, var(--primary) 11%);
-
-  /* Semantic elevation aliases */
-  --md-sys-elevation-card: var(--md-sys-elevation-1);
-  --md-sys-elevation-raised: var(--md-sys-elevation-2);
-
-  /* MD3 State Layer opacities (on-surface overlays for hover/focus/pressed) */
-  --md-sys-state-layer-hover: rgba(var(--on-surface-rgb), 0.08);
-  --md-sys-state-layer-focus: rgba(var(--on-surface-rgb), 0.12);
-  --md-sys-state-layer-pressed: rgba(var(--on-surface-rgb), 0.12);
-
-  /* MD3 Typography Tokens (system sans-serif stack) */
-  --md-sys-typescale-title-large-size: 1.375rem;
-  --md-sys-typescale-title-large-weight: 400;
-  --md-sys-typescale-title-large-line-height: 1.75rem;
-  --md-sys-typescale-title-large-tracking: 0;
-  --md-sys-typescale-title-medium-size: 1rem;
-  --md-sys-typescale-title-medium-weight: 500;
-  --md-sys-typescale-title-medium-line-height: 1.5rem;
-  --md-sys-typescale-title-medium-tracking: 0.009375rem;
-  --md-sys-typescale-title-small-size: 0.875rem;
-  --md-sys-typescale-title-small-weight: 500;
-  --md-sys-typescale-title-small-line-height: 1.25rem;
-  --md-sys-typescale-title-small-tracking: 0.00625rem;
-  --md-sys-typescale-body-large-size: 1rem;
-  --md-sys-typescale-body-large-weight: 400;
-  --md-sys-typescale-body-large-line-height: 1.5rem;
-  --md-sys-typescale-body-large-tracking: 0.03125rem;
-  --md-sys-typescale-body-medium-size: 0.875rem;
-  --md-sys-typescale-body-medium-weight: 400;
-  --md-sys-typescale-body-medium-line-height: 1.25rem;
-  --md-sys-typescale-body-medium-tracking: 0.015625rem;
-  --md-sys-typescale-label-large-size: 0.875rem;
-  --md-sys-typescale-label-large-weight: 500;
-  --md-sys-typescale-label-large-line-height: 1.25rem;
-  --md-sys-typescale-label-large-tracking: 0.00625rem;
-  --md-sys-typescale-label-small-size: 0.6875rem;
-  --md-sys-typescale-label-small-weight: 500;
-  --md-sys-typescale-label-small-line-height: 1rem;
-  --md-sys-typescale-label-small-tracking: 0.03125rem;
-
-  --primary: #006494;
-  --on-primary: #ffffff;
-  --primary-container: #cae6ff;
-  --on-primary-container: #001e30;
-  --surface: #fdfcff;
-  --surface-container: #f0f4f8;
-  --on-surface: #1a1c1e;
-  --on-surface-variant: #43474e;
-  --outline: #73777f;
-  
-  /* Status badges */
-  --status-paid-bg: #e8f5e9;
-  --status-paid-text: #2e7d32;
-  --status-unpaid-bg: #ffebee;
-  --status-unpaid-text: #c62828;
-  --status-queued-bg: #fff8e1;
-  --status-queued-text: #805900;
-  
-  /* Cooldown banner */
-  --cooldown-bg: #fbe9e7;
-  --cooldown-text: #d84315;
-  --cooldown-border: #ffccbc;
-  
-  /* Price summary */
-  --price-bg: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
-  --price-border: #a5d6a7;
-  --price-text: #2e7d32;
-  --price-total: #1b5e20;
-  --price-subtext: #33691e;
-  --price-divider: rgba(46, 125, 50, 0.25);
-  
-  /* Hover states */
-  --tab-hover-bg: rgba(0, 100, 148, 0.05);
-  --tab-active-bg: rgba(0, 100, 148, 0.08);
-  
-  /* Error indicator */
-  --error: #ba1a1a;
-  
-  /* Color channels for opacity calculations */
-  --on-surface-rgb: 26, 28, 30;
-}
-
-html.dark {
-  color-scheme: dark;
-  --primary: #8ecdff;
-  --on-primary: #003450;
-  --primary-container: #004b71;
-  --on-primary-container: #cae6ff;
-  --surface: #111416;
-  --surface-container: #1b1e22;
-  --on-surface: #e2e2e6;
-  --on-surface-variant: #c3c7cf;
-  --outline: #8d9199;
-  
-  /* Status badges */
-  --status-paid-bg: rgba(46, 125, 50, 0.18);
-  --status-paid-text: #81c784;
-  --status-unpaid-bg: rgba(198, 40, 40, 0.18);
-  --status-unpaid-text: #e57373;
-  --status-queued-bg: rgba(183, 129, 3, 0.18);
-  --status-queued-text: #ffd54f;
-  
-  /* Cooldown banner */
-  --cooldown-bg: rgba(216, 67, 21, 0.18);
-  --cooldown-text: #ff8a65;
-  --cooldown-border: rgba(216, 67, 21, 0.35);
-  
-  /* Price summary */
-  --price-bg: linear-gradient(135deg, #182a1c 0%, #0d1a10 100%);
-  --price-border: #2c4d32;
-  --price-text: #81c784;
-  --price-total: #a5d6a7;
-  --price-subtext: #81c784;
-  --price-divider: rgba(129, 199, 132, 0.15);
-  
-  /* Hover states */
-  --tab-hover-bg: rgba(255, 255, 255, 0.05);
-  --tab-active-bg: rgba(255, 255, 255, 0.08);
-  
-  /* Error indicator */
-  --error: #ffb4ab;
-  
-  /* Color channels for opacity calculations */
-  --on-surface-rgb: 226, 226, 230;
-}
-
-/* --- Color Palette Themes --- */
-
-/* Blue Theme (Default) */
-.theme-blue {
-  --primary: #006494;
-  --on-primary: #ffffff;
-  --primary-container: #cae6ff;
-  --on-primary-container: #001e30;
-  --surface: #fdfcff;
-  --surface-container: #f0f4f8;
-  --tab-hover-bg: rgba(0, 100, 148, 0.05);
-  --tab-active-bg: rgba(0, 100, 148, 0.08);
-}
-html.dark.theme-blue, html.dark .theme-blue {
-  --primary: #8ecdff;
-  --on-primary: #003450;
-  --primary-container: #004b71;
-  --on-primary-container: #cae6ff;
-  --surface: #111416;
-  --surface-container: #1b1e22;
-}
-
-/* Green Theme */
-.theme-green {
-  --primary: #0b6b3a;
-  --on-primary: #ffffff;
-  --primary-container: #a3f4c1;
-  --on-primary-container: #00210c;
-  --surface: #f7fcf7;
-  --surface-container: #edf5ed;
-  --tab-hover-bg: rgba(11, 107, 58, 0.05);
-  --tab-active-bg: rgba(11, 107, 58, 0.08);
-}
-html.dark.theme-green, html.dark .theme-green {
-  --primary: #87d8a6;
-  --on-primary: #003819;
-  --primary-container: #005228;
-  --on-primary-container: #a3f4c1;
-  --surface: #0f1411;
-  --surface-container: #181e1a;
-}
-
-/* Purple Theme */
-.theme-purple {
-  --primary: #684fa3;
-  --on-primary: #ffffff;
-  --primary-container: #e8ddff;
-  --on-primary-container: #23005c;
-  --surface: #fdfaff;
-  --surface-container: #f3eff7;
-  --tab-hover-bg: rgba(104, 79, 163, 0.05);
-  --tab-active-bg: rgba(104, 79, 163, 0.08);
-}
-html.dark.theme-purple, html.dark .theme-purple {
-  --primary: #cfbdff;
-  --on-primary: #391e72;
-  --primary-container: #4f378a;
-  --on-primary-container: #e8ddff;
-  --surface: #141218;
-  --surface-container: #1e1b22;
-}
-
-/* Teal Theme */
-.theme-teal {
-  --primary: #00696b;
-  --on-primary: #ffffff;
-  --primary-container: #9ef0f2;
-  --on-primary-container: #002021;
-  --surface: #fafdfd;
-  --surface-container: #eef5f5;
-  --tab-hover-bg: rgba(0, 105, 107, 0.05);
-  --tab-active-bg: rgba(0, 105, 107, 0.08);
-}
-html.dark.theme-teal, html.dark .theme-teal {
-  --primary: #82d4d6;
-  --on-primary: #003738;
-  --primary-container: #004f51;
-  --on-primary-container: #9ef0f2;
-  --surface: #0e1414;
-  --surface-container: #171e1e;
-}
-
-/* Rose Theme */
-.theme-rose {
-  --primary: #a23e5c;
-  --on-primary: #ffffff;
-  --primary-container: #ffd9e1;
-  --on-primary-container: #3e0016;
-  --surface: #fffbff;
-  --surface-container: #f9edf0;
-  --tab-hover-bg: rgba(162, 62, 92, 0.05);
-  --tab-active-bg: rgba(162, 62, 92, 0.08);
-}
-html.dark.theme-rose, html.dark .theme-rose {
-  --primary: #ffb2c4;
-  --on-primary: #63002a;
-  --primary-container: #822644;
-  --on-primary-container: #ffd9e1;
-  --surface: #161113;
-  --surface-container: #201a1c;
-}
-
-/* Orange Theme */
-.theme-orange {
-  --primary: #904d00;
-  --on-primary: #ffffff;
-  --primary-container: #ffdbbf;
-  --on-primary-container: #2e1500;
-  --surface: #fffbff;
-  --surface-container: #fbf0ea;
-  --tab-hover-bg: rgba(144, 77, 0, 0.05);
-  --tab-active-bg: rgba(144, 77, 0, 0.08);
-}
-html.dark.theme-orange, html.dark .theme-orange {
-  --primary: #ffb77c;
-  --on-primary: #4d2200;
-  --primary-container: #703800;
-  --on-primary-container: #ffdbbf;
-  --surface: #151311;
-  --surface-container: #201b18;
-}
-
 * { box-sizing: border-box; }
 body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
@@ -411,7 +118,6 @@ body {
   padding: 12px 16px; border-radius: var(--md-sys-shape-corner-medium); margin-bottom: 20px;
   font-size: 13px; display: flex; align-items: center; gap: 10px;
 }
-.hidden { display: none !important; }
 
 .section-label {
   font-size: var(--md-sys-typescale-label-small-size); font-weight: var(--md-sys-typescale-label-small-weight); color: var(--primary);
@@ -469,7 +175,7 @@ body {
   cursor: not-allowed;
 }
 .spinner {
-  border: 2px solid rgba(255,255,255,.3); border-top: 2px solid #fff;
+  border: 2px solid color-mix(in srgb, currentColor 30%, transparent); border-top: 2px solid currentColor;
   border-radius: 50%; width: 18px; height: 18px; animation: spin 1s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -601,8 +307,8 @@ body {
   bottom: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%) translateY(4px);
-  background: #313033;
-  color: #f4eff4;
+  background: var(--md-sys-color-inverse-surface);
+  color: var(--md-sys-color-inverse-on-surface);
   padding: 6px 10px;
   border-radius: var(--md-sys-shape-corner-extra-small, 4px);
   font-size: var(--md-sys-typescale-label-small-size, 0.6875rem);
@@ -941,14 +647,16 @@ body {
 
 /* History badge chips (extracted from inline styles) */
 .hist-badge {
-  padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight: 600;
+  min-height: 20px; padding: 0 6px; border-radius: var(--md-sys-shape-corner-small);
+  font-size: var(--md-sys-typescale-label-small-size); font-weight: var(--md-sys-typescale-label-small-weight);
   display: inline-flex; align-items: center;
 }
-.hist-badge-bw { background: rgba(122,138,176,.15); color: var(--outline); border: 1px solid rgba(122,138,176,.3); }
-.hist-badge-color { background: rgba(52,152,219,.15); color: var(--primary); border: 1px solid rgba(52,152,219,.3); }
-.hist-badge-single { background: var(--status-paid-bg); color: var(--status-paid-text); border: 1px solid rgba(46,204,113,.15); }
-.hist-badge-double { background: var(--status-queued-bg); color: var(--status-queued-text); border: 1px solid rgba(243,156,18,.15); }
-.hist-badge-binding { background: var(--status-unpaid-bg); color: var(--status-unpaid-text); border: 1px solid rgba(233,69,96,.15); }
+.hist-badge-bw { background: var(--md-sys-color-surface-container-highest); color: var(--on-surface-variant); }
+.hist-badge-color { background: var(--primary-container); color: var(--on-primary-container); }
+.hist-badge-single { background: var(--status-paid-bg); color: var(--status-paid-text); }
+.hist-badge-double { background: var(--status-queued-bg); color: var(--status-queued-text); }
+/* 裝訂與留白／裁切是中性資訊，不使用代表未付款的錯誤色。 */
+.hist-badge-binding { background: transparent; color: var(--on-surface-variant); border: 1px solid var(--md-sys-color-outline-variant); }
 .hist-badge-pages { background: var(--tab-active-bg); color: var(--primary); }
 
 /* Cooldown banner class */
@@ -1100,10 +808,17 @@ html.dark .theme-icon-moon {
 .mb-24 {
   margin-bottom: 24px;
 }
+.md3-supporting-text {
+  padding: 4px 16px 0;
+  color: var(--on-surface-variant);
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
 #pickup-error {
   color: var(--error);
-  font-size: 12px;
-  margin-top: 4px;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  padding: 4px 16px 0;
   display: none;
 }
 .btn-icon-svg {
@@ -1342,6 +1057,24 @@ html.dark .theme-icon-moon {
 .remove-icon {
   font-size: 20px;
 }
+/* 只在手機版出現的 text button，桌面版預覽卡就在右側。 */
+.file-item-preview-btn {
+  display: none;
+  flex-shrink: 0;
+  min-height: 48px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: transparent;
+  color: var(--primary);
+  font: inherit;
+  font-weight: var(--md-sys-typescale-label-large-weight);
+  cursor: pointer;
+}
+.file-item-preview-btn:hover { background: var(--tab-hover-bg); }
+@media (max-width: 680px) {
+  .file-item-preview-btn { display: inline-flex; align-items: center; }
+}
 .file-item-settings {
   display: flex;
   flex-direction: column;
@@ -1510,7 +1243,7 @@ html.tab-transition::view-transition-new(panel) {
   }
   .md3-card, .preview-card {
     padding: 16px 12px;
-    border-radius: 16px;
+    border-radius: var(--md-sys-shape-corner-large);
   }
   .chip-group {
     gap: 6px;
@@ -1526,11 +1259,15 @@ html.tab-transition::view-transition-new(panel) {
   }
 }
 /* 禮物卡沿用目前主題色與可觸控的控制項尺寸。 */
-.gift-card-fields { border: 1px solid var(--md-sys-color-outline-variant); border-radius: 16px; margin: 16px 0; padding: 16px; min-width: 0; }
+.gift-card-fields { border: 1px solid var(--md-sys-color-outline-variant); border-radius: var(--md-sys-shape-corner-large); margin: 16px 0; padding: 16px; min-width: 0; }
 .gift-card-fields legend { padding: 0 8px; font-weight: 600; }
 .gift-card-fields label { display: block; margin-bottom: 8px; }
-.gift-card-controls { display: flex; flex-wrap: wrap; gap: 8px; }
-.gift-card-controls input { flex: 1 1 180px; width: 100%; min-width: 0; border: 1px solid var(--outline); border-radius: 8px; background: var(--surface); color: var(--on-surface); padding: 10px; font: inherit; }
-.gift-card-controls button { min-height: 44px; padding: 8px 16px; border: 0; border-radius: 20px; background: var(--primary-container); color: var(--on-primary-container); cursor: pointer; font: inherit; }
+/* 輸入框與兩個按鈕在 320px 以上保持同一列。 */
+.gift-card-controls { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; }
+.gift-card-controls input { flex: 1 1 auto; width: 100%; min-width: 0; min-height: 48px; border: 1px solid var(--outline); border-radius: var(--md-sys-shape-corner-small); background: transparent; color: var(--on-surface); padding: 0 12px; font: inherit; }
+.gift-card-controls button { flex: 0 0 auto; min-height: 48px; padding: 0 16px; border: 0; border-radius: var(--md-sys-shape-corner-full); background: var(--primary-container); color: var(--on-primary-container); cursor: pointer; font: inherit; font-weight: var(--md-sys-typescale-label-large-weight); white-space: nowrap; }
+.gift-card-controls #gift-card-remove { padding: 0 12px; background: transparent; color: var(--primary); }
+.gift-card-controls #gift-card-remove:hover { background: var(--tab-hover-bg); }
+.gift-card-controls button:disabled { opacity: 0.38; cursor: default; }
 .gift-card-fields p { font-size: 13px; line-height: 1.6; margin: 12px 0 0; }
 .gift-card-controls :focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }

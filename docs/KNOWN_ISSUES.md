@@ -15,6 +15,7 @@
 | CI-01 P2 | 原先无CI；本輪已配置但未推送，遠端workflow／branch protection尚未驗證 | 推送經授權後執行CI，儲存庫管理員設定必需job；CI檔案存在不等於合併強制受保護 |
 | TEST-01 P2 | pytest共用test_pdf_pipeline的import-time隔離、單一測試DB；gift與core引用該模組，不適合pytest-xdist平行 | 先維持單進程；後提conftest fixtures隔離、測試後清理。勿並行跑多個會共享來源sidecar的pytest |
 | TEST-02 P2 | 實機iPhone／Android、真人無障礙、LINE正式傳達、印表機設定及正式台灣測速未驗證 | 採部署後人工验收清單，browser模擬只证明本機行為 |
+| TEST-03 P2 | 2026/10/21 二分確認：只改手機版（≤680px）`.pdf-placeholder` 尺寸（display:none、單行、或只把 min-height 改 120px），Playwright WebKit（iPhone 14）在 browser_preview_smoke 切到歷史訂單或開始繪製 PDF 時穩定 Page/Target crashed；還原即通過，Chromium 不受影響。原因未知，是否影響真實 iOS Safari 未驗證 | 改手機版預覽區版面前先在真實 iPhone 與較新 WebKit 重現並縮小範圍；修正前保持 placeholder 原狀，不以跳過 WebKit 讓檢查變綠 |
 | MAINT-01 P2 | 無全面lint／型別檢查、相似邏輯／未用export語意掃描；此輪語法／依賴／整份相同模組檢查有界限 | 後續按高風險模組逐步引入，不為全域規則大改穩定來源；孤立模組警告需人工核實 |
 | MAINT-02 P3 | git追蹤orders.db但檔案0bytes；有效DB是db.sqlite3，歷史誤稱排除 | 記錄並待使用者同意後另案移出Git，初始化保留 |
 | MAINT-03 P3 | QA唯一build／報告／合成temp長期執行會占空間 | 依QUALITY.md人工確認安全路徑後清理過期qa產物；不能刪正式release或他人未提交檔 |
