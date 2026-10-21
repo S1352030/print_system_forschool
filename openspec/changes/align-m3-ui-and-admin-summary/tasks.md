@@ -4,9 +4,9 @@
 
 ## 2. 後端
 
-- [x] 2.1 `/api/orders` 分頁新增 `summary` 與 `q`，舊格式不變
+- [x] 2.1 `/api/orders` 分頁新增 `summary` 與 `search`，舊格式不變
 - [x] 2.2 新增 pytest：跨頁統計、姓名／編號搜尋、萬用字元、舊格式
-- [x] 2.3 人工更新 `tests/fixtures/contracts.json` 新增 `q`，於回報中列出差異
+- [x] 2.3 人工更新 `tests/fixtures/contracts.json` 新增 `search`，於回報中列出差異
 
 ## 3. 前端
 
@@ -20,4 +20,4 @@
 - [x] 4.1 `npm run check`（Node 22）完整通過
 - [x] 4.2 瀏覽器實際檢查前後台的深淺色、桌面與 375px（headless Chromium 截圖；真實手機未驗）
 - [x] 4.3 更新 ARCHITECTURE.md 與 AI_CHANGELOG.md
-- [ ] 4.4 人工審查 contracts.json 的 `q` 差異後再 archive
+- [ ] 4.4 人工審查 contracts.json 的 `search` 差異後再 archive

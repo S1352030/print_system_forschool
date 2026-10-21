@@ -66,7 +66,7 @@ flowchart LR
 | POST `/api/check-pages` | multipart PDF；`{pages}`，錯誤 400／413／422 |
 | POST `/api/upload` | multipart 檔案／姓名／列印設定／取件時間／可選卡及 UUID；201 回 order_id、原價、折抵、應付及卡餘額 |
 | GET `/api/orders/history` | user_name，選填 page/page_size；無 page 的舊陣列保留，上限 200；新格式為 items/total/page/page_size/total_pages |
-| GET `/api/orders`；PUT/DELETE `/api/orders/{id}` | 管理員列表／付款與列印狀態更正／刪除。分頁格式另含全庫 `summary`（未付款／待列印），選填 `q` 依姓名或編號搜尋；財務紀錄限制不可繞過 |
+| GET `/api/orders`；PUT/DELETE `/api/orders/{id}` | 管理員列表／付款與列印狀態更正／刪除。分頁格式另含全庫 `summary`（未付款／待列印），選填 `search` 依姓名或編號搜尋；財務紀錄限制不可繞過 |
 | GET `/api/orders/{id}/file[/{file_name}]` | 管理員原檔串流；URL 檔名不控制實體檔案路徑 |
 | GET `/api/orders/{id}/preview[/{file_name}]` | user_name 驗證原檔串流；姓名是既有弱識別，非會員授權 |
 | GET/HEAD `/api/announcements` | 公開啟用公告，五分鐘公開快取 |

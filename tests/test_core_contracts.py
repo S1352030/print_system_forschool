@@ -157,15 +157,15 @@ def test_admin_order_summary_counts_all_pages_and_search_filters_items(client):
     assert len(page["items"]) == 50 and page["total"] == 63
     assert page["summary"] == {"unpaid_count": 61, "unpaid_amount": 60 * 3,
                                "unprinted_count": 61, "unprinted_pages": 60 * 2 + 1}
-    named = client.get("/api/orders?page=1&page_size=50&q=%20王%20", auth=AUTH).json()
+    named = client.get("/api/orders?page=1&page_size=50&search=%20王%20", auth=AUTH).json()
     assert named["total"] == 59 and all(item["user_name"] == "王同學" for item in named["items"])
     assert named["summary"] == page["summary"]
-    by_id = client.get(f"/api/orders?page=1&q={target_id}", auth=AUTH).json()
+    by_id = client.get(f"/api/orders?page=1&search={target_id}", auth=AUTH).json()
     assert [item["id"] for item in by_id["items"]] == [target_id]
-    wildcard = client.get("/api/orders?page=1&q=%25", auth=AUTH).json()
+    wildcard = client.get("/api/orders?page=1&search=%25", auth=AUTH).json()
     assert [item["user_name"] for item in wildcard["items"]] == ["全額折抵%"]
-    assert client.get("/api/orders?page=1&q=" + "x" * 65, auth=AUTH).status_code == 422
-    legacy = client.get("/api/orders?q=王", auth=AUTH).json()
+    assert client.get("/api/orders?page=1&search=" + "x" * 65, auth=AUTH).status_code == 422
+    legacy = client.get("/api/orders?search=王", auth=AUTH).json()
     assert isinstance(legacy, list) and len(legacy) == 63
 
 

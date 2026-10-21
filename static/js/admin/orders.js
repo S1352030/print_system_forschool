@@ -41,7 +41,7 @@ export async function loadOrders(loadMore = false) {
 
   try {
     const targetPage = (_currentPage || 0) + 1;
-    const query = _search ? `&q=${encodeURIComponent(_search)}` : '';
+    const query = _search ? `&search=${encodeURIComponent(_search)}` : '';
     const data = await apiGet(`${API_BASE}/api/orders?page=${targetPage}&page_size=${PAGE_SIZE}${query}`);
     // 較新的搜尋已送出時,忽略過期回應。
     if (revision !== _loadRevision) return;

@@ -1295,7 +1295,7 @@ async def get_all_orders(
     request: Request,
     page: int | None = Query(default=None, ge=1, description="頁碼(從 1 開始);不帶則回傳舊版全量格式"),
     page_size: int | None = Query(default=None, ge=1, description="每頁筆數(上限由 ORDERS_MAX_PAGE_SIZE 控制)"),
-    q: str | None = Query(default=None, max_length=64, description="姓名包含;純數字時也比對訂單編號(僅分頁模式)"),
+    search: str | None = Query(default=None, max_length=64, description="姓名包含;純數字時也比對訂單編號(僅分頁模式)"),
     db: Session = Depends(get_db),
     username: str = Depends(authenticate_admin),
     _rl: None = Depends(rate_limit("admin")),
@@ -1307,7 +1307,7 @@ async def get_all_orders(
     - 不帶 page 參數 → 回傳舊版純陣列(但加安全上限 ORDERS_MAX_PAGE_SIZE,
       並附 X-Deprecation-Warning header 提示未來將淘汰)。
     - 帶 page 參數 → 回傳分頁結構 {items, total, page, page_size, total_pages, summary};
-      summary 為全庫統計,不受分頁與 q 影響。
+      summary 為全庫統計,不受分頁與 search 影響。
     """
     # 釐清有效 page_size(不論哪種模式都套用上限保護)
     effective_page_size = (
@@ -1333,11 +1333,11 @@ async def get_all_orders(
         return response
 
     # 分頁模式
-    search = (q or "").strip()
-    if search:
-        condition = Order.user_name.contains(search, autoescape=True)
-        if search.isdigit():
-            condition = or_(condition, Order.id == int(search))
+    term = (search or "").strip()
+    if term:
+        condition = Order.user_name.contains(term, autoescape=True)
+        if term.isdigit():
+            condition = or_(condition, Order.id == int(term))
         base_query = base_query.filter(condition)
     total = base_query.count()
     total_pages = (total + effective_page_size - 1) // effective_page_size if total > 0 else 0

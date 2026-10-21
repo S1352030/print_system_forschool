@@ -128,7 +128,7 @@ try {
   await printedSwitch.focus();
   await page.keyboard.press('Space');
   await page.waitForFunction(() => document.querySelector('.toast-msg')?.textContent.includes('狀態更新成功'));
-  const printedRow = (await (await api.get(`${origin}/api/orders?page=1&q=${order.order_id}`)).json()).items;
+  const printedRow = (await (await api.get(`${origin}/api/orders?page=1&search=${order.order_id}`)).json()).items;
   assert.deepEqual(printedRow.map((row) => [row.id, row.is_printed]), [[order.order_id, true]]);
   await page.locator('#order-search').fill(String(order.order_id));
   await page.waitForFunction((id) => {

@@ -1,5 +1,28 @@
 # AI Changelog
 
+### [2026/10/21 21:33] - 後台訂單搜尋參數由 q 改名為 search
+
+**1. 改了哪裡 (What changed):**
+- 修改的檔案路徑：`main.py`
+- 具體變更：`GET /api/orders` 的選填查詢參數 `q` 改名為 `search`，函式內的區域變數改為 `term`，避免和參數同名；行為不變。
+
+- 修改的檔案路徑：`static/js/admin/orders.js`
+- 具體變更：後台搜尋改送 `&search=`。
+
+- 修改的檔案路徑：`tests/test_core_contracts.py`、`tests/browser_gift_cards_smoke.mjs`、`tests/fixtures/contracts.json`
+- 具體變更：測試請求與契約基準改用 `search`。
+
+- 修改的檔案路徑：`ARCHITECTURE.md`、`openspec/changes/align-m3-ui-and-admin-summary/`
+- 具體變更：API 表、proposal、design、tasks 與 print-orders delta spec 改用 `search`，design 記錄命名理由。
+
+**2. 為什麼要改 (Why it changed):**
+- 原始問題或動機：審查契約差異時，使用者指出 `q` 不如 `user_name`、`page_size` 等既有參數明確。
+- 決策原因：禮物卡搜尋 API 已使用 `search`，改名後兩個後台搜尋命名一致；參數尚未推送或部署，沒有呼叫端需要相容處理。
+
+**3. 後續影響與注意事項 (Impact & Watchouts):**
+- 上一條紀錄（2026/10/21 19:49）提到的 `q`，現在一律稱為 `search`。
+- 契約差異仍需使用者最後確認，之後才歸檔 OpenSpec 變更。
+
 ### [2026/10/21 19:49] - 後台改用 Material 3 共用主題並修正統計、隱藏與手機版版面
 
 **1. 改了哪裡 (What changed):**

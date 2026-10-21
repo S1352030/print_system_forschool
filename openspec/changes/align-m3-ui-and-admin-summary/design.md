@@ -8,14 +8,14 @@
 2. **後台沿用既有 class 名稱**：`btn-view-pdf`、`btn-delete`、`toggle`、`badge-chip`、`data-*` 都由 JS 與 Playwright 使用，因此保留名稱，只改 CSS 對應的 M3 樣式。這樣不改事件綁定，也不重寫模組。
 3. **開關無障礙**：保留 `<label class="toggle"><input type="checkbox">…` 結構，input 改為覆蓋整個開關的透明元素（不用 `display:none`），加上 `role="switch"`，以 `:focus-visible` 顯示焦點環。
 4. **統計交由伺服器計算**：`summary` 以同一個 session 在分頁查詢前讀取未取消訂單的必要欄位後加總；應付金額沿用 `max(0, total_price - gift_card_discount)`。前端沒有 `summary`（例如舊伺服器）時退回原本的已載入資料計算。
-5. **搜尋**：`q` 去除前後空白後最多 64 字。純數字時比對 `id` 或姓名包含；其他情況只比對姓名包含，以 `contains(..., autoescape=True)` 避免 `%`／`_` 萬用字元。空字串等於沒有篩選。
+5. **搜尋**：`search` 去除前後空白後最多 64 字。純數字時比對 `id` 或姓名包含；其他情況只比對姓名包含，以 `contains(..., autoescape=True)` 避免 `%`／`_` 萬用字元。空字串等於沒有篩選。參數原本命名為 `q`，審查時改為 `search`：本專案參數都用完整描述用途的名稱（`user_name`、`page_size`），且禮物卡搜尋 API 已使用 `search`；改名時尚未推送或部署，沒有相容負擔。
 6. **手機預覽卡**：原計畫在窄螢幕隱藏或縮小空白預覽卡，但逐一二分後確認：只要改動手機版 `.pdf-placeholder` 的版面（`:has()` 隱藏、JS class 隱藏、改為單行、甚至只把 `min-height` 改成 120px），Playwright WebKit（iPhone 14）在 `browser_preview_smoke.mjs` 都穩定 Page/Target crashed；還原後即通過。這是與版面位置相關的 WebKit 崩潰，原因未查明，所以 placeholder 維持原狀。改為在檔案卡加「預覽」按鈕捲到預覽卡；PDF 預覽卡加上 `pdf-preview-card` class 供定位。
 
 ## Compatibility and Rollback
 
-- API 只新增欄位與選填參數；舊前端忽略 `summary`，不帶 `q` 時行為與現在相同。
+- API 只新增欄位與選填參數；舊前端忽略 `summary`，不帶 `search` 時行為與現在相同。
 - 純 CSS／HTML／前端改動可直接 revert 回復；沒有資料遷移。
-- 契約 fixture 只新增 `q` 參數定義，需人工審查 diff。
+- 契約 fixture 只新增 `search` 參數定義，需人工審查 diff。
 
 ## Non-goals
 

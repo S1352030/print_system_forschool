@@ -853,7 +853,7 @@
           },
           {
             "in": "query",
-            "name": "q",
+            "name": "search",
             "required": false,
             "schema": {
               "anyOf": [
