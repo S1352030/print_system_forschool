@@ -1,5 +1,25 @@
 # AI Changelog
 
+### [2026/10/21 21:45] - 歸檔 align-m3-ui-and-admin-summary 規格變更
+
+**1. 改了哪裡 (What changed):**
+- 新增的檔案路徑：`openspec/specs/interface-design/spec.md`
+- 具體變更：由歸檔建立新主規格（共用 M3 token、可用鍵盤操作的開關、行動版表單版面），並補上 Purpose。
+
+- 修改的檔案路徑：`openspec/specs/print-orders/spec.md`
+- 具體變更：併入「後台訂單統計與搜尋」需求（全庫 summary 與選填 search）。
+
+- 新增的檔案路徑：`openspec/changes/archive/2026-10-21-align-m3-ui-and-admin-summary/`
+- 具體變更：原變更移入歸檔，tasks 4.4 記錄使用者已核准 contracts.json 的 search 差異。
+
+**2. 為什麼要改 (Why it changed):**
+- 原始問題或動機：使用者審查並核准契約差異（新增選填 search 參數），變更的 12 項任務全部完成。
+- 決策原因：依 AGENTS.md，契約經人工審查且驗收通過後才歸檔，讓主規格反映目前行為。
+
+**3. 後續影響與注意事項 (Impact & Watchouts):**
+- 程式碼未變更；主規格現有七份，interface-design 為新能力。
+- 仍未在真實手機與正式站驗收，屬「已測試」而非 stable。
+
 ### [2026/10/21 21:33] - 後台訂單搜尋參數由 q 改名為 search
 
 **1. 改了哪裡 (What changed):**

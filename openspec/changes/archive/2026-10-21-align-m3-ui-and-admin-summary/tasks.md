@@ -20,4 +20,4 @@
 - [x] 4.1 `npm run check`（Node 22）完整通過
 - [x] 4.2 瀏覽器實際檢查前後台的深淺色、桌面與 375px（headless Chromium 截圖；真實手機未驗）
 - [x] 4.3 更新 ARCHITECTURE.md 與 AI_CHANGELOG.md
-- [ ] 4.4 人工審查 contracts.json 的 `search` 差異後再 archive
+- [x] 4.4 人工審查 contracts.json 的 `search` 差異後再 archive（2026/10/21 使用者核准）
