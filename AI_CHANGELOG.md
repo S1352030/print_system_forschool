@@ -1,5 +1,22 @@
 # AI Changelog
 
+### [2026/10/25 17:00] - 修正 GitHub CI 瀏覽器測試因 Socket 路徑過長而失敗
+
+**1. 改了哪裡 (What changed):**
+- 修改的檔案路徑：`scripts/run-browser-tests.mjs`
+- 具體變更：非 Windows 平台在 `/tmp/psqa-XXXXXX` 建立短暫存目錄，只給瀏覽器測試作為 `TMP`／`TEMP`／`TMPDIR`，結束後刪除；Windows 維持原行為。
+
+- 修改的檔案路徑：`.github/workflows/quality.yml`
+- 具體變更：`upload-artifact` 加上 `include-hidden-files: true`，讓 `.quality-reports/` 能上傳。
+
+**2. 為什麼要改 (Why it changed):**
+- 原始問題或動機：CI 的 `browser` 檢查失敗，Chromium 回報「Socket path too long」。`isolatedEnv()` 把 TMPDIR 指到 `/home/runner/work/.../.quality-reports/tmp`，SingletonSocket 路徑超過 Unix socket 約 108 位元組上限。
+- 決策原因：只縮短瀏覽器子程序的暫存路徑；其他檢查仍使用專案內隔離暫存區，未跳過或降低任何測試。upload-artifact v4 預設略過隱藏資料夾，導致品質報告從未上傳。
+
+**3. 後續影響與注意事項 (Impact & Watchouts):**
+- 本機 Windows 無法重現此 Linux 限制；修正需以下一次 GitHub Actions 結果確認。
+- 瀏覽器暫存檔改在系統 `/tmp`，仍為每次執行專屬目錄並於結束時清除。
+
 ### [2026/10/21 21:45] - 歸檔 align-m3-ui-and-admin-summary 規格變更
 
 **1. 改了哪裡 (What changed):**

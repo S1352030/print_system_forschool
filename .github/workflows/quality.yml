@@ -67,4 +67,5 @@ jobs:
           name: quality-${{ github.run_id }}
           path: .quality-reports/
           if-no-files-found: warn
+          include-hidden-files: true
           retention-days: 30
