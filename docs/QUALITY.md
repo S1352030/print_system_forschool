@@ -40,7 +40,7 @@ Chromium gate保護 SW 安装／單次更新重載、离線／配額故障、Pix
 
 ## 規格驅動修改
 
-本機 devDependencies 精確鎖定 OpenSpec 1.14.1，已使用 `init --tools codex --language zh-TW --profile core` 初始化；不需全域安装，勿重複 init。官方依賴 Node >=20.19，本專案指定的 Node 22符合。Codex 整合生成六個 `.agents/skills/openspec-*`；保留原有 update-changelog／craft-commit／material-3 技能。
+本機 devDependencies 精確鎖定 OpenSpec 1.14.1，已使用 `init --tools codex --language zh-TW --profile core` 初始化，之後以 `init --tools codex,claude --profile core` 補上 Claude Code 整合；不需全域安装，除新增 AI 工具整合外勿重複 init。官方依賴 Node >=20.19，本專案指定的 Node 22符合。Codex 整合生成六個 `.agents/skills/openspec-*`；Claude Code 整合生成 `.claude/skills/openspec-*` 與 `/opsx:*` 指令（`.claude/commands/opsx/`）。各工具目錄只放操作指令；proposal、design、delta specs、tasks 一律寫在共用的 `openspec/changes/<change>/`，規格在 `openspec/specs/`，任何 AI 與人都以此為準。保留原有 update-changelog／craft-commit／material-3 技能。
 
 簡單修字／局部 bug修正可直接依 AGENTS 流程。跨模組、中大型功能、API或資料結構修改：
 
