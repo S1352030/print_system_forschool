@@ -31,7 +31,7 @@
 ## 工具與版本
 
 - Node 22 LTS（`.nvmrc` 22.23.2，至少 22.12）；Python 3.10+，CI 使用 3.13。用 `npm ci`、`python -m pip install -r requirements-dev.txt`。
-- OpenSpec 鎖定本機開發依賴：`npx --no-install openspec ...`。已初始化，勿再次 init；使用生成的 Codex skills 或 CLI，詳見 `docs/QUALITY.md`。
+- OpenSpec 鎖定本機開發依賴：`npx --no-install openspec ...`。已初始化（Codex 與 Claude Code 整合），勿再次 init；使用生成的 skills／`/opsx:*` 指令或 CLI，提案一律放共用的 `openspec/changes/`，不放工具專屬資料夾，詳見 `docs/QUALITY.md`。
 - 現有 `update-changelog` 技能若可用，依其三區塊繁體中文格式在歷史最上方新增紀錄，不覆寫歷史。現有 `craft-commit` 用於要求提交訊息時；不因完成修改自動 commit。
 - 重大工作用 `codex/` 分支；不覆蓋使用者修改，不執行 `reset --hard`、force push、刪除遠端分支。提交、推送、正式部署與資料庫回復遵守本次明確授權範圍。
 - 「開發中」「已測試」「已知穩定」需區分。品質門檻通過仍只是候選；正式健康、真人／實機驗收、資料相容與回復證據確認後才能標 stable。

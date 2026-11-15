@@ -1,5 +1,33 @@
 # AI Changelog
 
+### [2026/11/15 12:05] - 後台 PDF 預覽新增「列印」按鈕（add-admin-direct-print）
+
+**1. 改了哪裡 (What changed):**
+- 新增的檔案路徑：`static/js/admin/pdf-print.js`
+- 具體變更：以同源 `fetch` 取得原始 PDF blob，放進畫面外 1px iframe（不用 `display:none`），`load` 後等 300ms 再呼叫 `contentWindow.print()`，叫出瀏覽器列印對話框。同一時間只保留一個列印工作；fetch、iframe 載入與延遲都可被 AbortSignal 中止。iframe 15 秒未載入視為失敗。另提供 `canPrintPdf()`，只在 `navigator.pdfViewerEnabled === true` 時允許列印。
+
+- 修改的檔案路徑：`admin.html`、`admin.css`、`static/js/admin/pdf-modal.js`
+- 具體變更：預覽標頭「下載 PDF」旁新增「列印」按鈕，沿用 `#i-print` 圖示與 filled tonal 樣式，以 `data-admin-pdf-print` 綁定。準備中停用按鈕、設 `aria-busy`，文字改為「準備列印…」。失敗時 toast 提示改用「下載 PDF」。關閉預覽或開啟其他訂單時中止並清理 iframe 與 blob URL。`downloadCurrentPdf()` 未修改。
+
+- 新增／修改的檔案路徑：`tests/admin_pdf_print.test.mjs`、`tests/browser_preview_smoke.mjs`
+- 具體變更：新增 12 個單元測試（假 DOM／fetch／計時器），涵蓋成功、非 2xx、網路錯誤、`print()` 拋錯、載入逾時、中止、過期回應與重複列印。瀏覽器 smoke 以測試專用的 `/admin?pdf-viewer=0|1` 固定 `pdfViewerEnabled`，在 Chromium 與 WebKit 驗證按鈕顯示／隱藏、只多一次原檔請求、準備中不重送，以及關閉後清理與重設。
+
+- 修改的檔案路徑：`ARCHITECTURE.md`、`openspec/changes/add-admin-direct-print/`
+- 具體變更：架構文件補充瀏覽器列印對話框與 pdf-print 模組責任。OpenSpec 變更新增 `print-orders` 兩條需求（後台直接列印原檔、列印準備的失敗與中止處理）。
+
+**2. 為什麼要改 (Why it changed):**
+- 原始問題或動機：管理員列印要先下載 PDF，再到下載資料夾開檔列印，步驟多又容易開錯檔案。
+- 決策原因：管理員 2026/11/15 在 Windows Edge 後台主控台實測，iframe 加 blob 再呼叫 `print()` 可正確叫出 Edge 列印對話框（預覽 28 張、A4）。彩色／雙面等設定由管理員在 Edge 或「使用系統對話方塊列印」（Epson L3550 驅動預設值）選擇，系統不預設或覆寫。不改 API、資料庫、CSP 與 `contracts.json`，也不新增依賴。本機列印代理、kiosk 列印與 PDF.js 點陣列印都已評估，不採用。
+
+**3. 後續影響與注意事項 (Impact & Watchouts):**
+- 列印不會自動標記「已列印」，仍需管理員手動切換。
+- 自動測試無法證明真實列印對話框與出紙：headless Chromium 回報沒有 PDF 檢視器，PDF iframe 也不會 `load`。真實 Edge 叫出對話框、留白／裁切訂單經 L3550 出紙，待管理員人工驗收（tasks 5.2）。在此之前此功能只算「已測試」，不是 stable。
+- WebKit（iPhone 模擬）回報 `pdfViewerEnabled=true`，所以 iPhone Safari 會顯示「列印」，但不保證能正確列印；失敗時有逾時提示，可改用下載。
+- Edge 會沿用上次的列印設定，列印前請核對預覽視窗上的訂單設定 badge。
+- 檢查結果：`node --test tests/admin_pdf_print.test.mjs` 12/12 通過；`tests/csp_frontend_bindings.test.mjs` 通過；`npm run test:browser`（Chromium 與 WebKit）通過；`npm run check:architecture` 無違規。
+- 完整 `npm run check`：第一次在 Node v26.3.0 被 runtime 檢查擋下（需 Node 22 LTS ≥22.12），沒有執行任何步驟。改用 Node v22.23.5，加上 Python 3.13.2 虛擬環境（依 `requirements-dev.txt` 安裝，pytest 8.3.4）後重跑，**12 項全部通過**（build `qa-1794757195029-56b3d8c3`，前後原始碼指紋一致）：syntax、architecture-js／python、specs、specs-archived、governance、frontend、backend（60 passed，2 個既有的 HEAD 路由 Operation ID 重複警告）、build、precompress、verify-build（初始 4 個請求、24,738 Brotli bytes）、browser（Chromium、WebKit、禮物卡）。
+- 環境注意：`requirements.lock` 的 websockets 17.0 需要 Python ≥3.11，與 AGENTS.md「Python 3.10+」不一致，在 3.10 無法安裝；本次改用 3.13（與 CI 相同）。另外，本機防毒軟體的 HTTPS 檢查曾讓 pip 出現憑證錯誤，管理員在防毒軟體加入排除後即正常。
+
 ### [2026/10/25 17:00] - 修正 GitHub CI 瀏覽器測試因 Socket 路徑過長而失敗
 
 **1. 改了哪裡 (What changed):**

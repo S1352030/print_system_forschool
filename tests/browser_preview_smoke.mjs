@@ -39,6 +39,7 @@ function createPdf(paddingBytes = 180_000) {
 const fixturePdf = createPdf();
 let fallbackRequests = 0;
 let rangeRequests = 0;
+let fullPdfRequests = 0;
 const uploadedForms = [];
 
 const mimeTypes = new Map([
@@ -68,6 +69,7 @@ function sendPdf(request, response) {
     'Cache-Control': 'private, no-cache',
   };
   if (!range) {
+    fullPdfRequests += 1;
     response.writeHead(200, { ...headers, 'Content-Length': fixturePdf.length });
     response.end(fixturePdf);
     return;
@@ -227,6 +229,66 @@ async function verifyFirstInstallDoesNotReload() {
     await context.close();
     await browser.close();
   }
+}
+
+/**
+ * 測試用模擬：只在 /admin?pdf-viewer=0|1 時固定 navigator.pdfViewerEnabled，
+ * 讓有／無內建 PDF 檢視器兩種情況可重現。正式程式不讀這個查詢參數。
+ */
+function mockPdfViewerFromQuery() {
+  if (location.pathname !== '/admin') return;
+  const flag = new URLSearchParams(location.search).get('pdf-viewer');
+  if (flag !== '0' && flag !== '1') return;
+  Object.defineProperty(Navigator.prototype, 'pdfViewerEnabled', {
+    configurable: true,
+    get: () => flag === '1',
+  });
+}
+
+async function openAdminPreview(page) {
+  await page.getByRole('button', { name: /查看/ }).click();
+  await page.locator('#pdf-modal[open]').waitFor();
+  await page.waitForFunction(() =>
+    document.querySelector('#admin-pdf-preview [data-pdf-canvas]')
+      ?.getAttribute('aria-label')?.includes('共 2 頁'),
+  );
+}
+
+/**
+ * 後台「列印」：headless 瀏覽器沒有可列印的 PDF 檢視器（iframe 不會 load），
+ * 這裡只驗證原檔請求、暫存 iframe、按鈕狀態與關閉清理；真實對話框與出紙需人工驗收。
+ */
+async function verifyAdminPrint(page) {
+  await page.goto(`${origin}/admin?pdf-viewer=1`, { waitUntil: 'domcontentloaded' });
+  await openAdminPreview(page);
+  const printButton = page.locator('#btn-print-pdf');
+  assert.equal(await printButton.isVisible(), true, 'built-in PDF viewer: print button must be visible');
+  assert.equal((await printButton.textContent()).trim(), '列印');
+
+  const fullRequestsBefore = fullPdfRequests;
+  await printButton.click();
+  const printFrame = page.locator('[data-admin-print-frame]');
+  await printFrame.waitFor({ state: 'attached' });
+  assert.match(await printFrame.getAttribute('src'), /^blob:/);
+  assert.equal(await printFrame.evaluate((element) => getComputedStyle(element).display), 'block');
+  assert.equal(await printButton.isDisabled(), true);
+  assert.equal(await printButton.getAttribute('aria-busy'), 'true');
+  assert.equal((await printButton.textContent()).trim(), '準備列印…');
+
+  await printButton.click({ force: true });
+  await page.waitForTimeout(200);
+  assert.equal(fullPdfRequests - fullRequestsBefore, 1, 'print must fetch the original PDF exactly once');
+  assert.equal(await printFrame.count(), 1);
+
+  await page.locator('[data-admin-pdf-close]').click();
+  await page.waitForFunction(() => !document.querySelector('[data-admin-print-frame]'));
+  assert.equal(await printButton.isHidden(), true);
+
+  await openAdminPreview(page);
+  assert.equal(await printButton.isEnabled(), true, 'closing the preview must reset the print button');
+  assert.equal(await printButton.getAttribute('aria-busy'), null);
+  assert.equal((await printButton.textContent()).trim(), '列印');
+  await page.locator('[data-admin-pdf-close]').click();
 }
 
 async function exercise(browserType, device) {
@@ -393,13 +455,12 @@ async function exercise(browserType, device) {
     return false;
   }), false, 'upload and history must not enter Service Worker caches');
 
-  await page.goto(`${origin}/admin`, { waitUntil: 'domcontentloaded' });
-  await page.getByRole('button', { name: /查看/ }).click();
-  await page.locator('#pdf-modal[open]').waitFor();
-  await page.waitForFunction(() =>
-    document.querySelector('#admin-pdf-preview [data-pdf-canvas]')
-      ?.getAttribute('aria-label')?.includes('共 2 頁'),
-  );
+  await page.addInitScript(mockPdfViewerFromQuery);
+  await page.goto(`${origin}/admin?pdf-viewer=0`, { waitUntil: 'domcontentloaded' });
+  await openAdminPreview(page);
+  assert.equal(await page.locator('#btn-print-pdf').isHidden(), true,
+    'no built-in PDF viewer: print button must stay hidden');
+  assert.equal(await page.locator('#btn-download-pdf').isVisible(), true);
   assert.equal(await page.locator('#admin-pdf-preview canvas').count(), 1);
   assert.equal(
     await page.locator('#admin-pdf-preview [data-pdf-paper]').textContent(),
@@ -413,6 +474,8 @@ async function exercise(browserType, device) {
   }
   await page.locator('[data-admin-pdf-close]').click();
   assert.ok(rangeRequests > 0, 'remote preview must use HTTP Range');
+
+  await verifyAdminPrint(page);
 
   assert.deepEqual(pageErrors, []);
   await context.close();

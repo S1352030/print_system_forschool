@@ -3,17 +3,42 @@
  *
  * PDF 載入、單頁渲染、Range、鍵盤與手勢皆由共用
  * PdfPreviewController 處理；本模組只負責訂單資料與 dialog。
+ * 「列印」交給 pdf-print.js 以瀏覽器內建 PDF 檢視器叫出列印對話框。
  */
 
 import { findOrder, buildSettingBadges } from './orders.js';
 import { PdfPreviewController } from '../pdf-preview-controller.js';
+import { canPrintPdf, createPdfPrinter, isPrintAbort } from './pdf-print.js';
 
 let controller = null;
 let currentPreviewOrderId = null;
 let currentOrder = null;
+let printer = null;
+let printAttempt = 0;
 
 function dialog() {
   return document.getElementById('pdf-modal');
+}
+
+function printButton() {
+  return document.getElementById('btn-print-pdf');
+}
+
+function setPrintBusy(busy) {
+  const button = printButton();
+  if (!button) return;
+  button.disabled = busy;
+  if (busy) button.setAttribute('aria-busy', 'true');
+  else button.removeAttribute('aria-busy');
+  const label = button.querySelector('[data-admin-pdf-print-label]');
+  if (label) label.textContent = busy ? '準備列印…' : '列印';
+}
+
+/** 放棄尚未完成的列印準備，並移除暫存 iframe 與 blob URL。 */
+function cancelPrint() {
+  printAttempt += 1;
+  printer?.cleanup();
+  setPrintBusy(false);
 }
 
 function ensureController() {
@@ -45,6 +70,10 @@ export function bindAdminFitToggle() {
     'click',
     () => void downloadCurrentPdf(),
   );
+  document.querySelector('[data-admin-pdf-print]')?.addEventListener(
+    'click',
+    () => void printCurrentPdf(),
+  );
   document.getElementById('admin-fit-btn')?.addEventListener('click', () => {
     syncFitButtons('fit');
     void preview?.setPrintMode('fit');
@@ -70,6 +99,7 @@ export async function openPdfModal(orderId) {
   const modal = dialog();
   if (!order || !preview || !modal) return;
 
+  cancelPrint();
   currentPreviewOrderId = orderId;
   currentOrder = order;
   document.getElementById('modal-title').textContent = order.file_name;
@@ -86,6 +116,8 @@ export async function openPdfModal(orderId) {
   }
   const downloadButton = document.getElementById('btn-download-pdf');
   if (downloadButton) downloadButton.hidden = false;
+  const print = printButton();
+  if (print) print.hidden = !canPrintPdf();
 
   syncFitButtons(order.fit_mode || 'fit');
   if (!modal.open) modal.showModal();
@@ -100,11 +132,14 @@ export async function openPdfModal(orderId) {
 }
 
 export function closePdfModal() {
+  cancelPrint();
   controller?.reset();
   currentPreviewOrderId = null;
   currentOrder = null;
   const downloadButton = document.getElementById('btn-download-pdf');
   if (downloadButton) downloadButton.hidden = true;
+  const print = printButton();
+  if (print) print.hidden = true;
   const modal = dialog();
   if (modal?.open) modal.close();
 }
@@ -133,6 +168,29 @@ export async function downloadCurrentPdf() {
     showToastAdmin('下載成功');
   } catch (error) {
     showToastAdmin(`下載失敗：${error.message}`, true);
+  }
+}
+
+/**
+ * 以原始 PDF 叫出瀏覽器列印對話框。色彩、雙面與縮放由管理員在對話框
+ * 選擇；不改變訂單付款或列印狀態。
+ */
+export async function printCurrentPdf() {
+  if (!currentPreviewOrderId || !currentOrder) return;
+  if (printButton()?.disabled) return;
+  const url = `/api/orders/${currentPreviewOrderId}/file/` +
+    encodeURIComponent(currentOrder.file_name);
+  if (!printer) printer = createPdfPrinter();
+  const attempt = ++printAttempt;
+  setPrintBusy(true);
+  try {
+    await printer.print(url);
+  } catch (error) {
+    if (!isPrintAbort(error) && attempt === printAttempt) {
+      showToastAdmin(`列印失敗：${error.message}，可改用「下載 PDF」`, true);
+    }
+  } finally {
+    if (attempt === printAttempt) setPrintBusy(false);
   }
 }
 
