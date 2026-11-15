@@ -42,7 +42,7 @@ body {
 .site-header small { display: block; color: var(--on-surface-variant); font-size: 0.75rem; line-height: 1rem; }
 
 /* Shared M3 buttons (class names are used by scripts and browser tests). */
-.btn-refresh, .btn-view-pdf, .btn-outlined, .btn-delete, .btn-download-pdf, .admin-load-more-btn {
+.btn-refresh, .btn-view-pdf, .btn-outlined, .btn-delete, .btn-download-pdf, .btn-print-pdf, .admin-load-more-btn {
   position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   min-height: 40px; padding: 0 16px;
   border-radius: var(--md-sys-shape-corner-full);
@@ -56,10 +56,10 @@ body {
     box-shadow var(--md-sys-motion-duration-short) var(--md-sys-motion-easing-standard);
 }
 /* Filled tonal: primary row actions such as 收款、查看. */
-.btn-view-pdf, .btn-download-pdf {
+.btn-view-pdf, .btn-download-pdf, .btn-print-pdf {
   border: 0; background: var(--primary-container); color: var(--on-primary-container);
 }
-.btn-view-pdf:hover, .btn-download-pdf:hover {
+.btn-view-pdf:hover, .btn-download-pdf:hover, .btn-print-pdf:hover:not(:disabled) {
   background: color-mix(in srgb, var(--primary-container) 92%, var(--on-primary-container));
 }
 /* Outlined: secondary actions such as 重新整理、取消訂單、載入更多. */
@@ -71,7 +71,7 @@ body {
 /* Text button in error color: irreversible 刪除. */
 .btn-delete { border: 0; background: transparent; color: var(--md-sys-color-error); padding: 0 12px; }
 .btn-delete:hover { background: var(--admin-danger-hover); }
-:where(.btn-refresh, .btn-view-pdf, .btn-outlined, .btn-delete, .btn-download-pdf, .admin-load-more-btn):disabled {
+:where(.btn-refresh, .btn-view-pdf, .btn-outlined, .btn-delete, .btn-download-pdf, .btn-print-pdf, .admin-load-more-btn):disabled {
   opacity: 0.38; cursor: default;
 }
 

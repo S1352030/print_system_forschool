@@ -4,7 +4,7 @@
 
 ## 目的及執行環境
 
-學校 PDF 列印收件、計價、進度查詢、管理員收款與禮物卡折抵。使用者不需會員；管理員使用瀏覽器原生 HTTP Basic Auth，沒有獨立帳號登入／登出 API。實際列印由管理員操作印表機，本系統沒有印表機驅動或自動出紙功能。
+學校 PDF 列印收件、計價、進度查詢、管理員收款與禮物卡折抵。使用者不需會員；管理員使用瀏覽器原生 HTTP Basic Auth，沒有獨立帳號登入／登出 API。實際列印由管理員操作印表機：後台預覽可透過瀏覽器內建 PDF 檢視器叫出列印對話框列印原檔，色彩、雙面、縮放與印表機都由管理員在對話框選擇。本系統沒有印表機驅動或自動出紙功能。
 
 前端為原生 HTML/CSS/ES Modules、Material 3 風格自訂元件及共用 `<dialog>`；Vite 8.1.5 多頁建置。PDF.js 5.7.284 自架於版本化路徑。後端為 FastAPI、Pydantic Settings、SQLAlchemy 2、pypdf、SQLite WAL、APScheduler，部署以單一 Uvicorn worker＋PM2 在 Linux/GCP 免費主機運行，Cloudflare 負責反向代理與分層快取。
 
@@ -29,6 +29,7 @@ flowchart LR
 | --- | --- |
 | `index.html`、`style.css`、`static/js/app.js` | 前台入口、分頁、主題、公告、SW 註冊；協調 upload/history/preview |
 | `admin.html`、`admin.css`、`static/js/admin/app.js` | 後台入口，協調 orders/announcements/pdf-modal/gift-cards |
+| `static/js/admin/pdf-modal.js`、`pdf-print.js` | 後台 PDF 預覽 dialog、下載與列印。pdf-print 以同源 blob 放進畫面外 iframe，交給瀏覽器內建檢視器叫出列印對話框；不經 PDF.js 重繪，不 import 入口或 pdf-engine，只在 `navigator.pdfViewerEnabled` 為 true 時顯示 |
 | `static/material-common.css` | 前後台共用 M3 token、六組配色與 `html.dark`、`.hidden`、對話框與焦點／減少動態政策；style.css 與 admin.css 都 `@import` 它 |
 | `static/js/upload.js` | 最多 5 份本地 PDF、依序頁數解析、設定、試算、依序 multipart 上傳與重試 |
 | `static/js/history.js`、`gift-card.js` | 姓名查詢分頁、唯讀進度；禮物卡套用查詢及過期回應防護 |
@@ -52,7 +53,7 @@ flowchart LR
 2. `/api/upload` 先逐塊驗證副檔名、大小、magic，寫同目錄 `.part`，限制 PDF 解析併發，成功後原子改名，再以交易建立訂單及折抵。未提交失敗清除檔案並 rollback。檔案與 SQLite 是兩種儲存，斷電一致性仍有待改進，不能宣稱跨儲存完全 ACID。
 3. 金額為新台幣整數，`amount_due = max(0, total_price - gift_card_discount)`。SQLite `BEGIN IMMEDIATE` 必須先於讀取餘額／收款狀態；UUID request_id＋內容指紋＋收據與扣款在同一交易。不能把重送當新交易或解除財務狀態保護。
 4. 管理員實收不足拒絕，剛好不發卡，多付差額自動發卡。取消未列印訂單只退折抵至原卡，現金退款另行處理，原多付款發出的卡保留。刪除／清理不退款，帳目／收據不得隨訂單刪除。
-5. 原始 PDF 不轉圖、不改寫；fit／cover 為前端預覽與列印偏好。遠端 PDF 支援 200／206／416 Range，使用者預覽驗證姓名、管理下載驗證 Basic Auth。
+5. 原始 PDF 不轉圖、不改寫；fit／cover 為前端預覽與列印偏好。遠端 PDF 支援 200／206／416 Range，使用者預覽驗證姓名、管理下載與列印驗證 Basic Auth。
 6. 主頁原始碼或版本化 Vite HTML依 APP_BUILD_ID 選擇。正式模式缺少匹配產物拒絕啟動；`/health` 同時回報後端與前端版本。PDF 引擎不可進入初始 bundle，初始 JS/CSS 最多 4 個請求、100 KiB Brotli。
 
 ## API 與資料模型
